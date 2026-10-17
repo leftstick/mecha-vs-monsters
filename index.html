@@ -15,30 +15,49 @@
   #scan{position:fixed;inset:0;pointer-events:none;z-index:40;
     background:repeating-linear-gradient(0deg,rgba(0,0,0,0.12) 0px,rgba(0,0,0,0.12) 1px,transparent 1px,transparent 3px);
     mix-blend-mode:multiply;}
-  /* HUD */
-  #hud{position:fixed;top:0;left:0;right:0;z-index:20;padding:8px 96px 8px 12px;display:flex;justify-content:space-between;align-items:center;pointer-events:none;text-shadow:1px 1px 0 #000;gap:6px;flex-wrap:nowrap;}
-  .hud-cell{background:rgba(0,20,40,0.6);border:1px solid #0af;padding:4px 10px;font-weight:bold;font-size:clamp(11px,2.8vw,15px);border-radius:3px;letter-spacing:1px;color:#0df;}
+  /* HUD — 科幻半透明面板 */
+  #hud{position:fixed;top:0;left:0;right:0;z-index:20;margin:8px 96px 8px 8px;padding:7px 12px;display:flex;justify-content:space-between;align-items:center;pointer-events:none;text-shadow:1px 1px 0 #000;gap:8px;flex-wrap:nowrap;
+    background:linear-gradient(180deg,rgba(0,40,70,0.55),rgba(0,15,30,0.35));
+    border:1px solid rgba(0,229,255,0.45);border-radius:6px;
+    box-shadow:0 0 14px rgba(0,170,255,0.25),inset 0 0 12px rgba(0,100,160,0.18);
+    backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);}
+  .hud-cell{background:rgba(0,25,50,0.55);border:1px solid rgba(0,200,255,0.5);padding:4px 11px;font-weight:bold;font-size:clamp(11px,2.8vw,15px);border-radius:3px;letter-spacing:1px;color:#0df;
+    box-shadow:inset 0 0 6px rgba(0,170,255,0.15);clip-path:polygon(6px 0,100% 0,calc(100% - 6px) 100%,0 100%);}
   .hud-cell b{color:#fff;}
   #hpBar{display:flex;gap:3px;align-items:center;}
-  .hp{width:clamp(10px,2.6vw,16px);height:clamp(10px,2.6vw,16px);background:#ff3050;clip-path:polygon(50% 0,100% 38%,82% 100%,18% 100%,0 38%);box-shadow:0 0 6px #ff3050;}
+  .hp{width:clamp(10px,2.6vw,16px);height:clamp(10px,2.6vw,16px);background:#ff3050;clip-path:polygon(50% 0,100% 38%,82% 100%,18% 100%,0 38%);box-shadow:0 0 6px #ff3050;transition:filter .15s;}
   .hp.empty{background:#331020;box-shadow:none;}
   #shieldBar{display:flex;gap:3px;align-items:center;}
   .sd{width:clamp(9px,2.2vw,13px);height:clamp(9px,2.2vw,13px);background:#00e5ff;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);box-shadow:0 0 6px #00e5ff;}
   .sd.empty{background:#0a2030;box-shadow:none;}
   /* 触控 */
   #touchArea{position:fixed;inset:0;z-index:15;display:none;}
-  /* 覆盖层 */
+  /* 覆盖层 — 科幻玻璃拟态 */
   .ov{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    background:radial-gradient(ellipse at center,rgba(5,10,30,0.92),rgba(2,4,12,0.98));text-align:center;padding:20px;}
+    background:
+      radial-gradient(ellipse at center,rgba(8,16,40,0.82),rgba(2,4,12,0.96)),
+      repeating-linear-gradient(0deg,rgba(0,170,255,0.04) 0,rgba(0,170,255,0.04) 1px,transparent 1px,transparent 28px),
+      repeating-linear-gradient(90deg,rgba(0,170,255,0.04) 0,rgba(0,170,255,0.04) 1px,transparent 1px,transparent 28px);
+    text-align:center;padding:20px;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);}
   .ov.hidden{display:none;}
+  /* 四角 HUD 装饰括号 */
+  .ov::before,.ov::after{content:'';position:absolute;width:28px;height:28px;border:2px solid rgba(0,229,255,0.55);pointer-events:none;}
+  .ov::before{top:14px;left:14px;border-right:none;border-bottom:none;}
+  .ov::after{bottom:14px;right:14px;border-left:none;border-top:none;}
   .title{font-size:clamp(30px,9vw,64px);font-weight:900;color:#00e5ff;
-    text-shadow:0 0 20px #00e5ff,0 0 40px #0088ff,3px 3px 0 #003;letter-spacing:0.08em;margin-bottom:4px;}
-  .subtitle{font-size:clamp(11px,3.2vw,20px);color:#88ccff;letter-spacing:0.4em;margin-bottom:32px;}
+    text-shadow:0 0 18px #00e5ff,0 0 38px #0088ff,0 0 2px #fff,3px 3px 0 #003;letter-spacing:0.08em;margin-bottom:4px;
+    animation:titleGlow 2.6s ease-in-out infinite;}
+  @keyframes titleGlow{0%,100%{filter:brightness(1);}50%{filter:brightness(1.25);}}
+  .subtitle{font-size:clamp(11px,3.2vw,20px);color:#88ccff;letter-spacing:0.4em;margin-bottom:32px;
+    text-shadow:0 0 8px rgba(100,180,255,0.5);}
   .btn{padding:12px 40px;font-size:clamp(15px,4vw,20px);font-weight:bold;color:#001;cursor:pointer;
-    background:linear-gradient(180deg,#00e5ff,#0099cc);border:2px solid #0ff;border-radius:4px;letter-spacing:2px;
-    box-shadow:0 0 18px rgba(0,229,255,0.5),0 4px 0 #003;margin:6px;}
-  .btn:active{transform:translateY(3px);box-shadow:0 0 12px rgba(0,229,255,0.4),0 1px 0 #003;}
-  .btn.ghost{background:transparent;color:#00e5ff;box-shadow:none;}
+    background:linear-gradient(180deg,#33eeff,#0099cc);border:2px solid #0ff;border-radius:4px;letter-spacing:2px;
+    box-shadow:0 0 18px rgba(0,229,255,0.55),inset 0 1px 0 rgba(255,255,255,0.4),0 4px 0 #003;margin:6px;
+    transition:transform .1s,box-shadow .15s,filter .15s;}
+  .btn:hover{filter:brightness(1.12);box-shadow:0 0 26px rgba(0,229,255,0.8),inset 0 1px 0 rgba(255,255,255,0.4),0 4px 0 #003;}
+  .btn:active{transform:translateY(3px);box-shadow:0 0 12px rgba(0,229,255,0.4),inset 0 1px 0 rgba(255,255,255,0.2),0 1px 0 #003;}
+  .btn.ghost{background:rgba(0,40,70,0.4);color:#00e5ff;border:1px solid rgba(0,229,255,0.5);box-shadow:inset 0 0 10px rgba(0,170,255,0.12);}
+  .btn.ghost:hover{background:rgba(0,80,130,0.55);box-shadow:0 0 16px rgba(0,229,255,0.4),inset 0 0 10px rgba(0,170,255,0.2);}
   /* 手柄选中态：高亮发光 + 轻微放大 */
   .gp-sel{outline:3px solid #fff;outline-offset:2px;box-shadow:0 0 22px #0ff,0 0 44px #0ff;transform:scale(1.06);transition:.12s;}
   .btn.ghost.gp-sel{background:rgba(0,229,255,0.28);color:#fff;}
@@ -51,10 +70,14 @@
   .lv .best{font-size:10px;color:#6f8;margin-top:3px;}
   .lv.locked{opacity:0.4;border-color:#555;cursor:not-allowed;}
   .lv.locked .num{color:#888;}
-  .ov-stat{font-size:clamp(13px,3.5vw,18px);color:#aaf;margin:5px 0;}
-  .ov-stat b{color:#ffd23f;font-size:1.2em;}
-  .rank{font-size:clamp(42px,12vw,80px);color:#ffd23f;text-shadow:0 0 20px #ff8800,4px 4px 0 #000;margin:6px 0;}
-  .hint{font-size:11px;color:#668;margin-top:18px;line-height:1.7;}
+  .ov-stat{font-size:clamp(13px,3.5vw,18px);color:#aaf;margin:5px 0;padding:4px 14px;
+    background:rgba(0,30,60,0.4);border:1px solid rgba(0,170,255,0.3);border-radius:4px;
+    box-shadow:inset 0 0 8px rgba(0,100,160,0.15);}
+  .ov-stat b{color:#ffd23f;font-size:1.2em;text-shadow:0 0 8px rgba(255,200,60,0.6);}
+  .rank{font-size:clamp(42px,12vw,80px);color:#ffd23f;text-shadow:0 0 22px #ff8800,0 0 44px #ff5500,4px 4px 0 #000;margin:6px 0;
+    animation:rankPulse 1.8s ease-in-out infinite;}
+  @keyframes rankPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.06);}}
+  .hint{font-size:11px;color:#668;margin-top:18px;line-height:1.7;opacity:0.8;}
   /* Boss 预告 (荒野大镖客风格) */
   #ovBossIntro{background:radial-gradient(ellipse at center,rgba(40,0,0,0.94),rgba(10,0,0,0.99));}
   .boss-intro{animation:bossShake 0.5s ease-out;max-width:90%;}
@@ -186,6 +209,7 @@ const CFG = {
   maxHP: 6,
   invulnTime: 1.2,
   baseMonsterSpeed: 80,
+  maxParticles: 400, // 粒子上限，防止卡顿
   // 难度曲线: 每关递增, 速度倍率 & 射击间隔缩短
   difficulty: [1.0, 1.1, 1.2, 1.35, 1.5, 1.65, 1.85, 2.1],
 };
@@ -306,6 +330,7 @@ let player = {
   shield: GAME_CONFIG.maxShield,
   maxShield: GAME_CONFIG.maxShield,
   shieldRegenTimer: 0, // 受伤后回盾冷却
+  shieldPulse: 0,      // 护盾受击冲击环（0-1，衰减）
   invuln: 0,
   fireCD: 0,
   tilt: 0,
@@ -541,14 +566,37 @@ document.getElementById('touchArea').style.display = 'block';
 function initStars(level) {
   const lv = LEVELS[level];
   game.stars = [];
-  for (let i = 0; i < 80; i++) {
-    game.stars.push({
+  // 三层视差星空：远(小/慢/暗) / 中 / 近(大/快/亮)
+  const layers = [
+    { count: 60, size: [0.4, 1.2], speed: [10, 28], alpha: [0.2, 0.5] },   // 远
+    { count: 50, size: [1.0, 2.2], speed: [30, 60], alpha: [0.4, 0.85] },  // 中
+    { count: 30, size: [1.8, 3.2], speed: [80, 150], alpha: [0.6, 1.0] },  // 近
+  ];
+  for (const L of layers) {
+    for (let i = 0; i < L.count; i++) {
+      game.stars.push({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        size: rand(L.size[0], L.size[1]),
+        speed: rand(L.speed[0], L.speed[1]),
+        color: lv.starColor,
+        alpha: rand(L.alpha[0], L.alpha[1]),
+        tw: Math.random() * Math.PI * 2, // 闪烁相位
+      });
+    }
+  }
+  // 废墟碎片：漂浮的金属残骸（远景废墟感）
+  game.debris = [];
+  for (let i = 0; i < 14; i++) {
+    game.debris.push({
       x: Math.random() * W,
       y: Math.random() * H,
-      size: rand(0.5, 2.5),
-      speed: rand(20, 80),
-      color: lv.starColor,
-      alpha: rand(0.3, 1),
+      size: rand(6, 22),
+      speed: rand(6, 18),
+      rot: Math.random() * Math.PI * 2,
+      rotSpeed: rand(-0.4, 0.4),
+      alpha: rand(0.12, 0.32),
+      shape: Math.floor(Math.random() * 3),
     });
   }
 }
@@ -1023,6 +1071,22 @@ function drawPlayer() {
     ctx.lineWidth = 6;
     ctx.beginPath();
     ctx.arc(0, 0, 34, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // 护盾受击冲击环（向外扩散并淡出）
+  if (player.shieldPulse > 0) {
+    const pr = player.shieldPulse;
+    const r = 34 + (1 - pr) * 26;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = `rgba(120,240,255,${0.9 * pr})`;
+    ctx.lineWidth = 3 * pr + 1;
+    ctx.shadowColor = '#00ddff';
+    ctx.shadowBlur = 18 * pr;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
     ctx.stroke();
     ctx.shadowBlur = 0;
     ctx.globalCompositeOperation = 'source-over';
@@ -2006,6 +2070,22 @@ function addExplosion(x, y, color, count = 12, power = 1) {
   }
 }
 
+// 命中火花：细小亮色碎片向外飞溅
+function addHitSparks(x, y, color) {
+  const n = 7;
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const sp = rand(80, 220);
+    game.particles.push({
+      x, y,
+      vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+      life: rand(0.12, 0.28),
+      color: Math.random() < 0.5 ? '#ffffff' : color,
+      size: rand(1.5, 3),
+    });
+  }
+}
+
 function updateParticles(dt) {
   for (let i = game.particles.length - 1; i >= 0; i--) {
     const p = game.particles[i];
@@ -2013,6 +2093,10 @@ function updateParticles(dt) {
     p.vx *= 0.96; p.vy *= 0.96;
     p.life -= dt;
     if (p.life <= 0) game.particles.splice(i, 1);
+  }
+  // 粒子上限裁剪：移除最旧的粒子防止卡顿
+  if (game.particles.length > CFG.maxParticles) {
+    game.particles.splice(0, game.particles.length - CFG.maxParticles);
   }
 }
 
@@ -2044,6 +2128,7 @@ function checkCollisions() {
         m.kbVX = kdx / kd * GAME_CONFIG.monsterKnockbackForce;
         m.kbVY = kdy / kd * GAME_CONFIG.monsterKnockbackForce;
         addExplosion(b.x, b.y, '#88ccff', 4, 0.5);
+        addHitSparks(b.x, b.y, '#aaddff');
         hitCount++;
         if (m.hp <= 0) {
           game.kills++;
@@ -2075,6 +2160,7 @@ function checkCollisions() {
         game.boss.hitFlash = GAME_CONFIG.monsterHitFlashTime;
         game.hits++;
         addExplosion(b.x, b.y, '#ffaa00', 4, 0.5);
+        addHitSparks(b.x, b.y, '#ffcc66');
         hitCount++;
         if (b.type === 'rocket') rocketExplode(b.x, b.y, 60, b.dmg);
         document.getElementById('bossFill').style.width = (game.boss.hp / game.boss.maxHp * 100) + '%';
@@ -2206,6 +2292,7 @@ function playerHit() {
   if (player.shield > 0) {
     // 护盾吸收伤害
     player.shield--;
+    player.shieldPulse = 1; // 触发护盾冲击环
     game.shake = 0.15;
     addExplosion(player.x, player.y, '#00ddff', 8, 0.6);
     sfx('hit');
@@ -2545,15 +2632,53 @@ function drawBackground(dt) {
   // 视差远景层
   drawFarLayer(lv.ground, lv);
 
-  // 星空/粒子 (中景)
+  // 星空/粒子 (中景) — 带闪烁
   for (const s of game.stars) {
     s.y += s.speed * dt;
     if (s.y > H) { s.y = 0; s.x = Math.random() * W; }
-    ctx.globalAlpha = s.alpha;
+    const tw = 0.6 + 0.4 * Math.sin(game.time * 3 + s.tw);
+    ctx.globalAlpha = s.alpha * tw;
     ctx.fillStyle = s.color;
     ctx.fillRect(s.x, s.y, s.size, s.size);
   }
   ctx.globalAlpha = 1;
+
+  // 废墟碎片 (漂浮金属残骸)
+  if (game.debris) {
+    for (const d of game.debris) {
+      d.y += d.speed * dt;
+      d.rot += d.rotSpeed * dt;
+      if (d.y > H + d.size) { d.y = -d.size; d.x = Math.random() * W; }
+      ctx.save();
+      ctx.translate(d.x, d.y);
+      ctx.rotate(d.rot);
+      ctx.globalAlpha = d.alpha;
+      ctx.fillStyle = '#7a7a8a';
+      ctx.strokeStyle = '#3a3a48';
+      ctx.lineWidth = 1;
+      if (d.shape === 0) {
+        // 断裂装甲板
+        ctx.beginPath();
+        ctx.moveTo(-d.size, -d.size * 0.5);
+        ctx.lineTo(d.size * 0.6, -d.size * 0.8);
+        ctx.lineTo(d.size, d.size * 0.3);
+        ctx.lineTo(-d.size * 0.4, d.size * 0.7);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+      } else if (d.shape === 1) {
+        // I 型梁
+        ctx.fillRect(-d.size * 0.2, -d.size, d.size * 0.4, d.size * 2);
+        ctx.fillRect(-d.size, -d.size * 0.15, d.size * 2, d.size * 0.3);
+      } else {
+        // 圆管截面
+        ctx.beginPath();
+        ctx.ellipse(0, 0, d.size * 0.5, d.size, 0, 0, Math.PI * 2);
+        ctx.fill(); ctx.stroke();
+      }
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  }
 
   // 地形 (近景底部)
   if (lv.ground) drawGround(lv.ground);
@@ -3420,6 +3545,8 @@ function update(dt) {
   } else if (player.shield < player.maxShield) {
     player.shield = Math.min(player.maxShield, player.shield + GAME_CONFIG.shieldRegenRate * dt);
   }
+  // 护盾冲击环衰减
+  if (player.shieldPulse > 0) player.shieldPulse = Math.max(0, player.shieldPulse - dt * 2.5);
   player.fireCD -= dt;
   // 武器持续时间
   if (player.weaponTime > 0) {
@@ -3439,11 +3566,53 @@ function update(dt) {
 
 function render() {
   if (game.state === 'title' || game.state === 'level') {
-    // 标题背景
-    ctx.fillStyle = '#050a18';
-    ctx.fillRect(0, 0, W, H);
-    for (const s of game.stars) { s.y += 20 * 0.016; if (s.y > H) { s.y = 0; s.x = Math.random() * W; } ctx.globalAlpha = s.alpha; ctx.fillStyle = s.color; ctx.fillRect(s.x, s.y, s.size, s.size); }
+    // 标题背景：深空渐变 + 星云 + 视差星空 + 漂浮废墟
+    const tt = performance.now() / 1000;
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, '#050818'); bg.addColorStop(0.5, '#0a1030'); bg.addColorStop(1, '#1a0a2e');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+    // 星云光晕
+    const n1 = ctx.createRadialGradient(W*0.2, H*0.3, 5, W*0.2, H*0.3, W*0.5);
+    n1.addColorStop(0, 'rgba(80,40,160,0.35)'); n1.addColorStop(1, 'rgba(80,40,160,0)');
+    ctx.fillStyle = n1; ctx.fillRect(0, 0, W, H);
+    const n2 = ctx.createRadialGradient(W*0.8, H*0.6, 5, W*0.8, H*0.6, W*0.45);
+    n2.addColorStop(0, 'rgba(0,140,200,0.28)'); n2.addColorStop(1, 'rgba(0,140,200,0)');
+    ctx.fillStyle = n2; ctx.fillRect(0, 0, W, H);
+    // 星空（带闪烁）
+    for (const s of game.stars) {
+      s.y += 20 * 0.016;
+      if (s.y > H) { s.y = 0; s.x = Math.random() * W; }
+      const tw = 0.6 + 0.4 * Math.sin(tt * 3 + s.tw);
+      ctx.globalAlpha = s.alpha * tw;
+      ctx.fillStyle = s.color;
+      ctx.fillRect(s.x, s.y, s.size, s.size);
+    }
     ctx.globalAlpha = 1;
+    // 漂浮废墟
+    if (game.debris) {
+      for (const d of game.debris) {
+        d.y += d.speed * 0.016;
+        d.rot += d.rotSpeed * 0.016;
+        if (d.y > H + d.size) { d.y = -d.size; d.x = Math.random() * W; }
+        ctx.save();
+        ctx.translate(d.x, d.y); ctx.rotate(d.rot);
+        ctx.globalAlpha = d.alpha;
+        ctx.fillStyle = '#7a7a8a';
+        if (d.shape === 0) {
+          ctx.beginPath();
+          ctx.moveTo(-d.size, -d.size*0.5); ctx.lineTo(d.size*0.6, -d.size*0.8);
+          ctx.lineTo(d.size, d.size*0.3); ctx.lineTo(-d.size*0.4, d.size*0.7);
+          ctx.closePath(); ctx.fill();
+        } else if (d.shape === 1) {
+          ctx.fillRect(-d.size*0.2, -d.size, d.size*0.4, d.size*2);
+          ctx.fillRect(-d.size, -d.size*0.15, d.size*2, d.size*0.3);
+        } else {
+          ctx.beginPath(); ctx.ellipse(0, 0, d.size*0.5, d.size, 0, 0, Math.PI*2); ctx.fill();
+        }
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+    }
     return;
   }
   if (game.state === 'pause' || game.state === 'over' || game.state === 'bossIntro') {
