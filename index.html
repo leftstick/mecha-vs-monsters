@@ -1746,10 +1746,14 @@ function fireBullet() {
     game.shots += 3;
     sfx('rocket');
   }
-  // 炮口闪光粒子
-  for (let i = 0; i < 3; i++) {
-    game.particles.push({ x: player.x + rand(-4, 4), y: player.y - 24, vx: rand(-30, 30), vy: rand(-50, -10), life: 0.15, color: '#aaffff', size: 3 });
+  // 炮口闪光（按武器着色 + 亮白核）
+  const mx = player.x, my = player.y - 24;
+  const mfColor = w === 'shotgun' ? '#ffe08a' : w === 'rocket' ? '#ffb066' : '#bff7ff';
+  for (let i = 0; i < 8; i++) {
+    game.particles.push({ x: mx + rand(-5, 5), y: my, vx: rand(-60, 60), vy: rand(-90, -10), life: 0.25, color: mfColor, size: rand(2, 5) });
   }
+  game.particles.push({ x: mx, y: my, vx: 0, vy: -20, life: 0.3, color: '#ffffff', size: 10 });
+  game.particles.push({ x: mx, y: my, vx: 0, vy: -10, life: 0.3, color: mfColor, size: 7 });
 }
 
 function updateBullets(dt) {
@@ -1777,6 +1781,9 @@ function updateBullets(dt) {
       }
     }
     b.x += b.vx * dt; b.y += b.vy * dt;
+    // 子弹拖尾（颜色随武器类型）
+    const tCol = b.type === 'laser' ? '#7ff7ff' : b.type === 'shotgun' ? '#ffe066' : b.type === 'rocket' ? '#ff9933' : '#33eaff';
+    game.particles.push({ x: b.x, y: b.y, vx: -b.vx * 0.04, vy: -b.vy * 0.04, life: 0.15, color: tCol, size: b.type === 'laser' ? 5 : 3 });
     if (b.y < -20 || b.y > H + 20 || b.x < -20 || b.x > W + 20) game.bullets.splice(i, 1);
   }
   for (let i = game.enemyBullets.length - 1; i >= 0; i--) {
