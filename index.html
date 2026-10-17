@@ -17,18 +17,21 @@
     mix-blend-mode:multiply;}
 
   /* ============ HUD 三段式 ============ */
-  #hud{position:fixed;top:0;left:0;right:0;z-index:20;padding:8px 10px;
-    display:grid;grid-template-columns:1fr auto 1fr;align-items:start;gap:8px;
-    pointer-events:none;}
+  #hud{position:fixed;top:0;left:0;right:0;bottom:0;z-index:20;padding:8px 10px 12px;
+    display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:1fr auto 1fr;
+    align-items:start;gap:8px;pointer-events:none;}
   .hud-panel{background:linear-gradient(180deg,rgba(12,18,30,0.82),rgba(6,10,18,0.7));
     border:1px solid;border-image:linear-gradient(135deg,rgba(0,229,255,0.5),rgba(0,229,255,0.1)) 1;
     border-radius:12px;padding:8px 12px;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
     box-shadow:0 0 14px rgba(0,170,255,0.12),inset 0 0 10px rgba(0,80,120,0.12);min-width:0;}
-  .hud-left{justify-self:start;text-align:left;}
-  .hud-right{justify-self:end;text-align:right;}
+  .hud-left{grid-row:1;grid-column:1;justify-self:start;text-align:left;}
+  .hud-right{grid-row:1;grid-column:3;justify-self:end;text-align:right;}
   .hud-row{display:flex;align-items:baseline;gap:8px;line-height:1.3;}
   .hud-label{font-size:10px;letter-spacing:2px;color:#5a7a9a;text-transform:uppercase;}
-  .hud-val{font-size:clamp(14px,4vw,20px);font-weight:900;color:#00e5ff;text-shadow:0 0 8px rgba(0,229,255,0.5);}
+  .hud-val{font-size:clamp(14px,4vw,20px);font-weight:900;color:#00e5ff;text-shadow:0 0 8px rgba(0,229,255,0.5);
+    display:inline-block;transition:transform .15s ease;}
+  .hud-val.bounce{animation:valBounce .28s ease;}
+  @keyframes valBounce{0%{transform:scale(1);}40%{transform:scale(1.28);}100%{transform:scale(1);}}
   .score-val{font-size:clamp(16px,4.5vw,22px);}
   .weapon-row{margin-top:4px;transition:opacity .3s;}
   .weapon-row.flash{animation:wpFlash .3s;}
@@ -38,8 +41,12 @@
   .combo-num{font-size:clamp(20px,5vw,30px);font-weight:900;color:#ffd23f;text-shadow:0 0 10px rgba(255,180,40,0.7);display:inline-block;transform-origin:right center;transition:transform .2s ease,color .2s,text-shadow .2s;}
   .combo-mult{font-size:12px;font-weight:700;color:#ff9a3c;letter-spacing:1px;}
 
-  /* 中上血条/护盾条 */
-  .hud-bars{display:flex;flex-direction:column;gap:4px;min-width:clamp(140px,38vw,280px);}
+  /* 底部血条/护盾条（居中，中间射击区留白） */
+  .hud-bars{grid-row:3;grid-column:1 / -1;justify-self:center;align-self:end;
+    display:flex;flex-direction:column;gap:4px;min-width:clamp(160px,46vw,320px);
+    padding:6px 10px;background:linear-gradient(0deg,rgba(12,18,30,0.78),rgba(6,10,18,0.55));
+    border:1px solid rgba(0,229,255,0.22);border-radius:10px;
+    box-shadow:0 0 14px rgba(0,170,255,0.1),inset 0 0 10px rgba(0,80,120,0.1);}
   .bar-wrap{display:flex;align-items:center;gap:8px;}
   .bar-label{font-size:9px;letter-spacing:2px;color:#5a7a9a;width:42px;text-align:right;flex-shrink:0;}
   .bar-track{flex:1;height:12px;background:#1a1a22;border:1px solid rgba(0,229,255,0.25);border-radius:6px;overflow:hidden;position:relative;
@@ -56,6 +63,10 @@
   #hpWrap.low .bar-track{animation:hpBlink .12s steps(2) infinite;
     border-color:#ff3b3b;box-shadow:0 0 10px rgba(255,59,59,0.6),inset 0 0 6px rgba(255,59,59,0.3);}
   @keyframes hpBlink{0%{border-color:#ff3b3b;box-shadow:0 0 12px rgba(255,59,59,0.8);}100%{border-color:rgba(255,59,59,0.3);box-shadow:none;}}
+  /* 护盾低于30%时青光闪烁 */
+  .bar-wrap.shield-low .bar-track{animation:shieldBlink .14s steps(2) infinite;
+    border-color:#00e5ff;box-shadow:0 0 10px rgba(0,229,255,0.6),inset 0 0 6px rgba(0,229,255,0.3);}
+  @keyframes shieldBlink{0%{border-color:#00e5ff;box-shadow:0 0 12px rgba(0,229,255,0.8);}100%{border-color:rgba(0,229,255,0.3);box-shadow:none;}}
   /* 护盾受击高亮 */
   #shieldWrap.hit .bar-track{animation:shieldHit .25s;}
   @keyframes shieldHit{0%{box-shadow:0 0 16px #00e5ff;}100%{box-shadow:inset 0 1px 3px rgba(0,0,0,0.6);}}
@@ -215,7 +226,7 @@
         <div class="bar-scan hp-scan"></div>
       </div>
     </div>
-    <div class="bar-wrap">
+    <div class="bar-wrap" id="shieldWrap">
       <div class="bar-label">SHIELD</div>
       <div class="bar-track">
         <div class="bar-fill shield-fill" id="shieldFill"></div>
@@ -531,6 +542,89 @@ const GAME_CONFIG = {
   },
 };
 
+/* ==================== 美术统一配置 GAME_ART_CONFIG ====================
+ * 仅管理视觉渲染参数与开关，不影响任何玩法数值。
+ * quality: high | medium | low —— 影响描边粗细、发光模糊、粒子上限、后处理强度。
+ * qv(obj)：若 obj 是 {high,medium,low} 则返回当前档位值，否则原样返回。
+ */
+const GAME_ART_CONFIG = {
+  quality: 'high',
+
+  // 实体轮廓描边（锐利无羽化）
+  outline: {
+    player:  { color: '#00e5ff', width: { high: 2, medium: 1.5, low: 1 } },
+    monster: { color: '#3a3a48', width: { high: 1.5, medium: 1.2, low: 1 } },
+    elite:   { color: '#ff3344', width: { high: 2, medium: 1.5, low: 1 } },
+  },
+
+  // 阴影
+  shadow: {
+    enabled: true,
+    color: '#0a1420',
+    monsterAlpha: 0.3,
+    playerAlpha:  { high: 0.4, medium: 0.3, low: 0.2 },
+  },
+
+  // 子弹三层结构
+  bullet: {
+    threeLayer: true,
+    glowBlur: { high: 12, medium: 8, low: 4 },
+    enemyPulse: true,
+    coreColor: '#ffffff',
+  },
+
+  // 四层纵向视差场景
+  parallax: {
+    farSpeed: 6,        // 远景星云
+    midSpeed: 18,       // 中景城市剪影霓虹
+    nearSpeed: 36,      // 近景建筑废墟
+    groundSpeed: 60,    // 地面杂物
+    fogAlpha: { high: 0.35, medium: 0.25, low: 0.15 },
+    neonAccent: '#00e5ff',
+  },
+
+  // 战斗特效
+  fx: {
+    muzzleFlash: true,
+    hitSparks: true,
+    critText: true,
+    explosionMaxBrightness: 0.9,
+    shieldPulse: true,
+    hitEdgeRed: true,
+    particleCapMult: { high: 1, medium: 0.7, low: 0.4 },
+    glowBlur: { high: 14, medium: 9, low: 5 },
+  },
+
+  // HUD / UI
+  hud: {
+    neonBorder: true,
+    lowHpBlink: true,
+    lowShieldWarn: true,
+    accent: '#00e5ff',
+    warn: '#ff3b3b',
+  },
+
+  // 可开关后处理
+  postprocess: {
+    vignette: true,
+    grain: true,
+    scanlines: false,
+    colorGrade: true,
+    vignetteStrength: { high: 0.5, medium: 0.35, low: 0 },
+    grainDensity: { high: 0.04, medium: 0.03, low: 0 },
+    scanlineAlpha: { high: 0.04, medium: 0.03, low: 0 },
+  },
+
+  // 按画质档位取值
+  qv(obj) {
+    if (obj && typeof obj === 'object' && !Array.isArray(obj) &&
+        ('high' in obj || 'medium' in obj || 'low' in obj)) {
+      return obj[this.quality] !== undefined ? obj[this.quality] : obj.high;
+    }
+    return obj;
+  },
+};
+
 /* ==================== 8 关卡定义 ==================== */
 const LEVELS = [
   { name:'太空', bg:['#0a0e2a','#1a1a4a','#2a1a5a'], starColor:'#ffffff', particle:'star', ground:null,
@@ -577,6 +671,19 @@ const BOSS_TYPES = {
 const rand = (a,b) => a + Math.random()*(b-a);
 const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
 function dist(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
+
+// 将 #rgb / #rrggbb 颜色转为 rgba(...) 字符串；非 hex 原样返回
+function hexToRgba(hex, alpha) {
+  if (typeof hex !== 'string') return hex;
+  if (hex.startsWith('rgb')) return hex;
+  let h = hex.replace('#', '');
+  if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  if (h.length !== 6) return hex;
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
 
 /* ==================== 存档 (localStorage) ==================== */
 const SAVE_KEY = 'mecha_vs_monsters_save_v1';
@@ -1500,6 +1607,31 @@ function drawPlayer() {
   ctx.fillStyle = '#7788aa';
   ctx.beginPath(); ctx.arc(0,-34,1,0,Math.PI*2); ctx.fill();
 
+  // 枪口锥形闪光（读 player.fireCD，不写状态）
+  if (GAME_ART_CONFIG.fx.muzzleFlash && player.fireCD > 0) {
+    const mfI = clamp(player.fireCD / 0.1, 0, 1);
+    if (mfI > 0.01) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const mc = { laser:'#88ddff', shotgun:'#ffd23f', rocket:'#ff8833', normal:'#ffffff' }[player.weapon] || '#ffffff';
+      // 外锥光晕
+      const mg = ctx.createRadialGradient(0, -30, 1, 0, -30, 18 * mfI);
+      mg.addColorStop(0, hexToRgba(mc, 0.8 * mfI));
+      mg.addColorStop(0.5, hexToRgba(mc, 0.3 * mfI));
+      mg.addColorStop(1, hexToRgba(mc, 0));
+      ctx.fillStyle = mg;
+      ctx.beginPath(); ctx.arc(0, -30, 18 * mfI, 0, Math.PI * 2); ctx.fill();
+      // 锥形核心
+      ctx.fillStyle = `rgba(255,255,255,${0.9 * mfI})`;
+      ctx.beginPath();
+      ctx.moveTo(0, -30 - 14 * mfI);
+      ctx.lineTo(-5 * mfI, -30);
+      ctx.lineTo(5 * mfI, -30);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+  }
+
   // ---- 武器发光指示 (机鼻下方挂点) ----
   if (player.weapon !== 'normal') {
     const wc = { laser:'#0ff', shotgun:'#fd0', rocket:'#f60' }[player.weapon];
@@ -1509,6 +1641,31 @@ function drawPlayer() {
     ctx.beginPath(); ctx.arc(0,-26,2.5,0,Math.PI*2); ctx.fill();
     ctx.globalAlpha = 1; ctx.shadowBlur = 0;
   }
+
+  // 发光部件呼吸脉动（座舱 / 翼尖 / 引擎）— 加色叠加，不写 player
+  const breath = 0.5 + 0.5 * Math.sin(game.time * 2.4);
+  const breath2 = 0.5 + 0.5 * Math.sin(game.time * 2.4 + 1.2);
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  // 座舱冷青光
+  const cgB = ctx.createRadialGradient(0, -14, 1, 0, -14, 12);
+  cgB.addColorStop(0, `rgba(120,240,255,${0.45 * breath})`);
+  cgB.addColorStop(1, 'rgba(120,240,255,0)');
+  ctx.fillStyle = cgB;
+  ctx.beginPath(); ctx.arc(0, -14, 12, 0, Math.PI * 2); ctx.fill();
+  // 左翼尖
+  const wl = ctx.createRadialGradient(-36, 14, 1, -36, 14, 10);
+  wl.addColorStop(0, `rgba(0,200,255,${0.35 * breath2})`);
+  wl.addColorStop(1, 'rgba(0,200,255,0)');
+  ctx.fillStyle = wl;
+  ctx.beginPath(); ctx.arc(-36, 14, 10, 0, Math.PI * 2); ctx.fill();
+  // 右翼尖
+  const wr = ctx.createRadialGradient(36, 14, 1, 36, 14, 10);
+  wr.addColorStop(0, `rgba(0,200,255,${0.35 * breath2})`);
+  wr.addColorStop(1, 'rgba(0,200,255,0)');
+  ctx.fillStyle = wr;
+  ctx.beginPath(); ctx.arc(36, 14, 10, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
 
   // 护盾环（护盾 > 0 时显示，残盾时闪烁）
   if (player.shield > 0) {
@@ -1548,6 +1705,31 @@ function drawPlayer() {
     ctx.globalCompositeOperation = 'source-over';
   }
 
+  // 动态引擎投影（随喷焰脉动，不写 player）
+  const ACp = GAME_ART_CONFIG;
+  if (ACp.shadow.enabled) {
+    const sp = 0.5 + 0.5 * Math.sin(game.time * 18);
+    ctx.save();
+    ctx.globalAlpha = ACp.qv(ACp.shadow.playerAlpha) * (0.6 + 0.4 * sp);
+    ctx.fillStyle = ACp.shadow.color;
+    ctx.beginPath();
+    ctx.ellipse(0, 26, 22, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // 外轮廓描边（冷青，锐利无羽化）
+  ctx.save();
+  ctx.strokeStyle = ACp.outline.player.color;
+  ctx.lineWidth = ACp.qv(ACp.outline.player.width);
+  ctx.beginPath();
+  ctx.moveTo(0, -30);
+  ctx.lineTo(38, 16); ctx.lineTo(16, 20);
+  ctx.lineTo(-16, 20); ctx.lineTo(-38, 16);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.restore();
+
   ctx.restore();
 }
 
@@ -1557,12 +1739,30 @@ function drawMonster(m) {
   ctx.save();
   ctx.translate(x, y);
 
+  // 精英判定（提前，供描边配色使用）
+  const isElite = GAME_CONFIG.eliteWarning.eliteTypes.includes(m.type);
+  const AC = GAME_ART_CONFIG;
+  const olW = AC.qv(isElite ? AC.outline.elite.width : AC.outline.monster.width);
+  const olC = isElite ? AC.outline.elite.color : AC.outline.monster.color;
+
+  // 固定椭圆冷灰阴影（透明度 0.3）
+  if (AC.shadow.enabled) {
+    ctx.save();
+    ctx.globalAlpha = AC.shadow.monsterAlpha;
+    ctx.fillStyle = AC.shadow.color;
+    ctx.beginPath();
+    ctx.ellipse(0, 18 * s, 13 * s, 4 * s, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   if (m.type === 'octopus') {
     // 生化机械章鱼: 金属头壳 + 发光脉络 + 分段机械触手
     const hg = ctx.createRadialGradient(-4*s,-6*s,2*s, 0,-4*s,15*s);
     hg.addColorStop(0,'#5a3a7a'); hg.addColorStop(0.6,'#3a1a5a'); hg.addColorStop(1,'#1a0a2a');
     ctx.fillStyle = hg;
     ctx.beginPath(); ctx.arc(0,-4*s,14*s,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle = olC; ctx.lineWidth = olW; ctx.stroke();
     // 头壳装甲板
     ctx.fillStyle = 'rgba(20,10,30,0.5)';
     ctx.beginPath(); ctx.arc(0,-4*s,14*s,Math.PI*0.15,Math.PI*0.85); ctx.lineTo(0,-4*s); ctx.fill();
@@ -1610,6 +1810,7 @@ function drawMonster(m) {
       ctx.beginPath();
       ctx.ellipse(0,-8*s+i*8*s,(12-i*1.5)*s,(5-i*0.5)*s,0,0,Math.PI*2);
       ctx.fill();
+      ctx.strokeStyle = olC; ctx.lineWidth = olW; ctx.stroke();
       // 装甲板缝
       ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.ellipse(0,-8*s+i*8*s,(12-i*1.5)*s,(5-i*0.5)*s,0,0,Math.PI*2); ctx.stroke();
@@ -1660,6 +1861,7 @@ function drawMonster(m) {
     ctx.moveTo(-22*s,4*s); ctx.lineTo(-16*s,10*s); ctx.lineTo(16*s,10*s);
     ctx.lineTo(22*s,4*s); ctx.lineTo(16*s,-2*s); ctx.lineTo(-16*s,-2*s);
     ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = olC; ctx.lineWidth = olW; ctx.stroke();
     // 中层舰桥
     const mg = ctx.createLinearGradient(0,-6*s,0,4*s);
     mg.addColorStop(0,'#5a6a7a'); mg.addColorStop(1,'#334252');
@@ -1701,6 +1903,7 @@ function drawMonster(m) {
     ctx.beginPath();
     ctx.moveTo(0,-15*s); ctx.lineTo(9*s,0); ctx.lineTo(6*s,14*s);
     ctx.lineTo(-6*s,14*s); ctx.lineTo(-9*s,0); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = olC; ctx.lineWidth = olW; ctx.stroke();
     // 甲壳分割线
     ctx.strokeStyle = 'rgba(80,140,60,0.5)'; ctx.lineWidth = 1.2*s;
     ctx.beginPath(); ctx.moveTo(0,-15*s); ctx.lineTo(0,14*s); ctx.stroke();
@@ -1741,6 +1944,7 @@ function drawMonster(m) {
     ctx.moveTo(-16*s,-4*s); ctx.lineTo(-18*s,4*s); ctx.lineTo(-16*s,14*s);
     ctx.lineTo(16*s,14*s); ctx.lineTo(18*s,4*s); ctx.lineTo(16*s,-4*s);
     ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = olC; ctx.lineWidth = olW; ctx.stroke();
     // 装甲铆钉
     ctx.fillStyle = '#888';
     for (let j = -1; j <= 1; j++) {
@@ -1803,6 +2007,7 @@ function drawMonster(m) {
     ctx.lineTo(12*s,-14*s); ctx.lineTo(28*s,-8*s); ctx.lineTo(40*s,8*s);
     ctx.lineTo(20*s,14*s); ctx.lineTo(-20*s,14*s);
     ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = olC; ctx.lineWidth = olW; ctx.stroke();
     // 翼面折线 (隐身切面)
     ctx.strokeStyle = 'rgba(120,90,60,0.4)'; ctx.lineWidth = 1*s;
     ctx.beginPath();
@@ -1844,7 +2049,6 @@ function drawMonster(m) {
   }
 
   // 精英怪：缓慢旋转的红色发光环 + 头顶 ★ 标记（仅渲染，不改属性）
-  const isElite = GAME_CONFIG.eliteWarning.eliteTypes.includes(m.type);
   if (isElite) {
     const er = GAME_CONFIG.eliteRing;
     const ringR = 24 * s;
@@ -2491,63 +2695,158 @@ function updateBullets(dt) {
 
 function drawBullets() {
   const bc = GAME_CONFIG.bulletColors;
+  const AC = GAME_ART_CONFIG;
+  const glowBlur = AC.qv(AC.bullet.glowBlur);
+  const tl = AC.bullet.threeLayer;
+
+  // ---- 玩家子弹：三层结构（光晕 + 深色内圈 + 高亮核心） ----
   for (const b of game.bullets) {
     if (b.type === 'laser') {
       // 穿透弹：冰蓝色粗光柱
       const col = bc.laser;
-      ctx.fillStyle = col;
+      ctx.save();
       ctx.shadowColor = col;
-      ctx.shadowBlur = 12;
+      ctx.shadowBlur = glowBlur;
+      // 光晕底层
+      ctx.fillStyle = 'rgba(120,220,255,0.35)';
+      ctx.fillRect(b.x - 6, b.y - 14, 12, 24);
+      // 深色内圈
+      ctx.fillStyle = '#1a5a78';
       ctx.fillRect(b.x - 4, b.y - 14, 8, 24);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(b.x - 2, b.y - 14, 4, 24);
+      // 高亮核心
       ctx.shadowBlur = 0;
+      ctx.fillStyle = col;
+      ctx.fillRect(b.x - 3, b.y - 14, 6, 24);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(b.x - 1, b.y - 14, 2, 24);
+      ctx.restore();
     } else if (b.type === 'shotgun') {
       // 霰弹：金黄小球
       const col = bc.shotgun;
-      ctx.fillStyle = col;
-      ctx.shadowColor = '#ffaa00';
-      ctx.shadowBlur = 6;
-      ctx.beginPath(); ctx.arc(b.x, b.y, 4, 0, Math.PI * 2); ctx.fill();
-      ctx.shadowBlur = 0;
+      ctx.save();
+      const r = 4;
+      if (tl) {
+        ctx.shadowColor = '#ffaa00';
+        ctx.shadowBlur = glowBlur * 0.6;
+        ctx.fillStyle = 'rgba(255,200,60,0.35)';
+        ctx.beginPath(); ctx.arc(b.x, b.y, r + 2, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#7a4a00';
+        ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = col;
+        ctx.beginPath(); ctx.arc(b.x, b.y, r * 0.6, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#fff8d0';
+        ctx.beginPath(); ctx.arc(b.x - 0.8, b.y - 0.8, r * 0.25, 0, Math.PI * 2); ctx.fill();
+      } else {
+        ctx.fillStyle = col;
+        ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
     } else if (b.type === 'rocket') {
       // 爆炸弹：橙红色带尾焰
       const col = bc.rocket;
-      ctx.fillStyle = col;
+      ctx.save();
       ctx.shadowColor = '#ff2200';
-      ctx.shadowBlur = 8;
-      ctx.beginPath();
-      ctx.moveTo(b.x, b.y - 8); ctx.lineTo(b.x + 4, b.y + 6); ctx.lineTo(b.x - 4, b.y + 6);
-      ctx.closePath(); ctx.fill();
-      ctx.shadowBlur = 0;
+      ctx.shadowBlur = glowBlur * 0.7;
       // 尾焰
-      ctx.fillStyle = 'rgba(255,180,80,0.6)';
-      ctx.beginPath(); ctx.arc(b.x, b.y + 8, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,180,80,0.55)';
+      ctx.beginPath(); ctx.arc(b.x, b.y + 8, 4, 0, Math.PI * 2); ctx.fill();
+      // 深色内圈
+      ctx.fillStyle = '#5a1a00';
+      ctx.beginPath();
+      ctx.moveTo(b.x, b.y - 9); ctx.lineTo(b.x + 5, b.y + 7); ctx.lineTo(b.x - 5, b.y + 7);
+      ctx.closePath(); ctx.fill();
+      // 高亮核心
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.moveTo(b.x, b.y - 8); ctx.lineTo(b.x + 3, b.y + 5); ctx.lineTo(b.x - 3, b.y + 5);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#fff0c0';
+      ctx.beginPath(); ctx.arc(b.x, b.y - 1, 1.6, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
     } else {
-      // 普通弹：白色能量弹
+      // 普通弹：冷白/冰蓝能量弹
       const col = bc.normal;
+      ctx.save();
+      if (tl) {
+        ctx.shadowColor = col;
+        ctx.shadowBlur = glowBlur * 0.7;
+        // 光晕
+        ctx.fillStyle = 'rgba(180,230,255,0.3)';
+        ctx.beginPath();
+        ctx.ellipse(b.x, b.y, 5, 12, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        // 深色内圈
+        ctx.fillStyle = '#2a4a66';
+        ctx.beginPath();
+        ctx.ellipse(b.x, b.y, 3, 10, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // 高亮核心
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.ellipse(b.x, b.y, 1.6, 7, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(b.x - 0.8, b.y - 5, 1.6, 10);
+      } else {
+        ctx.fillStyle = col;
+        ctx.shadowColor = col;
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.ellipse(b.x, b.y, 3, 10, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.fillRect(b.x - 1, b.y, 2, 8);
+      }
+      ctx.restore();
+    }
+  }
+
+  // ---- 敌方子弹：橙红/红三层，大型弹幕脉动发光 ----
+  for (const b of game.enemyBullets) {
+    const col = b.color || '#ff4444';
+    const rad = b.radius || 5;
+    ctx.save();
+    if (tl) {
+      const big = rad >= 6;
+      const pulse = big && AC.bullet.enemyPulse
+        ? 0.75 + 0.25 * Math.sin(game.time * 10 + b.x * 0.1)
+        : 1;
+      ctx.shadowColor = col;
+      ctx.shadowBlur = (big ? glowBlur : glowBlur * 0.6) * pulse;
+      // 外层光晕
+      ctx.fillStyle = hexToRgba(col, 0.32 * pulse);
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, rad + 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      // 深色内圈
+      ctx.fillStyle = '#3a0a0a';
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, rad, 0, Math.PI * 2);
+      ctx.fill();
+      // 高亮核心（偏暖橙白）
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, rad * 0.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#fff0e0';
+      ctx.beginPath();
+      ctx.arc(b.x - rad * 0.2, b.y - rad * 0.2, rad * 0.25, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
       ctx.fillStyle = col;
       ctx.shadowColor = col;
       ctx.shadowBlur = 8;
       ctx.beginPath();
-      ctx.ellipse(b.x, b.y, 3, 10, 0, 0, Math.PI * 2);
+      ctx.arc(b.x, b.y, rad, 0, Math.PI * 2);
       ctx.fill();
       ctx.shadowBlur = 0;
-      ctx.fillStyle = 'rgba(255,255,255,0.3)';
-      ctx.fillRect(b.x - 1, b.y, 2, 8);
     }
-  }
-  // 敌方子弹 (按类型着色)
-  for (const b of game.enemyBullets) {
-    const col = b.color || '#ff4444';
-    const rad = b.radius || 5;
-    ctx.fillStyle = col;
-    ctx.shadowColor = col;
-    ctx.shadowBlur = 8;
-    ctx.beginPath();
-    ctx.arc(b.x, b.y, rad, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
+    ctx.restore();
   }
 }
 
@@ -2561,6 +2860,8 @@ function addExplosion(x, y, color, count = 12, power = 1, lifeMult = 1) {
       vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
       life: rand(0.3, 0.7) * lifeMult,
       color, size: rand(2, 5) * power,
+      rot: Math.random() * Math.PI * 2,
+      rotSpeed: rand(-8, 8),
     });
   }
 }
@@ -2671,6 +2972,7 @@ function updateParticles(dt) {
     if (typeof p.life !== 'number' || isNaN(p.life)) p.life = dLife;
     p.x += p.vx * dt; p.y += p.vy * dt;
     p.vx *= 0.96; p.vy *= 0.96;
+    if (p.rotSpeed) p.rot = (p.rot || 0) + p.rotSpeed * dt;
     p.life -= dt;
     if (p.life <= 0) game.particles.splice(i, 1);
   }
@@ -2684,7 +2986,16 @@ function drawParticles() {
   for (const p of game.particles) {
     ctx.globalAlpha = clamp(p.life * 2, 0, 1);
     ctx.fillStyle = p.color;
-    ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+    if (p.rot !== undefined) {
+      // 带旋转的碎片：绘制旋转矩形（爆炸拆解碎片）
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+      ctx.restore();
+    } else {
+      ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+    }
   }
   ctx.globalAlpha = 1;
 }
@@ -3315,6 +3626,9 @@ function drawBackground(dt) {
   // 视差远景层
   drawFarLayer(lv.ground, lv);
 
+  // 统一四层机甲末世视差（叠加在关卡背景之上，冷灰蓝霓虹风）
+  drawParallaxLayers();
+
   // 星空/粒子 (中景) — 带闪烁
   for (const s of game.stars) {
     s.y += s.speed * dt;
@@ -3365,6 +3679,126 @@ function drawBackground(dt) {
 
   // 地形 (近景底部)
   if (lv.ground) drawGround(lv.ground);
+
+  // 纵向雾气空气透视（远景朦胧近景清晰）
+  const ACfog = GAME_ART_CONFIG;
+  const fogA = ACfog.qv(ACfog.parallax.fogAlpha);
+  if (fogA > 0) {
+    ctx.save();
+    const fogG = ctx.createLinearGradient(0, 0, 0, H);
+    fogG.addColorStop(0, `rgba(10,20,40,${fogA})`);
+    fogG.addColorStop(0.5, `rgba(10,20,40,${fogA * 0.15})`);
+    fogG.addColorStop(1, `rgba(10,20,40,${fogA * 0.7})`);
+    ctx.fillStyle = fogG;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
+}
+
+// 统一四层机甲末世视差（远景星云→中景城市霓虹→近景建筑废墟→地面杂物）
+// 纯渲染侧：偏移量由 game.time 推导，不写任何状态。
+function drawParallaxLayers() {
+  const AC = GAME_ART_CONFIG;
+  const P = AC.parallax;
+  const neon = P.neonAccent;
+  const t = game.time;
+
+  // 伪随机（确定性，避免闪烁）
+  const pr = (n) => {
+    const x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+    return x - Math.floor(x);
+  };
+
+  ctx.save();
+
+  // ---- 第 1 层：远景深空星云（最慢） ----
+  ctx.globalAlpha = 0.22;
+  const farOff = (t * P.farSpeed) % H;
+  for (let i = 0; i < 3; i++) {
+    const cy = ((i * H * 0.5 + farOff * 0.3) % (H + 200)) - 100;
+    const cx = W * (0.2 + i * 0.3);
+    const ng = ctx.createRadialGradient(cx, cy, 5, cx, cy, 160);
+    ng.addColorStop(0, i % 2 ? 'rgba(80,120,220,0.5)' : 'rgba(120,80,200,0.4)');
+    ng.addColorStop(1, 'rgba(20,30,60,0)');
+    ctx.fillStyle = ng;
+    ctx.fillRect(0, 0, W, H);
+  }
+  ctx.globalAlpha = 1;
+
+  // ---- 第 2 层：中景城市剪影 + 霓虹窗（中速） ----
+  const midOff = (t * P.midSpeed) % H;
+  ctx.fillStyle = 'rgba(12,18,30,0.55)';
+  const midBaseY = H * 0.42;
+  const midTile = 46;
+  for (let x = -midTile; x < W + midTile; x += midTile) {
+    const seed = Math.floor(x / midTile);
+    const bh = 30 + pr(seed + 1) * 70;
+    const bw = midTile * (0.7 + pr(seed + 2) * 0.3);
+    const bx = x + (midTile - bw) * 0.5;
+    const by = midBaseY - bh;
+    ctx.fillRect(bx, by, bw, bh + H * 0.6);
+    // 霓虹窗点
+    if (pr(seed + 3) > 0.4) {
+      const winCol = pr(seed + 4) > 0.5 ? neon : '#ff3b6b';
+      ctx.fillStyle = winCol;
+      ctx.globalAlpha = 0.5 + 0.3 * Math.sin(t * 2 + seed);
+      for (let wy = 0; wy < bh - 6; wy += 8) {
+        for (let wx = 3; wx < bw - 3; wx += 7) {
+          if (pr(seed * 7 + wy + wx) > 0.55) {
+            ctx.fillRect(bx + wx, by + wy + 3, 2, 3);
+          }
+        }
+      }
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = 'rgba(12,18,30,0.55)';
+    }
+  }
+
+  // ---- 第 3 层：近景建筑废墟（较快，更暗更实） ----
+  const nearOff = (t * P.nearSpeed) % H;
+  ctx.fillStyle = 'rgba(8,12,22,0.78)';
+  const nearBaseY = H * 0.72;
+  const nearTile = 70;
+  for (let x = -nearTile; x < W + nearTile; x += nearTile) {
+    const seed = Math.floor(x / nearTile) + 1000;
+    const bh = 40 + pr(seed + 1) * 110;
+    const bw = nearTile * (0.6 + pr(seed + 2) * 0.4);
+    const bx = x + (nearTile - bw) * 0.5;
+    const by = nearBaseY - bh;
+    ctx.fillRect(bx, by, bw, bh + H * 0.3);
+    // 破顶缺口
+    if (pr(seed + 5) > 0.5) {
+      ctx.fillStyle = 'rgba(10,16,28,0.78)';
+      ctx.fillRect(bx + bw * 0.3, by, bw * 0.25, 8 + pr(seed + 6) * 14);
+      ctx.fillStyle = 'rgba(8,12,22,0.78)';
+    }
+    // 边缘霓虹灯带
+    if (pr(seed + 7) > 0.6) {
+      ctx.fillStyle = neon;
+      ctx.globalAlpha = 0.45 + 0.25 * Math.sin(t * 3 + seed);
+      ctx.fillRect(bx, by + bh * 0.4, bw, 1.5);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = 'rgba(8,12,22,0.78)';
+    }
+  }
+
+  // ---- 第 4 层：地面杂物（最快，贴底） ----
+  const groundOff = (t * P.groundSpeed) % 60;
+  ctx.fillStyle = 'rgba(6,10,18,0.85)';
+  ctx.fillRect(0, H - 18, W, 18);
+  ctx.fillStyle = 'rgba(20,28,44,0.9)';
+  for (let i = 0; i < 14; i++) {
+    const gx = ((i * 53 + groundOff) % (W + 40)) - 20;
+    const gw = 4 + pr(i + 50) * 10;
+    ctx.fillRect(gx, H - 16 - pr(i + 60) * 6, gw, 3 + pr(i + 70) * 5);
+  }
+  // 地面霓虹反光线
+  ctx.fillStyle = neon;
+  ctx.globalAlpha = 0.3;
+  ctx.fillRect(0, H - 19, W, 1);
+  ctx.globalAlpha = 1;
+
+  ctx.restore();
 }
 
 // 远景层: 每关独特的视差元素
@@ -3933,6 +4367,7 @@ function getComboMult() {
 }
 
 /* ==================== HUD ==================== */
+let _lastHudScore = 0;
 function updateHUD() {
   // 左上面板：波次编号
   const lv = LEVELS[game.level];
@@ -3956,6 +4391,23 @@ function updateHUD() {
   // 护盾条进度
   const shPct = Math.max(0, player.shield / player.maxShield) * 100;
   document.getElementById('shieldFill').style.width = shPct + '%';
+  const sw = document.getElementById('shieldWrap');
+  if (sw) {
+    if (player.shield / player.maxShield <= GAME_CONFIG.ui.hpLowThreshold) {
+      sw.classList.add('shield-low');
+    } else {
+      sw.classList.remove('shield-low');
+    }
+  }
+
+  // 数值变化弹跳动效（得分变化时）
+  if (game.score !== _lastHudScore) {
+    _lastHudScore = game.score;
+    const scEl = document.getElementById('hSc');
+    scEl.classList.remove('bounce');
+    void scEl.offsetWidth;
+    scEl.classList.add('bounce');
+  }
 
   // 武器状态
   const wr = document.getElementById('weaponRow');
@@ -4357,6 +4809,68 @@ function update(dt) {
   updateHUD();
 }
 
+/* ==================== 后处理（暗角 / 颗粒 / 扫描线 / 调色） ==================== */
+function drawPostProcess() {
+  const AC = GAME_ART_CONFIG;
+  const PP = AC.postprocess;
+  ctx.save();
+
+  // 1) 调色：高对比度 + 暗部冷蓝 + 霓虹高亮提亮（overlay 混合）
+  if (PP.colorGrade) {
+    ctx.globalCompositeOperation = 'overlay';
+    const cg = ctx.createLinearGradient(0, 0, 0, H);
+    cg.addColorStop(0, 'rgba(40,80,140,0.18)');
+    cg.addColorStop(0.5, 'rgba(20,30,60,0.05)');
+    cg.addColorStop(1, 'rgba(10,20,40,0.28)');
+    ctx.fillStyle = cg;
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // 2) 弱暗角
+  if (PP.vignette) {
+    const vs = AC.qv(PP.vignetteStrength);
+    if (vs > 0) {
+      const vg = ctx.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 0.78);
+      vg.addColorStop(0, 'rgba(0,0,0,0)');
+      vg.addColorStop(1, `rgba(0,0,0,${vs})`);
+      ctx.fillStyle = vg;
+      ctx.fillRect(0, 0, W, H);
+    }
+  }
+
+  // 3) 胶片颗粒（随机像素点，按档位密度）
+  if (PP.grain) {
+    const gd = AC.qv(PP.grainDensity);
+    if (gd > 0) {
+      const n = Math.floor(W * H * gd);
+      ctx.globalAlpha = 0.5;
+      for (let i = 0; i < n; i++) {
+        const gx = (Math.random() * W) | 0;
+        const gy = (Math.random() * H) | 0;
+        ctx.fillStyle = Math.random() > 0.5 ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+        ctx.fillRect(gx, gy, 1, 1);
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // 4) 扫描线（可选）
+  if (PP.scanlines) {
+    const sa = AC.qv(PP.scanlineAlpha);
+    if (sa > 0) {
+      ctx.globalAlpha = sa;
+      ctx.fillStyle = '#000';
+      for (let y = 0; y < H; y += 3) {
+        ctx.fillRect(0, y, W, 1);
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  ctx.restore();
+}
+
 function render() {
   if (game.state === 'title' || game.state === 'level') {
     // 标题背景：深空渐变 + 星云 + 视差星空 + 漂浮废墟
@@ -4430,6 +4944,24 @@ function render() {
   drawFloatTexts();
   drawWarning();
   drawTouchUI();
+
+  // 玩家受击红边（读 player.invuln，全屏红角渐隐）
+  if (GAME_ART_CONFIG.fx.hitEdgeRed && player.invuln > 0) {
+    const reI = clamp(player.invuln / CFG.invulnTime, 0, 1) * 0.55;
+    if (reI > 0.01) {
+      ctx.save();
+      const re = ctx.createRadialGradient(W / 2, H / 2, H * 0.25, W / 2, H / 2, H * 0.75);
+      re.addColorStop(0, 'rgba(255,40,40,0)');
+      re.addColorStop(0.7, `rgba(255,40,40,${reI * 0.5})`);
+      re.addColorStop(1, `rgba(255,20,20,${reI})`);
+      ctx.fillStyle = re;
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+    }
+  }
+
+  // 后处理（暗角 / 颗粒 / 扫描线 / 调色）
+  drawPostProcess();
 }
 
 /* ==================== 关卡选择 UI ==================== */
