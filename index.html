@@ -406,6 +406,27 @@ const GAME_CONFIG = {
     shootBtnMargin: 28,          // 射击按钮距右下角边距
     shootBtnOpacity: 0.6,
   },
+
+  // 玩家边界限制：主体不出画布，允许少量武器/引擎特效露出边缘
+  playerBounds: {
+    marginX: 20,    // 水平边距：中心距画布左右的最小距离
+    marginTop: 0.25, // 顶部限制（占屏高比例）
+    marginBottom: 40, // 底部边距
+  },
+
+  // 怪兽生成范围限制
+  spawn: {
+    minY: -20,      // 生成点最小 Y（刚在屏幕上方一点，不会凭空出现在脸上）
+    maxY: -120,     // 生成点最大 Y（不能离可视区域太远）
+    marginX: 40,    // 水平边距
+    waveSpread: 1.5,// 随波次扩大生成范围的系数
+  },
+
+  // 粒子系统
+  particles: {
+    max: 400,       // 全局粒子上限
+    defaultLife: 0.3, // 粒子无 life 属性时的默认生命周期
+  },
 };
 
 /* ==================== 8 关卡定义 ==================== */
@@ -472,7 +493,9 @@ function unlockLevel(idx) {
   if (idx + 1 > save.unlocked) { save.unlocked = idx + 1; saveSave(save); }
 }
 function recordBest(idx, score) {
-  if (!save.bestScores[idx] || score > save.bestScores[idx]) {
+  // 默认值为 0；saveSave 内部已 try-catch，存储禁用时静默降级不报错
+  const cur = save.bestScores[idx] || 0;
+  if (score > cur) {
     save.bestScores[idx] = score;
     saveSave(save);
   }
@@ -701,11 +724,15 @@ function pollGamepad() {
 /* ==================== 输入 ==================== */
 addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
-  if (k==='arrowleft'||k==='a') input.left=true;
-  if (k==='arrowright'||k==='d') input.right=true;
-  if (k==='arrowup'||k==='w') input.up=true;
-  if (k==='arrowdown'||k==='s') input.down=true;
-  if (k===' '||k==='j') { input.kbShoot = true; input.shoot = true; }
+  // 非游戏中状态屏蔽移动和射击指令（但允许 ESC 暂停）
+  const canControl = game.state === 'playing';
+  if (canControl) {
+    if (k==='arrowleft'||k==='a') input.left=true;
+    if (k==='arrowright'||k==='d') input.right=true;
+    if (k==='arrowup'||k==='w') input.up=true;
+    if (k==='arrowdown'||k==='s') input.down=true;
+    if (k===' '||k==='j') { input.kbShoot = true; input.shoot = true; }
+  }
   if (k==='escape') togglePause();
   if (['arrowleft','arrowright','arrowup','arrowdown',' '].includes(k)) e.preventDefault();
 });
@@ -806,8 +833,9 @@ ta.addEventListener('pointerup', e => {
 
 function movePlayerTo(cx, cy) {
   const rect = canvas.getBoundingClientRect();
-  player.x = clamp(cx - rect.left, 30, W - 30);
-  player.y = clamp(cy - rect.top, H * 0.3, H - 50);
+  const pb = GAME_CONFIG.playerBounds;
+  player.x = clamp(cx - rect.left, pb.marginX, W - pb.marginX);
+  player.y = clamp(cy - rect.top, H * pb.marginTop, H - pb.marginBottom);
 }
 
 // 绘制虚拟摇杆 & 射击按钮（Canvas）
@@ -920,9 +948,13 @@ function spawnWave(wave) {
   const cfg = MONSTER_TYPES[wave.type];
   const diff = CFG.difficulty[game.level] || 1;
   const n = wave.n;
-  const startY = -50;
-  // 根据屏幕宽度自适应间距，确保所有怪兽都在屏幕内
-  const maxSpread = W - 80; // 左右各留 40 边距
+  const sp = GAME_CONFIG.spawn;
+  // 生成 Y 范围：刚在屏幕外上方，不太远也不太近（不会凭空出现在脸上）
+  const startY = sp.minY;
+  const maxGenY = sp.maxY;
+  // 根据屏幕宽度自适应间距，随波次扩大生成范围
+  const waveScale = 1 + (game.waveIdx / Math.max(lv.waves.length, 1)) * sp.waveSpread;
+  const maxSpread = (W - sp.marginX * 2) * waveScale;
   const spacing = Math.min(60, maxSpread / Math.max(n - 1, 1));
 
   for (let i = 0; i < n; i++) {
@@ -930,18 +962,18 @@ function spawnWave(wave) {
     const offset = (i - (n - 1) / 2) * spacing;
     if (wave.pattern === 'line') {
       x = W / 2 + offset;
-      y = startY - i * 30;
+      y = clamp(startY - i * 30, maxGenY, sp.minY);
     } else if (wave.pattern === 'v') {
       const half = (n - 1) / 2;
       x = W / 2 + offset;
-      y = startY - Math.abs(i - half) * 40;
+      y = clamp(startY - Math.abs(i - half) * 40, maxGenY, sp.minY);
     } else { // wave
       x = W / 2 + offset;
-      y = startY - i * 20;
+      y = clamp(startY - i * 20, maxGenY, sp.minY);
       vx = (i % 2 === 0 ? 1 : -1) * 40 * diff;
     }
-    // 确保生成位置在屏幕内
-    x = clamp(x, 40, W - 40);
+    // 确保生成位置在屏幕水平范围内
+    x = clamp(x, sp.marginX, W - sp.marginX);
     const shootInt = cfg.shoot ? cfg.shootInterval / diff : 0;
     game.monsters.push({
       type: wave.type, x, y, vx, vy,
@@ -2412,16 +2444,20 @@ function addHitSparks(x, y, color, dirX, dirY, scale) {
 }
 
 function updateParticles(dt) {
+  const pmax = GAME_CONFIG.particles.max;
+  const dLife = GAME_CONFIG.particles.defaultLife;
   for (let i = game.particles.length - 1; i >= 0; i--) {
     const p = game.particles[i];
+    // 防御性：确保每个粒子都有生命周期计时器
+    if (typeof p.life !== 'number' || isNaN(p.life)) p.life = dLife;
     p.x += p.vx * dt; p.y += p.vy * dt;
     p.vx *= 0.96; p.vy *= 0.96;
     p.life -= dt;
     if (p.life <= 0) game.particles.splice(i, 1);
   }
   // 粒子上限裁剪：移除最旧的粒子防止卡顿
-  if (game.particles.length > CFG.maxParticles) {
-    game.particles.splice(0, game.particles.length - CFG.maxParticles);
+  if (game.particles.length > pmax) {
+    game.particles.splice(0, game.particles.length - pmax);
   }
 }
 
@@ -2935,11 +2971,12 @@ function spawnTrickle(lv) {
   const cfg = MONSTER_TYPES[type];
   const diff = CFG.difficulty[game.level] || 1;
   const count = Math.random() < 0.35 ? 2 : 1;
+  const sp = GAME_CONFIG.spawn;
   for (let i = 0; i < count; i++) {
-    const x = clamp(rand(W * 0.15, W * 0.85), 40, W - 40);
+    const x = clamp(rand(W * 0.15, W * 0.85), sp.marginX, W - sp.marginX);
     const shootInt = cfg.shoot ? cfg.shootInterval / diff : 0;
     game.monsters.push({
-      type, x, y: -50 - i * 40,
+      type, x, y: clamp(sp.minY - i * 40, sp.maxY, sp.minY),
       vx: rand(-30, 30) * diff, vy: cfg.speed * CFG.baseMonsterSpeed * diff,
       hp: cfg.hp, maxHp: cfg.hp, size: cfg.size, score: cfg.score,
       shootCD: cfg.shoot ? rand(0.5, shootInt) : 0, shootInterval: shootInt,
@@ -3723,11 +3760,23 @@ function hideAllOverlays() {
 function togglePause() {
   if (game.state === 'playing') {
     game.state = 'pause';
+    resetInput();
     document.getElementById('ovPause').classList.remove('hidden');
   } else if (game.state === 'pause') {
     game.state = 'playing';
     document.getElementById('ovPause').classList.add('hidden');
   }
+}
+
+// 清空所有输入状态，防止暂停/弹窗时残留指令造成异常
+function resetInput() {
+  input.left = input.right = input.up = input.down = false;
+  input.shoot = false;
+  input.kbShoot = false;
+  inputDash = false;
+  touchActive = false; touchId = null;
+  stick.active = false; stick.dx = 0; stick.dy = 0;
+  shootBtn.active = false; shootBtn.pressed = false;
 }
 
 /* ==================== 音频 (Web Audio 合成) ==================== */
@@ -3908,8 +3957,9 @@ function update(dt) {
     if (input.down) player.y += sp * dt;
     player.tilt = (input.right ? 1 : 0) - (input.left ? 1 : 0);
   }
-  player.x = clamp(player.x, 20, W - 20);
-  player.y = clamp(player.y, H * 0.25, H - 40);
+  const pb = GAME_CONFIG.playerBounds;
+  player.x = clamp(player.x, pb.marginX, W - pb.marginX);
+  player.y = clamp(player.y, H * pb.marginTop, H - pb.marginBottom);
 
   if (player.invuln > 0) player.invuln -= dt;
   // 护盾缓慢恢复（受伤后延迟一段时间再开始）
