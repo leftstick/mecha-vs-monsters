@@ -296,7 +296,7 @@ let player = {
   dashVY: 0,     // 冲刺速度Y
 };
 
-let input = { left:false, right:false, up:false, down:false, shoot:false };
+let input = { left:false, right:false, up:false, down:false, shoot:false, kbShoot:false };
 // 手柄状态
 let gamepadConnected = false;
 let gamepadPrevButtons = []; // 上一帧按键状态，用于边沿检测
@@ -417,11 +417,11 @@ function pollGamepad() {
   input.up = ly < -DEADZONE || dpadUp;
   input.down = ly > DEADZONE || dpadDown;
 
-  // 射击: A(0), X(2), RT(7) 任意一个按下
+  // 射击: A(0), X(2), RT(7) 任意一个按住 — 每帧重算，释放即停
   const aPressed = pad.buttons[0] && pad.buttons[0].pressed;
   const xPressed = pad.buttons[2] && pad.buttons[2].pressed;
   const rtPressed = pad.buttons[7] && pad.buttons[7].pressed && pad.buttons[7].value > 0.3;
-  input.shoot = input.shoot || aPressed || xPressed || rtPressed;
+  input.shoot = input.kbShoot || touchActive || aPressed || xPressed || rtPressed;
 
   // 边沿检测按键
   const wasPressed = (i) => gamepadPrevButtons[i] && gamepadPrevButtons[i].pressed;
@@ -479,7 +479,7 @@ addEventListener('keydown', e => {
   if (k==='arrowright'||k==='d') input.right=true;
   if (k==='arrowup'||k==='w') input.up=true;
   if (k==='arrowdown'||k==='s') input.down=true;
-  if (k===' '||k==='j') input.shoot=true;
+  if (k===' '||k==='j') { input.kbShoot = true; input.shoot = true; }
   if (k==='escape') togglePause();
   if (['arrowleft','arrowright','arrowup','arrowdown',' '].includes(k)) e.preventDefault();
 });
@@ -489,7 +489,7 @@ addEventListener('keyup', e => {
   if (k==='arrowright'||k==='d') input.right=false;
   if (k==='arrowup'||k==='w') input.up=false;
   if (k==='arrowdown'||k==='s') input.down=false;
-  if (k===' '||k==='j') input.shoot=false;
+  if (k===' '||k==='j') { input.kbShoot = false; input.shoot = false; }
 });
 
 // 触摸拖动
