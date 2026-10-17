@@ -627,6 +627,7 @@ let game = {
   floatTexts: [],  // 伤害飘字
   warnTimer: 0,    // 精英预警剩余时间
   debris: [],      // 战场碎屑（独立于粒子，无碰撞无伤害）
+  bgDebris: [],    // 标题屏漂浮废墟（远景装饰，与战场碎屑分离）
 };
 
 // 渲染侧倾斜角（仅用于绘制平滑，不写入 player，不影响碰撞/移动）
@@ -1032,10 +1033,10 @@ function initStars(level) {
       });
     }
   }
-  // 废墟碎片：漂浮的金属残骸（远景废墟感）
-  game.debris = [];
+  // 废墟碎片：漂浮的金属残骸（远景废墟感）— 使用独立数组，不与战场碎屑冲突
+  game.bgDebris = [];
   for (let i = 0; i < 14; i++) {
-    game.debris.push({
+    game.bgDebris.push({
       x: Math.random() * W,
       y: Math.random() * H,
       size: rand(6, 22),
@@ -4377,8 +4378,8 @@ function render() {
     }
     ctx.globalAlpha = 1;
     // 漂浮废墟
-    if (game.debris) {
-      for (const d of game.debris) {
+    if (game.bgDebris) {
+      for (const d of game.bgDebris) {
         d.y += d.speed * 0.016;
         d.rot += d.rotSpeed * 0.016;
         if (d.y > H + d.size) { d.y = -d.size; d.x = Math.random() * W; }
