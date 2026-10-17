@@ -70,6 +70,7 @@
   <div class="hud-cell">关卡 <b id="hLv">1</b></div>
   <div class="hud-cell">分数 <b id="hSc">0</b></div>
   <div id="hpBar"></div>
+  <div class="hud-cell" id="weaponCell" style="display:none">武器 <b id="hWp">普通</b></div>
   <div class="hud-cell">怪兽 <b id="hMst">0</b></div>
 </div>
 <div id="bossBar"><div class="name" id="bossName">BOSS</div><div class="track"><div class="fill" id="bossFill" style="width:100%"></div></div></div>
@@ -228,6 +229,7 @@ let game = {
   bossActive: false,
   shake: 0,
   overWin: false,
+  powerups: [], // 奖励宝盒
 };
 
 let player = {
@@ -237,6 +239,8 @@ let player = {
   fireCD: 0,
   tilt: 0,
   engineT: 0,
+  weapon: 'normal', // normal / laser / shotgun / rocket
+  weaponTime: 0, // 武器持续时间
 };
 
 let input = { left:false, right:false, up:false, down:false, shoot:false };
@@ -306,24 +310,28 @@ function spawnWave(wave) {
   const cfg = MONSTER_TYPES[wave.type];
   const diff = CFG.difficulty[game.level] || 1;
   const n = wave.n;
-  const startX = W / 2;
   const startY = -50;
-  const spacing = 60;
+  // 根据屏幕宽度自适应间距，确保所有怪兽都在屏幕内
+  const maxSpread = W - 80; // 左右各留 40 边距
+  const spacing = Math.min(60, maxSpread / Math.max(n - 1, 1));
 
   for (let i = 0; i < n; i++) {
     let x, y, vx = 0, vy = cfg.speed * CFG.baseMonsterSpeed * diff;
+    const offset = (i - (n - 1) / 2) * spacing;
     if (wave.pattern === 'line') {
-      x = W / 2 + (i - (n - 1) / 2) * spacing;
+      x = W / 2 + offset;
       y = startY - i * 30;
     } else if (wave.pattern === 'v') {
       const half = (n - 1) / 2;
-      x = W / 2 + (i - half) * spacing;
+      x = W / 2 + offset;
       y = startY - Math.abs(i - half) * 40;
     } else { // wave
-      x = W / 2 + (i - (n - 1) / 2) * spacing;
+      x = W / 2 + offset;
       y = startY - i * 20;
       vx = (i % 2 === 0 ? 1 : -1) * 40 * diff;
     }
+    // 确保生成位置在屏幕内
+    x = clamp(x, 40, W - 40);
     const shootInt = cfg.shoot ? cfg.shootInterval / diff : 0;
     game.monsters.push({
       type: wave.type, x, y, vx, vy,
@@ -353,68 +361,121 @@ function spawnBoss(type) {
 
 /* ==================== 玩家绘制: 精致机甲战斗机 ==================== */
 function drawPlayer() {
-  if (player.invuln > 0 && Math.floor(player.invuln * 12) % 2) return; // 闪烁
+  if (player.invuln > 0 && Math.floor(player.invuln * 12) % 2) return;
   const x = player.x, y = player.y;
   const tilt = player.tilt * 0.15;
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(tilt);
 
-  // 引擎喷焰 (动画)
+  // 引擎喷焰 (双层动画)
   player.engineT += 0.3;
-  const flame = 14 + Math.sin(player.engineT) * 4;
-  const fg = ctx.createLinearGradient(0, 18, 0, 18 + flame);
-  fg.addColorStop(0, '#00e5ff');
-  fg.addColorStop(0.4, '#0088ff');
-  fg.addColorStop(1, 'rgba(0,80,255,0)');
-  ctx.fillStyle = fg;
+  const flame1 = 16 + Math.sin(player.engineT) * 5;
+  const flame2 = 10 + Math.sin(player.engineT * 1.5) * 3;
+  // 外焰
+  const fg1 = ctx.createLinearGradient(0, 18, 0, 18 + flame1);
+  fg1.addColorStop(0, 'rgba(0,229,255,0.9)');
+  fg1.addColorStop(0.5, 'rgba(0,136,255,0.5)');
+  fg1.addColorStop(1, 'rgba(0,80,255,0)');
+  ctx.fillStyle = fg1;
   ctx.beginPath();
-  ctx.moveTo(-8, 18); ctx.lineTo(0, 18 + flame); ctx.lineTo(8, 18);
+  ctx.moveTo(-10, 18); ctx.lineTo(0, 18 + flame1); ctx.lineTo(10, 18);
+  ctx.closePath(); ctx.fill();
+  // 内焰
+  const fg2 = ctx.createLinearGradient(0, 18, 0, 18 + flame2);
+  fg2.addColorStop(0, '#ffffff');
+  fg2.addColorStop(0.6, '#00e5ff');
+  fg2.addColorStop(1, 'rgba(0,229,255,0)');
+  ctx.fillStyle = fg2;
+  ctx.beginPath();
+  ctx.moveTo(-5, 18); ctx.lineTo(0, 18 + flame2); ctx.lineTo(5, 18);
   ctx.closePath(); ctx.fill();
 
-  // 机翼
+  // 机翼 (后掠翼 + 武器挂架)
   ctx.fillStyle = '#1a4a7a';
   ctx.beginPath();
-  ctx.moveTo(-22, 10); ctx.lineTo(-14, -5); ctx.lineTo(-6, 8); ctx.lineTo(-6, 16); ctx.lineTo(-18, 16);
+  ctx.moveTo(-26, 12); ctx.lineTo(-16, -8); ctx.lineTo(-6, 6); ctx.lineTo(-6, 18); ctx.lineTo(-22, 18);
   ctx.closePath(); ctx.fill();
   ctx.beginPath();
-  ctx.moveTo(22, 10); ctx.lineTo(14, -5); ctx.lineTo(6, 8); ctx.lineTo(6, 16); ctx.lineTo(18, 16);
+  ctx.moveTo(26, 12); ctx.lineTo(16, -8); ctx.lineTo(6, 6); ctx.lineTo(6, 18); ctx.lineTo(22, 18);
   ctx.closePath(); ctx.fill();
+  // 机翼武器舱
+  ctx.fillStyle = '#0a2a4a';
+  ctx.fillRect(-20, 8, 6, 10);
+  ctx.fillRect(14, 8, 6, 10);
+  // 翼尖导弹
+  ctx.fillStyle = '#4488cc';
+  ctx.fillRect(-26, 10, 4, 8);
+  ctx.fillRect(22, 10, 4, 8);
 
-  // 机身主体
-  const bodyGrad = ctx.createLinearGradient(-10, -20, 10, 20);
-  bodyGrad.addColorStop(0, '#5ab8ff');
-  bodyGrad.addColorStop(0.5, '#2080d0');
-  bodyGrad.addColorStop(1, '#104080');
+  // 机身主体 (渐变 + 分块)
+  const bodyGrad = ctx.createLinearGradient(-12, -22, 12, 20);
+  bodyGrad.addColorStop(0, '#7ac8ff');
+  bodyGrad.addColorStop(0.3, '#3090e0');
+  bodyGrad.addColorStop(0.7, '#1a5a9a');
+  bodyGrad.addColorStop(1, '#0a2a5a');
   ctx.fillStyle = bodyGrad;
   ctx.beginPath();
-  ctx.moveTo(0, -24);
-  ctx.lineTo(10, -8);
-  ctx.lineTo(8, 16);
-  ctx.lineTo(-8, 16);
-  ctx.lineTo(-10, -8);
+  ctx.moveTo(0, -26);
+  ctx.lineTo(11, -6);
+  ctx.lineTo(9, 18);
+  ctx.lineTo(-9, 18);
+  ctx.lineTo(-11, -6);
   ctx.closePath();
   ctx.fill();
+  // 机身装甲缝
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(-8, -2); ctx.lineTo(8, -2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-7, 8); ctx.lineTo(7, 8); ctx.stroke();
 
   // 机身中线高光
-  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
   ctx.beginPath();
-  ctx.moveTo(0, -24); ctx.lineTo(3, -8); ctx.lineTo(0, 16); ctx.lineTo(-3, -8);
+  ctx.moveTo(0, -26); ctx.lineTo(3, -6); ctx.lineTo(0, 18); ctx.lineTo(-3, -6);
   ctx.closePath(); ctx.fill();
 
-  // 驾驶舱
-  ctx.fillStyle = '#001830';
+  // 驾驶舱 (深色玻璃 + 高光)
+  ctx.fillStyle = '#001020';
   ctx.beginPath();
-  ctx.ellipse(0, -6, 4, 7, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, -8, 5, 9, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = 'rgba(0,229,255,0.5)';
+  const cockpitGrad = ctx.createRadialGradient(-1.5, -11, 0, -1.5, -8, 8);
+  cockpitGrad.addColorStop(0, 'rgba(0,229,255,0.7)');
+  cockpitGrad.addColorStop(1, 'rgba(0,40,80,0.3)');
+  ctx.fillStyle = cockpitGrad;
   ctx.beginPath();
-  ctx.ellipse(-1, -8, 1.5, 2.5, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, -8, 5, 9, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // 驾驶舱反光
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.beginPath();
+  ctx.ellipse(-1.5, -11, 1.5, 3, -0.3, 0, Math.PI * 2);
   ctx.fill();
 
-  // 炮口
+  // 机头炮管
   ctx.fillStyle = '#88ccff';
-  ctx.fillRect(-2, -26, 4, 6);
+  ctx.fillRect(-2.5, -28, 5, 8);
+  ctx.fillStyle = '#aaddff';
+  ctx.fillRect(-1.5, -28, 3, 4);
+
+  // 武器颜色指示 (机身发光)
+  if (player.weapon === 'laser') {
+    ctx.shadowColor = '#0ff'; ctx.shadowBlur = 10;
+    ctx.fillStyle = 'rgba(0,255,255,0.5)';
+    ctx.fillRect(-3, -10, 6, 14);
+    ctx.shadowBlur = 0;
+  } else if (player.weapon === 'shotgun') {
+    ctx.shadowColor = '#fd0'; ctx.shadowBlur = 8;
+    ctx.fillStyle = 'rgba(255,221,0,0.4)';
+    ctx.fillRect(-3, -10, 6, 14);
+    ctx.shadowBlur = 0;
+  } else if (player.weapon === 'rocket') {
+    ctx.shadowColor = '#f60'; ctx.shadowBlur = 8;
+    ctx.fillStyle = 'rgba(255,102,0,0.4)';
+    ctx.fillRect(-3, -10, 6, 14);
+    ctx.shadowBlur = 0;
+  }
 
   ctx.restore();
 }
@@ -426,141 +487,216 @@ function drawMonster(m) {
   ctx.translate(x, y);
 
   if (m.type === 'octopus') {
-    // 章鱼怪: 圆头+触手
-    ctx.fillStyle = '#ff5566';
-    ctx.beginPath();
-    ctx.arc(0, -4 * s, 14 * s, 0, Math.PI * 2);
-    ctx.fill();
-    // 触手
-    ctx.fillStyle = '#cc3344';
+    // 章鱼怪: 头部渐变 + 5条波浪触手 + 大眼
+    const hg = ctx.createRadialGradient(-3*s, -7*s, 2*s, 0, -4*s, 14*s);
+    hg.addColorStop(0, '#ff8899');
+    hg.addColorStop(0.6, '#ff4466');
+    hg.addColorStop(1, '#cc2244');
+    ctx.fillStyle = hg;
+    ctx.beginPath(); ctx.arc(0, -4*s, 14*s, 0, Math.PI*2); ctx.fill();
+    // 头部高光
+    ctx.fillStyle = 'rgba(255,200,210,0.4)';
+    ctx.beginPath(); ctx.ellipse(-4*s, -9*s, 4*s, 3*s, -0.3, 0, Math.PI*2); ctx.fill();
+    // 触手 (5条, 波浪摆动)
     for (let i = -2; i <= 2; i++) {
       const tx = i * 7 * s;
-      const wave = Math.sin(m.t + i) * 4 * s;
+      const wave = Math.sin(m.t * 2 + i * 0.8) * 5 * s;
+      ctx.fillStyle = '#cc2244';
       ctx.beginPath();
-      ctx.moveTo(tx - 3 * s, 6 * s);
-      ctx.quadraticCurveTo(tx + wave, 16 * s, tx + 3 * s, 6 * s);
-      ctx.closePath();
+      ctx.moveTo(tx - 3.5*s, 5*s);
+      ctx.quadraticCurveTo(tx + wave, 18*s, tx - 1*s, 24*s);
+      ctx.quadraticCurveTo(tx + wave*0.5, 18*s, tx + 3.5*s, 5*s);
+      ctx.closePath(); ctx.fill();
+      // 触手吸盘
+      ctx.fillStyle = '#ff6677';
+      ctx.beginPath(); ctx.arc(tx + wave*0.3, 14*s, 1.5*s, 0, Math.PI*2); ctx.fill();
+    }
+    // 眼睛 (大白眼+黑瞳+高光)
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(-5*s, -7*s, 4.5*s, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(5*s, -7*s, 4.5*s, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.arc(-5*s, -7*s, 2.2*s, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(5*s, -7*s, 2.2*s, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(-6*s, -8*s, 1*s, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(4*s, -8*s, 1*s, 0, Math.PI*2); ctx.fill();
+  } else if (m.type === 'scorpion') {
+    // 蝎子怪: 分节身体 + 大钳 + 毒尾
+    const bg = ctx.createLinearGradient(0, -16*s, 0, 16*s);
+    bg.addColorStop(0, '#cc66dd'); bg.addColorStop(0.5, '#aa44cc'); bg.addColorStop(1, '#772299');
+    // 身体分节
+    for (let i = 0; i < 4; i++) {
+      ctx.fillStyle = i % 2 ? '#9933bb' : '#aa44cc';
+      ctx.beginPath();
+      ctx.ellipse(0, -8*s + i*8*s, (12 - i*1.5)*s, (5 - i*0.5)*s, 0, 0, Math.PI*2);
       ctx.fill();
     }
-    // 眼睛
-    ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.arc(-5 * s, -6 * s, 4 * s, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(5 * s, -6 * s, 4 * s, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#000';
-    ctx.beginPath(); ctx.arc(-5 * s, -6 * s, 2 * s, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(5 * s, -6 * s, 2 * s, 0, Math.PI * 2); ctx.fill();
-  } else if (m.type === 'scorpion') {
-    // 蝎子怪: 身体+钳子+尾巴
-    ctx.fillStyle = '#aa44cc';
-    // 身体
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 12 * s, 16 * s, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // 钳子
+    // 钳子 (带开合动画)
+    const clawOpen = Math.sin(m.t * 3) * 2 * s;
     ctx.fillStyle = '#8822aa';
+    ctx.beginPath(); ctx.ellipse(-15*s, -10*s, 7*s, 5*s, 0.3, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(15*s, -10*s, 7*s, 5*s, -0.3, 0, Math.PI*2); ctx.fill();
+    // 钳爪
+    ctx.fillStyle = '#661188';
+    ctx.beginPath(); ctx.moveTo(-20*s, -13*s + clawOpen); ctx.lineTo(-25*s, -16*s); ctx.lineTo(-18*s, -10*s); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(20*s, -13*s - clawOpen); ctx.lineTo(25*s, -16*s); ctx.lineTo(18*s, -10*s); ctx.closePath(); ctx.fill();
+    // 尾巴 (弯曲带毒刺)
+    ctx.strokeStyle = '#8822aa'; ctx.lineWidth = 5*s; ctx.lineCap = 'round';
+    const tailWag = Math.sin(m.t * 2) * 6 * s;
     ctx.beginPath();
-    ctx.arc(-14 * s, -8 * s, 6 * s, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath();
-    ctx.arc(14 * s, -8 * s, 6 * s, 0, Math.PI * 2); ctx.fill();
-    // 尾巴
-    ctx.strokeStyle = '#8822aa';
-    ctx.lineWidth = 5 * s;
-    ctx.beginPath();
-    ctx.moveTo(0, 14 * s);
-    ctx.quadraticCurveTo(10 * s, 22 * s, 4 * s, 30 * s);
+    ctx.moveTo(0, 14*s);
+    ctx.quadraticCurveTo(12*s + tailWag, 22*s, 6*s, 30*s);
     ctx.stroke();
-    ctx.fillStyle = '#ff3366';
-    ctx.beginPath(); ctx.arc(4 * s, 30 * s, 4 * s, 0, Math.PI * 2); ctx.fill();
+    // 毒刺
+    ctx.fillStyle = '#ff2244';
+    ctx.shadowColor = '#ff2244'; ctx.shadowBlur = 6;
+    ctx.beginPath(); ctx.moveTo(6*s, 30*s); ctx.lineTo(2*s, 36*s); ctx.lineTo(9*s, 34*s); ctx.closePath(); ctx.fill();
+    ctx.shadowBlur = 0;
     // 眼睛
     ctx.fillStyle = '#ffee00';
-    ctx.beginPath(); ctx.arc(-4 * s, -4 * s, 2.5 * s, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(4 * s, -4 * s, 2.5 * s, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowColor = '#ffaa00'; ctx.shadowBlur = 4;
+    ctx.beginPath(); ctx.arc(-4*s, -10*s, 2.5*s, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(4*s, -10*s, 2.5*s, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
   } else if (m.type === 'ufo') {
-    // 飞碟: 圆盘+罩
-    ctx.fillStyle = '#888';
-    ctx.beginPath();
-    ctx.ellipse(0, 4 * s, 20 * s, 7 * s, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#aaa';
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 14 * s, 5 * s, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // 玻璃罩
-    const dg = ctx.createRadialGradient(0, -4 * s, 0, 0, -4 * s, 10 * s);
-    dg.addColorStop(0, '#aaffff');
-    dg.addColorStop(1, '#006688');
+    // 飞碟: 多层圆盘 + 玻璃罩 + 底灯
+    // 底部圆盘
+    const dg1 = ctx.createLinearGradient(0, 2*s, 0, 9*s);
+    dg1.addColorStop(0, '#999'); dg1.addColorStop(1, '#555');
+    ctx.fillStyle = dg1;
+    ctx.beginPath(); ctx.ellipse(0, 6*s, 21*s, 6*s, 0, 0, Math.PI*2); ctx.fill();
+    // 中部圆盘
+    const dg2 = ctx.createLinearGradient(0, -2*s, 0, 5*s);
+    dg2.addColorStop(0, '#ccc'); dg2.addColorStop(1, '#888');
+    ctx.fillStyle = dg2;
+    ctx.beginPath(); ctx.ellipse(0, 1*s, 16*s, 5*s, 0, 0, Math.PI*2); ctx.fill();
+    // 玻璃罩 (径向渐变)
+    const dg = ctx.createRadialGradient(-3*s, -6*s, 1*s, 0, -3*s, 11*s);
+    dg.addColorStop(0, '#ccffff'); dg.addColorStop(0.5, '#44aacc'); dg.addColorStop(1, '#005577');
     ctx.fillStyle = dg;
-    ctx.beginPath();
-    ctx.ellipse(0, -3 * s, 10 * s, 8 * s, 0, Math.PI, 0);
-    ctx.fill();
-    // 底灯
-    const blink = (Math.sin(m.t * 2) + 1) / 2;
-    ctx.fillStyle = `rgba(255,255,0,${0.5 + blink * 0.5})`;
+    ctx.beginPath(); ctx.ellipse(0, -2*s, 11*s, 9*s, 0, Math.PI, 0); ctx.fill();
+    // 罩高光
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.beginPath(); ctx.ellipse(-4*s, -6*s, 3*s, 4*s, -0.3, 0, Math.PI*2); ctx.fill();
+    // 底灯 (闪烁)
+    const blink = (Math.sin(m.t * 3) + 1) / 2;
     for (let i = -2; i <= 2; i++) {
-      ctx.beginPath();
-      ctx.arc(i * 8 * s, 7 * s, 1.5 * s, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.fillStyle = `rgba(255,${100 + blink*155},0,${0.6 + blink*0.4})`;
+      ctx.shadowColor = '#ffaa00'; ctx.shadowBlur = 8;
+      ctx.beginPath(); ctx.arc(i * 8 * s, 8 * s, 2 * s, 0, Math.PI*2); ctx.fill();
     }
+    ctx.shadowBlur = 0;
+    // 外星人眼睛 (从罩里看)
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.ellipse(0, -3*s, 4*s, 3*s, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#0f0';
+    ctx.beginPath(); ctx.arc(-2*s, -3*s, 1.2*s, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(2*s, -3*s, 1.2*s, 0, Math.PI*2); ctx.fill();
   } else if (m.type === 'bug') {
-    // 机械虫: 椭圆+翅膀+腿
-    ctx.fillStyle = '#44aa44';
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 10 * s, 14 * s, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // 翅膀
-    const wing = Math.sin(m.t * 3) * 4 * s;
-    ctx.fillStyle = 'rgba(180,255,180,0.5)';
-    ctx.beginPath();
-    ctx.ellipse(-12 * s, -2 * s + wing, 8 * s, 5 * s, -0.3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(12 * s, -2 * s + wing, 8 * s, 5 * s, 0.3, 0, Math.PI * 2);
-    ctx.fill();
-    // 眼睛
+    // 机械虫: 椭圆甲壳 + 透明翅膀 + 复眼
+    const bg = ctx.createLinearGradient(0, -14*s, 0, 14*s);
+    bg.addColorStop(0, '#66cc44'); bg.addColorStop(0.5, '#338822'); bg.addColorStop(1, '#1a5511');
+    ctx.fillStyle = bg;
+    ctx.beginPath(); ctx.ellipse(0, 0, 11*s, 15*s, 0, 0, Math.PI*2); ctx.fill();
+    // 甲壳分缝
+    ctx.strokeStyle = 'rgba(0,60,0,0.5)'; ctx.lineWidth = 1.5*s;
+    ctx.beginPath(); ctx.moveTo(0, -14*s); ctx.lineTo(0, 14*s); ctx.stroke();
+    // 甲壳斑点
+    ctx.fillStyle = 'rgba(255,255,100,0.3)';
+    ctx.beginPath(); ctx.arc(-4*s, -4*s, 2*s, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(4*s, 2*s, 1.5*s, 0, Math.PI*2); ctx.fill();
+    // 翅膀 (高速振动模糊)
+    const wing = Math.sin(m.t * 8) * 3 * s;
+    ctx.fillStyle = 'rgba(200,255,200,0.35)';
+    ctx.beginPath(); ctx.ellipse(-13*s, -3*s + wing, 9*s, 6*s, -0.4, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(13*s, -3*s - wing, 9*s, 6*s, 0.4, 0, Math.PI*2); ctx.fill();
+    // 复眼 (红色发光)
     ctx.fillStyle = '#ff0000';
-    ctx.beginPath(); ctx.arc(-4 * s, -8 * s, 3 * s, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(4 * s, -8 * s, 3 * s, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 6;
+    ctx.beginPath(); ctx.arc(-4*s, -9*s, 3.5*s, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(4*s, -9*s, 3.5*s, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+    // 复眼高光
+    ctx.fillStyle = '#ffaaaa';
+    ctx.beginPath(); ctx.arc(-5*s, -10*s, 1*s, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(3*s, -10*s, 1*s, 0, Math.PI*2); ctx.fill();
   } else if (m.type === 'turret') {
-    // 炮台怪: 底座+炮管
-    ctx.fillStyle = '#666';
-    ctx.fillRect(-14 * s, -6 * s, 28 * s, 20 * s);
-    ctx.fillStyle = '#444';
-    ctx.fillRect(-16 * s, 8 * s, 32 * s, 6 * s);
-    // 炮管
+    // 炮台怪: 装甲底座 + 旋转炮管 + 红眼瞄准
+    // 底座
+    ctx.fillStyle = '#555';
+    ctx.fillRect(-15*s, -4*s, 30*s, 22*s);
+    const bg = ctx.createLinearGradient(0, -4*s, 0, 18*s);
+    bg.addColorStop(0, '#666'); bg.addColorStop(1, '#333');
+    ctx.fillStyle = bg;
+    ctx.fillRect(-15*s, -4*s, 30*s, 22*s);
+    // 装甲铆钉
+    ctx.fillStyle = '#888';
+    for (let i = -1; i <= 1; i++) {
+      ctx.beginPath(); ctx.arc(i*10*s, 12*s, 1.5*s, 0, Math.PI*2); ctx.fill();
+    }
+    // 履带
     ctx.fillStyle = '#222';
-    ctx.fillRect(-3 * s, -20 * s, 6 * s, 16 * s);
-    // 眼睛
-    ctx.fillStyle = '#ff3300';
-    ctx.fillRect(-8 * s, -2 * s, 5 * s, 5 * s);
-    ctx.fillRect(3 * s, -2 * s, 5 * s, 5 * s);
+    ctx.fillRect(-17*s, 14*s, 34*s, 8*s);
+    ctx.fillStyle = '#444';
+    for (let i = -2; i <= 2; i++) ctx.fillRect(i*7*s - 2, 15*s, 4*s, 6*s);
+    // 炮塔
+    ctx.fillStyle = '#777';
+    ctx.beginPath(); ctx.arc(0, -2*s, 9*s, 0, Math.PI*2); ctx.fill();
+    // 炮管 (朝玩家方向)
+    const ang = Math.atan2(player.y - m.y, player.x - m.x) + Math.PI/2;
+    ctx.save();
+    ctx.rotate(ang);
+    ctx.fillStyle = '#333';
+    ctx.fillRect(-3.5*s, -22*s, 7*s, 20*s);
+    ctx.fillStyle = '#555';
+    ctx.fillRect(-4.5*s, -24*s, 9*s, 4*s);
+    ctx.restore();
+    // 红眼瞄准
+    ctx.fillStyle = '#ff2200';
+    ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 8;
+    ctx.beginPath(); ctx.arc(0, -2*s, 3*s, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
   } else if (m.type === 'bomber') {
-    // 轰炸机: 大型机身+机翼
-    ctx.fillStyle = '#553322';
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 22 * s, 28 * s, 0, 0, Math.PI * 2);
-    ctx.fill();
+    // 轰炸机: 大型机身 + 宽翼 + 多炮塔
+    const bg = ctx.createLinearGradient(0, -28*s, 0, 28*s);
+    bg.addColorStop(0, '#775533'); bg.addColorStop(0.5, '#553322'); bg.addColorStop(1, '#332211');
+    ctx.fillStyle = bg;
+    ctx.beginPath(); ctx.ellipse(0, 0, 23*s, 30*s, 0, 0, Math.PI*2); ctx.fill();
     // 机翼
     ctx.fillStyle = '#442211';
     ctx.beginPath();
-    ctx.moveTo(-22 * s, -5 * s); ctx.lineTo(-36 * s, 8 * s); ctx.lineTo(-20 * s, 12 * s);
+    ctx.moveTo(-23*s, -6*s); ctx.lineTo(-40*s, 6*s); ctx.lineTo(-38*s, 14*s); ctx.lineTo(-20*s, 14*s);
     ctx.closePath(); ctx.fill();
     ctx.beginPath();
-    ctx.moveTo(22 * s, -5 * s); ctx.lineTo(36 * s, 8 * s); ctx.lineTo(20 * s, 12 * s);
+    ctx.moveTo(23*s, -6*s); ctx.lineTo(40*s, 6*s); ctx.lineTo(38*s, 14*s); ctx.lineTo(20*s, 14*s);
     ctx.closePath(); ctx.fill();
+    // 机翼引擎
+    ctx.fillStyle = '#222';
+    ctx.beginPath(); ctx.ellipse(-32*s, 8*s, 4*s, 7*s, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(32*s, 8*s, 4*s, 7*s, 0, 0, Math.PI*2); ctx.fill();
     // 驾驶舱
-    ctx.fillStyle = '#ff9900';
-    ctx.beginPath();
-    ctx.ellipse(0, -12 * s, 8 * s, 6 * s, 0, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillStyle = '#001830';
+    ctx.beginPath(); ctx.ellipse(0, -16*s, 9*s, 7*s, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,150,0,0.6)';
+    ctx.beginPath(); ctx.ellipse(0, -17*s, 6*s, 4*s, 0, 0, Math.PI*2); ctx.fill();
+    // 机身装甲带
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 2*s;
+    ctx.beginPath(); ctx.ellipse(0, 0, 20*s, 26*s, 0, 0, Math.PI*2); ctx.stroke();
+    // 尾部炮塔
+    ctx.fillStyle = '#555';
+    ctx.beginPath(); ctx.arc(0, 22*s, 5*s, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#ff2200';
+    ctx.beginPath(); ctx.arc(0, 22*s, 2*s, 0, Math.PI*2); ctx.fill();
   }
 
   // 血条 (多血怪兽)
   if (m.maxHp > 1) {
-    const bw = 24 * s;
+    const bw = 26 * s;
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(-bw/2, -20 * s, bw, 3);
+    ctx.fillRect(-bw/2, -22 * s, bw, 3);
     ctx.fillStyle = '#ff3030';
-    ctx.fillRect(-bw/2, -20 * s, bw * (m.hp / m.maxHp), 3);
+    ctx.fillRect(-bw/2, -22 * s, bw * (m.hp / m.maxHp), 3);
   }
   ctx.restore();
 }
@@ -571,79 +707,123 @@ function drawBoss(b) {
   ctx.translate(b.x, b.y);
 
   if (b.type === 'dragon') {
-    // 机械巨龙: 巨大龙头+翅膀
-    ctx.fillStyle = '#880000';
-    // 身体
-    ctx.beginPath();
-    ctx.ellipse(0, 10, 40, 50, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // 翅膀
-    const wf = Math.sin(b.t) * 15;
-    ctx.fillStyle = '#660000';
-    ctx.beginPath();
-    ctx.moveTo(-30, 0);
-    ctx.quadraticCurveTo(-90, -30 + wf, -70, 40);
-    ctx.lineTo(-30, 30);
-    ctx.closePath(); ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(30, 0);
-    ctx.quadraticCurveTo(90, -30 + wf, 70, 40);
-    ctx.lineTo(30, 30);
-    ctx.closePath(); ctx.fill();
-    // 头
-    ctx.fillStyle = '#aa0000';
-    ctx.beginPath();
-    ctx.ellipse(0, -30, 30, 25, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // 眼睛
-    ctx.fillStyle = '#ffff00';
-    ctx.beginPath(); ctx.arc(-12, -35, 6, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(12, -35, 6, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#000';
-    ctx.beginPath(); ctx.arc(-12, -35, 3, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(12, -35, 3, 0, Math.PI * 2); ctx.fill();
-    // 獠牙
-    ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.moveTo(-10, -18); ctx.lineTo(-7, -8); ctx.lineTo(-4, -18); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(10, -18); ctx.lineTo(7, -8); ctx.lineTo(4, -18); ctx.fill();
-    // 角
-    ctx.fillStyle = '#444';
-    ctx.beginPath(); ctx.moveTo(-20, -50); ctx.lineTo(-14, -70); ctx.lineTo(-10, -50); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(20, -50); ctx.lineTo(14, -70); ctx.lineTo(10, -50); ctx.fill();
-  } else if (b.type === 'kraken') {
-    // 深渊海妖: 巨型章鱼+触须
-    // 身体
-    const bg = ctx.createRadialGradient(0, 0, 10, 0, 0, 60);
-    bg.addColorStop(0, '#aa2266');
-    bg.addColorStop(1, '#440033');
-    ctx.fillStyle = bg;
-    ctx.beginPath();
-    ctx.arc(0, -10, 50, 0, Math.PI * 2);
-    ctx.fill();
-    // 触须
-    ctx.strokeStyle = '#771155';
-    ctx.lineWidth = 10;
-    ctx.lineCap = 'round';
-    for (let i = 0; i < 8; i++) {
-      const ang = (i / 8) * Math.PI * 2;
-      const wave = Math.sin(b.t + i) * 12;
+    // 机械巨龙: 分节身体 + 金属翅膀 + 龙头
+    const bodyGrad = ctx.createLinearGradient(0, -50, 0, 60);
+    bodyGrad.addColorStop(0, '#cc2222'); bodyGrad.addColorStop(0.5, '#880000'); bodyGrad.addColorStop(1, '#440000');
+    // 身体分节
+    for (let i = 0; i < 5; i++) {
+      ctx.fillStyle = i % 2 ? '#770000' : '#990000';
       ctx.beginPath();
-      ctx.moveTo(Math.cos(ang) * 30, Math.sin(ang) * 30 - 10);
-      ctx.quadraticCurveTo(Math.cos(ang) * 55, Math.sin(ang) * 55 + wave, Math.cos(ang) * 40, Math.sin(ang) * 80);
-      ctx.stroke();
-      // 吸盘
-      ctx.fillStyle = '#ff66aa';
-      ctx.beginPath();
-      ctx.arc(Math.cos(ang) * 40, Math.sin(ang) * 80, 4, 0, Math.PI * 2);
+      ctx.ellipse(0, -10 + i * 14, (35 - i * 3), (22 - i * 2), 0, 0, Math.PI*2);
       ctx.fill();
     }
-    // 眼睛
+    // 金属翅膀 (拍动)
+    const wf = Math.sin(b.t * 2) * 20;
+    const wingGrad = ctx.createLinearGradient(-90, 0, -30, 30);
+    wingGrad.addColorStop(0, '#550000'); wingGrad.addColorStop(1, '#880000');
+    ctx.fillStyle = wingGrad;
+    ctx.beginPath();
+    ctx.moveTo(-30, -5);
+    ctx.quadraticCurveTo(-100, -40 + wf, -80, 50);
+    ctx.quadraticCurveTo(-55, 25, -30, 35);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(30, -5);
+    ctx.quadraticCurveTo(100, -40 + wf, 80, 50);
+    ctx.quadraticCurveTo(55, 25, 30, 35);
+    ctx.closePath(); ctx.fill();
+    // 翅膀骨架
+    ctx.strokeStyle = '#330000'; ctx.lineWidth = 2;
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.moveTo(-30, 0 + i*10); ctx.lineTo(-75 - i*8, 20 + wf*0.5); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(30, 0 + i*10); ctx.lineTo(75 + i*8, 20 + wf*0.5); ctx.stroke();
+    }
+    // 龙头
+    const headGrad = ctx.createRadialGradient(-8, -40, 5, 0, -35, 35);
+    headGrad.addColorStop(0, '#dd3333'); headGrad.addColorStop(1, '#880000');
+    ctx.fillStyle = headGrad;
+    ctx.beginPath();
+    ctx.ellipse(0, -38, 32, 28, 0, 0, Math.PI*2);
+    ctx.fill();
+    // 龙角
+    ctx.fillStyle = '#333';
+    ctx.beginPath(); ctx.moveTo(-22, -55); ctx.lineTo(-16, -78); ctx.lineTo(-12, -55); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(22, -55); ctx.lineTo(16, -78); ctx.lineTo(12, -55); ctx.closePath(); ctx.fill();
+    // 眼睛 (发光黄)
     ctx.fillStyle = '#ffff00';
-    ctx.beginPath(); ctx.arc(-18, -18, 10, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(18, -18, 10, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowColor = '#ff8800'; ctx.shadowBlur = 10;
+    ctx.beginPath(); ctx.ellipse(-13, -42, 7, 5, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(13, -42, 7, 5, 0, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
     ctx.fillStyle = '#000';
-    ctx.beginPath(); ctx.arc(-18, -18, 5, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(18, -18, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(-12, -42, 3, 4, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(14, -42, 3, 4, 0, 0, Math.PI*2); ctx.fill();
+    // 鼻孔
+    ctx.fillStyle = '#220000';
+    ctx.beginPath(); ctx.arc(-6, -28, 2, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(6, -28, 2, 0, Math.PI*2); ctx.fill();
+    // 獠牙
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.moveTo(-11, -22); ctx.lineTo(-8, -10); ctx.lineTo(-5, -22); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(11, -22); ctx.lineTo(8, -10); ctx.lineTo(5, -22); ctx.closePath(); ctx.fill();
+  } else if (b.type === 'kraken') {
+    // 深渊海妖: 巨型头部 + 8条触须 + 发光眼
+    const bg = ctx.createRadialGradient(-10, -20, 10, 0, -10, 65);
+    bg.addColorStop(0, '#cc3377'); bg.addColorStop(0.6, '#882255'); bg.addColorStop(1, '#330022');
+    ctx.fillStyle = bg;
+    ctx.beginPath(); ctx.arc(0, -10, 55, 0, Math.PI*2); ctx.fill();
+    // 头部高光
+    ctx.fillStyle = 'rgba(255,150,200,0.3)';
+    ctx.beginPath(); ctx.ellipse(-15, -25, 18, 12, -0.3, 0, Math.PI*2); ctx.fill();
+    // 8条触须 (波浪摆动)
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 8; i++) {
+      const ang = (i / 8) * Math.PI * 2 + Math.PI/8;
+      const wave = Math.sin(b.t * 1.5 + i * 0.7) * 18;
+      ctx.strokeStyle = '#771155';
+      ctx.lineWidth = 12;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(ang) * 35, Math.sin(ang) * 35 - 10);
+      ctx.quadraticCurveTo(Math.cos(ang) * 60, Math.sin(ang) * 60 + wave, Math.cos(ang) * 45, Math.sin(ang) * 90);
+      ctx.stroke();
+      // 触须尖端
+      ctx.strokeStyle = '#992266';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(ang) * 45, Math.sin(ang) * 90);
+      ctx.lineTo(Math.cos(ang) * 40, Math.sin(ang) * 105);
+      ctx.stroke();
+      // 吸盘
+      ctx.fillStyle = '#ff88bb';
+      ctx.beginPath(); ctx.arc(Math.cos(ang) * 50, Math.sin(ang) * 70, 5, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(Math.cos(ang) * 42, Math.sin(ang) * 85, 3, 0, Math.PI*2); ctx.fill();
+    }
+    // 眼睛 (巨大发光)
+    ctx.fillStyle = '#ffff00';
+    ctx.shadowColor = '#ff8800'; ctx.shadowBlur = 15;
+    ctx.beginPath(); ctx.arc(-20, -20, 12, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(20, -20, 12, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.arc(-20, -20, 6, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(20, -20, 6, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(-22, -23, 2, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(18, -23, 2, 0, Math.PI*2); ctx.fill();
+    // 嘴
+    ctx.fillStyle = '#220011';
+    ctx.beginPath();
+    ctx.ellipse(0, 5, 18, 8, 0, 0, Math.PI*2);
+    ctx.fill();
+    // 牙齿
+    ctx.fillStyle = '#fff';
+    for (let i = -2; i <= 2; i++) {
+      ctx.beginPath();
+      ctx.moveTo(i * 7 - 3, 0); ctx.lineTo(i * 7, 8); ctx.lineTo(i * 7 + 3, 0);
+      ctx.closePath(); ctx.fill();
+    }
   }
   ctx.restore();
 }
@@ -651,10 +831,36 @@ function drawBoss(b) {
 /* ==================== 子弹 ==================== */
 function fireBullet() {
   if (player.fireCD > 0) return;
-  player.fireCD = CFG.fireInterval;
-  game.bullets.push({ x: player.x, y: player.y - 24, vx: 0, vy: -CFG.bulletSpeed, dmg: 1 });
-  game.shots++;
-  sfx('shoot');
+  const w = player.weapon;
+  if (w === 'normal') {
+    player.fireCD = CFG.fireInterval;
+    game.bullets.push({ x: player.x, y: player.y - 24, vx: 0, vy: -CFG.bulletSpeed, dmg: 1, type: 'normal' });
+    game.shots++;
+    sfx('shoot');
+  } else if (w === 'laser') {
+    // 激光: 穿透, 高伤害, 宽弹
+    player.fireCD = 0.08;
+    game.bullets.push({ x: player.x, y: player.y - 24, vx: 0, vy: -CFG.bulletSpeed * 1.4, dmg: 2, type: 'laser', pierce: true });
+    game.shots++;
+    sfx('laser');
+  } else if (w === 'shotgun') {
+    // 霰弹: 5 发扇形散射
+    player.fireCD = 0.28;
+    for (let i = -2; i <= 2; i++) {
+      const ang = -Math.PI / 2 + i * 0.18;
+      game.bullets.push({ x: player.x, y: player.y - 20, vx: Math.cos(ang) * CFG.bulletSpeed, vy: Math.sin(ang) * CFG.bulletSpeed, dmg: 1, type: 'shotgun' });
+    }
+    game.shots += 5;
+    sfx('shotgun');
+  } else if (w === 'rocket') {
+    // 三连发火箭: 追踪, 爆炸伤害
+    player.fireCD = 0.35;
+    for (let i = -1; i <= 1; i++) {
+      game.bullets.push({ x: player.x + i * 12, y: player.y - 20, vx: i * 60, vy: -CFG.bulletSpeed * 0.9, dmg: 3, type: 'rocket', track: true });
+    }
+    game.shots += 3;
+    sfx('rocket');
+  }
   // 炮口闪光粒子
   for (let i = 0; i < 3; i++) {
     game.particles.push({ x: player.x + rand(-4, 4), y: player.y - 24, vx: rand(-30, 30), vy: rand(-50, -10), life: 0.15, color: '#aaffff', size: 3 });
@@ -664,6 +870,27 @@ function fireBullet() {
 function updateBullets(dt) {
   for (let i = game.bullets.length - 1; i >= 0; i--) {
     const b = game.bullets[i];
+    // 追踪导弹
+    if (b.track) {
+      let target = game.boss;
+      if (!target && game.monsters.length > 0) {
+        // 找最近的怪兽
+        let minD = Infinity;
+        for (const m of game.monsters) {
+          const d = dist(b, m);
+          if (d < minD) { minD = d; target = m; }
+        }
+      }
+      if (target) {
+        const dx = target.x - b.x, dy = target.y - b.y;
+        const d = Math.hypot(dx, dy) || 1;
+        const sp = Math.hypot(b.vx, b.vy);
+        b.vx += (dx / d) * 600 * dt;
+        b.vy += (dy / d) * 600 * dt;
+        const ns = Math.hypot(b.vx, b.vy);
+        if (ns > sp * 1.5) { b.vx = b.vx / ns * sp * 1.5; b.vy = b.vy / ns * sp * 1.5; }
+      }
+    }
     b.x += b.vx * dt; b.y += b.vy * dt;
     if (b.y < -20 || b.y > H + 20 || b.x < -20 || b.x > W + 20) game.bullets.splice(i, 1);
   }
@@ -675,18 +902,47 @@ function updateBullets(dt) {
 }
 
 function drawBullets() {
-  // 玩家子弹: 蓝色能量弹
   for (const b of game.bullets) {
-    ctx.fillStyle = '#00e5ff';
-    ctx.shadowColor = '#00e5ff';
-    ctx.shadowBlur = 8;
-    ctx.beginPath();
-    ctx.ellipse(b.x, b.y, 3, 10, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    // 拖尾
-    ctx.fillStyle = 'rgba(0,229,255,0.3)';
-    ctx.fillRect(b.x - 1, b.y, 2, 8);
+    if (b.type === 'laser') {
+      // 激光: 青色粗光柱
+      ctx.fillStyle = '#00ffff';
+      ctx.shadowColor = '#00ffff';
+      ctx.shadowBlur = 12;
+      ctx.fillRect(b.x - 4, b.y - 14, 8, 24);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(b.x - 2, b.y - 14, 4, 24);
+      ctx.shadowBlur = 0;
+    } else if (b.type === 'shotgun') {
+      // 霰弹: 黄色小球
+      ctx.fillStyle = '#ffdd00';
+      ctx.shadowColor = '#ffaa00';
+      ctx.shadowBlur = 6;
+      ctx.beginPath(); ctx.arc(b.x, b.y, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+    } else if (b.type === 'rocket') {
+      // 火箭: 橙色带尾焰
+      ctx.fillStyle = '#ff6600';
+      ctx.shadowColor = '#ff3300';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.moveTo(b.x, b.y - 8); ctx.lineTo(b.x + 4, b.y + 6); ctx.lineTo(b.x - 4, b.y + 6);
+      ctx.closePath(); ctx.fill();
+      ctx.shadowBlur = 0;
+      // 尾焰
+      ctx.fillStyle = 'rgba(255,200,0,0.6)';
+      ctx.beginPath(); ctx.arc(b.x, b.y + 8, 3, 0, Math.PI * 2); ctx.fill();
+    } else {
+      // 普通子弹: 蓝色能量弹
+      ctx.fillStyle = '#00e5ff';
+      ctx.shadowColor = '#00e5ff';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.ellipse(b.x, b.y, 3, 10, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(0,229,255,0.3)';
+      ctx.fillRect(b.x - 1, b.y, 2, 8);
+    }
   }
   // 敌方子弹
   for (const b of game.enemyBullets) {
@@ -738,33 +994,41 @@ function checkCollisions() {
   // 玩家子弹 vs 怪兽
   for (let i = game.bullets.length - 1; i >= 0; i--) {
     const b = game.bullets[i];
-    let hit = false;
+    let consumed = false;
+    let hitCount = 0;
     for (let j = game.monsters.length - 1; j >= 0; j--) {
       const m = game.monsters[j];
       if (dist(b, m) < 18 * m.size) {
         m.hp -= b.dmg;
         game.hits++;
         addExplosion(b.x, b.y, '#88ccff', 4, 0.5);
-        hit = true;
+        hitCount++;
         if (m.hp <= 0) {
           game.kills++;
           game.score += m.score;
           addExplosion(m.x, m.y, '#ff8800', 16, 1);
           sfx('explode');
+          // 火箭爆炸范围伤害
+          if (b.type === 'rocket') {
+            rocketExplode(b.x, b.y, 50, b.dmg);
+          }
+          // 随机掉落宝盒 (15% 概率)
+          if (Math.random() < 0.15) spawnPowerup(m.x, m.y);
           game.monsters.splice(j, 1);
         } else {
           sfx('hit');
         }
-        break;
+        if (!b.pierce) { consumed = true; break; }
       }
     }
     // vs Boss
-    if (!hit && game.boss) {
+    if (!consumed && game.boss) {
       if (dist(b, game.boss) < 45 * game.boss.size) {
         game.boss.hp -= b.dmg;
         game.hits++;
         addExplosion(b.x, b.y, '#ffaa00', 4, 0.5);
-        hit = true;
+        hitCount++;
+        if (b.type === 'rocket') rocketExplode(b.x, b.y, 60, b.dmg);
         document.getElementById('bossFill').style.width = (game.boss.hp / game.boss.maxHp * 100) + '%';
         if (game.boss.hp <= 0) {
           game.score += game.boss.score;
@@ -776,9 +1040,21 @@ function checkCollisions() {
           document.getElementById('bossBar').classList.remove('show');
           setTimeout(() => endLevel(true), 800);
         }
+        if (!b.pierce) consumed = true;
       }
     }
-    if (hit) game.bullets.splice(i, 1);
+    if (consumed) game.bullets.splice(i, 1);
+  }
+
+  // 玩家 vs 宝盒
+  for (let i = game.powerups.length - 1; i >= 0; i--) {
+    const p = game.powerups[i];
+    if (dist(p, player) < 28) {
+      applyPowerup(p.type);
+      addExplosion(p.x, p.y, '#ffd700', 12, 0.8);
+      sfx('powerup');
+      game.powerups.splice(i, 1);
+    }
   }
 
   // 敌方子弹 vs 玩家
@@ -799,6 +1075,72 @@ function checkCollisions() {
       }
     }
   }
+}
+
+// 火箭爆炸范围伤害
+function rocketExplode(x, y, radius, dmg) {
+  addExplosion(x, y, '#ff6600', 20, 1.2);
+  game.shake = Math.max(game.shake, 0.15);
+  for (let j = game.monsters.length - 1; j >= 0; j--) {
+    const m = game.monsters[j];
+    if (dist({x,y}, m) < radius) {
+      m.hp -= dmg;
+      if (m.hp <= 0) {
+        game.kills++;
+        game.score += m.score;
+        addExplosion(m.x, m.y, '#ff8800', 12, 0.8);
+        if (Math.random() < 0.15) spawnPowerup(m.x, m.y);
+        game.monsters.splice(j, 1);
+      }
+    }
+  }
+  if (game.boss && dist({x,y}, game.boss) < radius) {
+    game.boss.hp -= dmg * 0.5;
+    document.getElementById('bossFill').style.width = (game.boss.hp / game.boss.maxHp * 100) + '%';
+  }
+}
+
+/* ==================== 奖励宝盒 ==================== */
+const POWERUP_TYPES = ['laser', 'shotgun', 'rocket'];
+function spawnPowerup(x, y) {
+  const type = POWERUP_TYPES[Math.floor(Math.random() * POWERUP_TYPES.length)];
+  game.powerups.push({ x, y, vy: 80, type, t: 0 });
+}
+function updatePowerups(dt) {
+  for (let i = game.powerups.length - 1; i >= 0; i--) {
+    const p = game.powerups[i];
+    p.y += p.vy * dt;
+    p.t += dt;
+    if (p.y > H + 30) game.powerups.splice(i, 1);
+  }
+}
+function drawPowerups() {
+  for (const p of game.powerups) {
+    const colors = { laser: '#00ffff', shotgun: '#ffdd00', rocket: '#ff6600' };
+    const labels = { laser: 'L', shotgun: 'S', rocket: 'R' };
+    const c = colors[p.type];
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.t * 2);
+    // 外框发光
+    ctx.shadowColor = c; ctx.shadowBlur = 12;
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(-12, -12, 24, 24);
+    ctx.strokeStyle = c; ctx.lineWidth = 2;
+    ctx.strokeRect(-12, -12, 24, 24);
+    ctx.shadowBlur = 0;
+    ctx.rotate(-p.t * 2);
+    // 字母
+    ctx.fillStyle = c;
+    ctx.font = 'bold 14px monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(labels[p.type], 0, 0);
+    ctx.restore();
+  }
+}
+function applyPowerup(type) {
+  player.weapon = type;
+  player.weaponTime = 10; // 持续 10 秒
 }
 
 function playerHit() {
@@ -822,12 +1164,16 @@ function updateMonsters(dt) {
       if (m.y > 80) { m.phase = 'fight'; m.baseY = m.y; }
     } else {
       // 战斗模式: 左右移动+射击
-      if (m.pattern === 'wave') m.x += m.vx * dt;
-      else m.x += Math.sin(m.t * 1.5) * 30 * dt;
+      if (m.pattern === 'wave') {
+        m.x += m.vx * dt;
+        // 边界反弹
+        if (m.x < 35) { m.x = 35; m.vx = Math.abs(m.vx); }
+        if (m.x > W - 35) { m.x = W - 35; m.vx = -Math.abs(m.vx); }
+      } else {
+        m.x += Math.sin(m.t * 1.5) * 30 * dt;
+        m.x = clamp(m.x, 35, W - 35);
+      }
       m.y = m.baseY + Math.sin(m.t) * 10;
-
-      if (m.x < 30) m.vx = Math.abs(m.vx);
-      if (m.x > W - 30) m.vx = -Math.abs(m.vx);
 
       const cfg = MONSTER_TYPES[m.type];
       if (cfg.shoot) {
@@ -895,7 +1241,7 @@ function updateWaves(dt) {
   }
 }
 
-/* ==================== 背景绘制 ==================== */
+/* ==================== 背景绘制 (多层视差) ==================== */
 function drawBackground(dt) {
   const lv = LEVELS[game.level];
   // 渐变天空
@@ -906,7 +1252,10 @@ function drawBackground(dt) {
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
 
-  // 星空/粒子
+  // 视差远景层
+  drawFarLayer(lv.ground, lv);
+
+  // 星空/粒子 (中景)
   for (const s of game.stars) {
     s.y += s.speed * dt;
     if (s.y > H) { s.y = 0; s.x = Math.random() * W; }
@@ -916,53 +1265,227 @@ function drawBackground(dt) {
   }
   ctx.globalAlpha = 1;
 
-  // 地形 (底部)
+  // 地形 (近景底部)
   if (lv.ground) drawGround(lv.ground);
 }
 
+// 远景层: 每关独特的视差元素
+function drawFarLayer(type, lv) {
+  const off = (game.time * 20) % W; // 视差滚动偏移
+  ctx.save();
+  if (type === null) {
+    // 太空: 星云 + 远处行星
+    ctx.globalAlpha = 0.15;
+    ctx.fillStyle = '#4466ff';
+    ctx.beginPath(); ctx.arc(W * 0.2 - off * 0.3, H * 0.3, 60, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#ff4488';
+    ctx.beginPath(); ctx.arc(W * 0.8 - off * 0.2, H * 0.2, 40, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
+  } else if (type === 'ocean') {
+    // 海洋: 远处海面光线
+    ctx.globalAlpha = 0.1;
+    for (let i = 0; i < 3; i++) {
+      ctx.fillStyle = '#44aaff';
+      ctx.fillRect(W * (0.2 + i * 0.3) - off * 0.1, 0, 30, H * 0.6);
+    }
+    ctx.globalAlpha = 1;
+  } else if (type === 'desert') {
+    // 沙漠: 远处金字塔
+    ctx.fillStyle = 'rgba(120,80,40,0.5)';
+    const px = W * 0.3 - off * 0.3;
+    ctx.beginPath();
+    ctx.moveTo(px, H * 0.7); ctx.lineTo(px + 50, H * 0.5); ctx.lineTo(px + 100, H * 0.7);
+    ctx.closePath(); ctx.fill();
+    const px2 = W * 0.7 - off * 0.3;
+    ctx.beginPath();
+    ctx.moveTo(px2, H * 0.72); ctx.lineTo(px2 + 35, H * 0.55); ctx.lineTo(px2 + 70, H * 0.72);
+    ctx.closePath(); ctx.fill();
+  } else if (type === 'mars') {
+    // 火星: 远处岩石山脉
+    ctx.fillStyle = 'rgba(90,30,15,0.6)';
+    ctx.beginPath();
+    ctx.moveTo(0, H * 0.6);
+    for (let x = 0; x <= W; x += 40) {
+      ctx.lineTo(x, H * 0.6 + Math.sin(x * 0.01 + 1) * 30 - 20);
+    }
+    ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.fill();
+  } else if (type === 'moon') {
+    // 月球: 远处地球
+    ctx.globalAlpha = 0.8;
+    const earthX = W * 0.8 - off * 0.15;
+    const eg = ctx.createRadialGradient(earthX, H * 0.15, 5, earthX, H * 0.15, 30);
+    eg.addColorStop(0, '#4488ff'); eg.addColorStop(0.7, '#224488'); eg.addColorStop(1, '#112244');
+    ctx.fillStyle = eg;
+    ctx.beginPath(); ctx.arc(earthX, H * 0.15, 28, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
+  } else if (type === 'savanna') {
+    // 草原: 远处金合欢树剪影
+    ctx.fillStyle = 'rgba(40,30,15,0.6)';
+    for (let i = 0; i < 4; i++) {
+      const tx = (i * W / 3 + 50 - off * 0.25) % (W + 100) - 50;
+      ctx.fillRect(tx, H * 0.6, 4, 30); // 树干
+      ctx.beginPath(); ctx.ellipse(tx + 2, H * 0.58, 18, 8, 0, 0, Math.PI*2); ctx.fill();
+    }
+  } else if (type === 'jungle') {
+    // 雨林: 远处树冠层
+    ctx.fillStyle = 'rgba(15,50,25,0.7)';
+    for (let x = 0; x < W; x += 25) {
+      const th = 20 + Math.sin(x * 0.05) * 10;
+      ctx.beginPath();
+      ctx.arc(x, H * 0.65, th, 0, Math.PI*2); ctx.fill();
+    }
+  } else if (type === 'neptune') {
+    // 海王星: 极光
+    ctx.globalAlpha = 0.2;
+    const ag = ctx.createLinearGradient(0, 0, W, 0);
+    ag.addColorStop(0, '#00ff88'); ag.addColorStop(0.5, '#00aaff'); ag.addColorStop(1, '#aa00ff');
+    ctx.fillStyle = ag;
+    ctx.beginPath();
+    ctx.moveTo(0, H * 0.1);
+    for (let x = 0; x <= W; x += 20) {
+      ctx.lineTo(x, H * 0.1 + Math.sin(x * 0.01 + game.time) * 15);
+    }
+    ctx.lineTo(W, H * 0.25);
+    for (let x = W; x >= 0; x -= 20) {
+      ctx.lineTo(x, H * 0.25 + Math.sin(x * 0.015 + game.time * 0.7) * 10);
+    }
+    ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+}
+
 function drawGround(type) {
-  const gy = H * 0.85;
+  const gy = H * 0.82;
   ctx.save();
   if (type === 'ocean') {
-    ctx.fillStyle = '#003366';
+    // 海洋: 深水 + 波浪 + 气泡
+    const og = ctx.createLinearGradient(0, gy, 0, H);
+    og.addColorStop(0, '#004477'); og.addColorStop(1, '#001133');
+    ctx.fillStyle = og;
     ctx.fillRect(0, gy, W, H - gy);
-    ctx.fillStyle = 'rgba(0,100,180,0.4)';
+    // 波浪线
+    ctx.strokeStyle = 'rgba(0,150,220,0.5)'; ctx.lineWidth = 2;
     for (let i = 0; i < 5; i++) {
-      ctx.fillRect(0, gy + i * 15 + Math.sin(game.time*2+i)*3, W, 2);
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += 10) {
+        ctx.lineTo(x, gy + i * 12 + Math.sin(game.time * 2 + x * 0.03 + i) * 4);
+      }
+      ctx.stroke();
+    }
+    // 气泡
+    ctx.fillStyle = 'rgba(150,220,255,0.3)';
+    for (let i = 0; i < 8; i++) {
+      const bx = (i * 73 + game.time * 30) % W;
+      const by = gy + 10 + ((i * 17 + game.time * 40) % (H - gy - 20));
+      ctx.beginPath(); ctx.arc(bx, by, 2 + i % 3, 0, Math.PI*2); ctx.fill();
     }
   } else if (type === 'desert') {
-    ctx.fillStyle = '#b8884a';
+    // 沙漠: 沙丘 + 沙粒
+    const dg = ctx.createLinearGradient(0, gy, 0, H);
+    dg.addColorStop(0, '#c8985a'); dg.addColorStop(1, '#8a6030');
+    ctx.fillStyle = dg;
     ctx.beginPath();
     ctx.moveTo(0, gy);
-    for (let x = 0; x <= W; x += 30) ctx.lineTo(x, gy + Math.sin(x*0.02)*8);
+    for (let x = 0; x <= W; x += 20) ctx.lineTo(x, gy + Math.sin(x * 0.02 + 1) * 12);
     ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.fill();
+    // 沙粒纹理
+    ctx.fillStyle = 'rgba(255,220,150,0.2)';
+    for (let i = 0; i < 30; i++) {
+      ctx.fillRect((i * 37 + game.time * 10) % W, gy + (i * 13) % (H - gy), 2, 2);
+    }
   } else if (type === 'mars') {
-    ctx.fillStyle = '#8a2a1a';
+    // 火星: 红色地表 + 陨石坑 + 岩石
+    const mg = ctx.createLinearGradient(0, gy, 0, H);
+    mg.addColorStop(0, '#aa3322'); mg.addColorStop(1, '#551108');
+    ctx.fillStyle = mg;
     ctx.fillRect(0, gy, W, H - gy);
-    ctx.fillStyle = '#6a1a0a';
-    for (let i = 0; i < 6; i++) ctx.fillRect(rand(0,W), gy+rand(0,30), rand(20,60), 3);
+    // 陨石坑
+    ctx.fillStyle = 'rgba(60,15,8,0.6)';
+    for (let i = 0; i < 5; i++) {
+      const cx = (i * 89) % W;
+      const cy = gy + 15 + i * 12;
+      ctx.beginPath(); ctx.ellipse(cx, cy, 15 + i*3, 6, 0, 0, Math.PI*2); ctx.fill();
+    }
+    // 岩石
+    ctx.fillStyle = '#772218';
+    for (let i = 0; i < 4; i++) {
+      const rx = (i * 120 + 30) % W;
+      ctx.beginPath(); ctx.arc(rx, gy + 8, 4 + i, 0, Math.PI*2); ctx.fill();
+    }
   } else if (type === 'moon') {
-    ctx.fillStyle = '#888';
+    // 月球: 灰色地表 + 陨石坑
+    ctx.fillStyle = '#999';
     ctx.fillRect(0, gy, W, H - gy);
-    ctx.fillStyle = '#666';
-    for (let i = 0; i < 10; i++) {
-      ctx.beginPath(); ctx.arc(rand(0,W), gy+rand(5,40), rand(3,10), 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#777';
+    for (let i = 0; i < 12; i++) {
+      const cx = (i * 53) % W;
+      const cy = gy + 8 + (i * 17) % (H - gy - 15);
+      ctx.beginPath(); ctx.arc(cx, cy, 3 + (i % 4) * 2, 0, Math.PI*2); ctx.fill();
+    }
+    // 陨石坑高光
+    ctx.fillStyle = '#bbb';
+    for (let i = 0; i < 8; i++) {
+      const cx = (i * 71) % W;
+      const cy = gy + 12 + (i * 23) % (H - gy - 20);
+      ctx.beginPath(); ctx.arc(cx, cy, 2, 0, Math.PI*2); ctx.fill();
     }
   } else if (type === 'savanna') {
-    ctx.fillStyle = '#4a6a2a';
+    // 草原: 草地 + 草丛
+    const sg = ctx.createLinearGradient(0, gy, 0, H);
+    sg.addColorStop(0, '#6a8a3a'); sg.addColorStop(1, '#3a5a1a');
+    ctx.fillStyle = sg;
     ctx.fillRect(0, gy, W, H - gy);
-    ctx.fillStyle = '#6a8a3a';
-    ctx.fillRect(0, gy, W, 4);
+    // 草丛
+    ctx.strokeStyle = '#8aaa4a'; ctx.lineWidth = 1.5;
+    for (let x = 0; x < W; x += 8) {
+      const gh = 4 + Math.sin(x * 0.1) * 3;
+      ctx.beginPath();
+      ctx.moveTo(x, gy); ctx.lineTo(x - 2, gy - gh); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x, gy); ctx.lineTo(x + 2, gy - gh); ctx.stroke();
+    }
   } else if (type === 'jungle') {
-    ctx.fillStyle = '#1a4a2a';
+    // 雨林: 深色地面 + 藤蔓 + 落叶
+    const jg = ctx.createLinearGradient(0, gy, 0, H);
+    jg.addColorStop(0, '#2a5a3a'); jg.addColorStop(1, '#0a2a1a');
+    ctx.fillStyle = jg;
     ctx.fillRect(0, gy, W, H - gy);
-    ctx.fillStyle = '#2a6a3a';
-    for (let x = 0; x < W; x += 20) ctx.fillRect(x, gy-8, 8, 16);
+    // 草丛/蕨类
+    ctx.fillStyle = '#3a7a4a';
+    for (let x = 0; x < W; x += 15) {
+      ctx.beginPath();
+      ctx.moveTo(x, gy);
+      ctx.lineTo(x - 4, gy - 10); ctx.lineTo(x, gy - 6); ctx.lineTo(x + 4, gy - 10);
+      ctx.closePath(); ctx.fill();
+    }
+    // 落叶
+    ctx.fillStyle = 'rgba(150,200,80,0.4)';
+    for (let i = 0; i < 5; i++) {
+      ctx.beginPath(); ctx.ellipse((i*80+30)%W, gy+10+i*8, 4, 2, i, 0, Math.PI*2); ctx.fill();
+    }
   } else if (type === 'neptune') {
-    ctx.fillStyle = '#3a5a9a';
+    // 海王星: 冰面 + 雪花
+    const ng = ctx.createLinearGradient(0, gy, 0, H);
+    ng.addColorStop(0, '#5a8aca'); ng.addColorStop(1, '#2a4a7a');
+    ctx.fillStyle = ng;
     ctx.fillRect(0, gy, W, H - gy);
-    ctx.fillStyle = '#5a7aba';
-    ctx.fillRect(0, gy+Math.sin(game.time)*5, W, 3);
+    // 冰裂纹
+    ctx.strokeStyle = 'rgba(180,210,255,0.4)'; ctx.lineWidth = 1;
+    for (let i = 0; i < 6; i++) {
+      ctx.beginPath();
+      ctx.moveTo((i*60)%W, gy + 5);
+      ctx.lineTo((i*60+30)%W, gy + 25);
+      ctx.lineTo((i*60+15)%W, gy + 45);
+      ctx.stroke();
+    }
+    // 雪花
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    for (let i = 0; i < 15; i++) {
+      const sx = (i * 47 + game.time * 20) % W;
+      const sy = gy + ((i * 23 + game.time * 30) % (H - gy));
+      ctx.beginPath(); ctx.arc(sx, sy, 1.5, 0, Math.PI*2); ctx.fill();
+    }
   }
   ctx.restore();
 }
@@ -979,6 +1502,18 @@ function updateHUD() {
     h.className = 'hp' + (i >= player.hp ? ' empty' : '');
     hp.appendChild(h);
   }
+  // 武器状态
+  const wc = document.getElementById('weaponCell');
+  if (player.weapon !== 'normal') {
+    wc.style.display = '';
+    const names = { laser: '激光', shotgun: '霰弹', rocket: '火箭' };
+    const colors = { laser: '#0ff', shotgun: '#fd0', rocket: '#f60' };
+    const el = document.getElementById('hWp');
+    el.textContent = names[player.weapon] + ' ' + Math.ceil(player.weaponTime) + 's';
+    el.style.color = colors[player.weapon];
+  } else {
+    wc.style.display = 'none';
+  }
 }
 
 /* ==================== 游戏流程 ==================== */
@@ -987,9 +1522,11 @@ function startGame(level) {
   game.score = 0; game.kills = 0; game.shots = 0; game.hits = 0;
   game.time = 0; game.waveIdx = 0;
   game.monsters = []; game.bullets = []; game.enemyBullets = []; game.particles = [];
+  game.powerups = [];
   game.boss = null; game.bossActive = false; game.shake = 0;
   player.x = W / 2; player.y = H - 100;
   player.hp = CFG.maxHP; player.invuln = 0; player.fireCD = 0;
+  player.weapon = 'normal'; player.weaponTime = 0;
   initStars(level);
   game.state = 'playing';
   hideAllOverlays();
@@ -1065,6 +1602,22 @@ function sfx(type) {
     o.type = 'sawtooth'; o.frequency.setValueAtTime(400, now); o.frequency.exponentialRampToValueAtTime(30, now+0.8);
     g.gain.setValueAtTime(0.2, now); g.gain.exponentialRampToValueAtTime(0.001, now+0.9);
     o.start(now); o.stop(now+0.9);
+  } else if (type === 'laser') {
+    o.type = 'sawtooth'; o.frequency.setValueAtTime(1200, now); o.frequency.exponentialRampToValueAtTime(600, now+0.1);
+    g.gain.setValueAtTime(0.07, now); g.gain.exponentialRampToValueAtTime(0.001, now+0.12);
+    o.start(now); o.stop(now+0.12);
+  } else if (type === 'shotgun') {
+    o.type = 'square'; o.frequency.setValueAtTime(180, now); o.frequency.exponentialRampToValueAtTime(60, now+0.15);
+    g.gain.setValueAtTime(0.1, now); g.gain.exponentialRampToValueAtTime(0.001, now+0.18);
+    o.start(now); o.stop(now+0.18);
+  } else if (type === 'rocket') {
+    o.type = 'sawtooth'; o.frequency.setValueAtTime(100, now); o.frequency.exponentialRampToValueAtTime(300, now+0.15);
+    g.gain.setValueAtTime(0.1, now); g.gain.exponentialRampToValueAtTime(0.001, now+0.2);
+    o.start(now); o.stop(now+0.2);
+  } else if (type === 'powerup') {
+    o.type = 'sine'; o.frequency.setValueAtTime(523, now); o.frequency.setValueAtTime(659, now+0.08); o.frequency.setValueAtTime(784, now+0.16);
+    g.gain.setValueAtTime(0.12, now); g.gain.exponentialRampToValueAtTime(0.001, now+0.3);
+    o.start(now); o.stop(now+0.3);
   }
 }
 
@@ -1158,13 +1711,20 @@ function update(dt) {
 
   if (player.invuln > 0) player.invuln -= dt;
   player.fireCD -= dt;
+  // 武器持续时间
+  if (player.weaponTime > 0) {
+    player.weaponTime -= dt;
+    if (player.weaponTime <= 0) { player.weapon = 'normal'; player.weaponTime = 0; }
+  }
   if (input.shoot) fireBullet();
 
   updateBullets(dt);
   updateMonsters(dt);
   updateWaves(dt);
   updateParticles(dt);
+  updatePowerups(dt);
   checkCollisions();
+  updateHUD();
 }
 
 function render() {
@@ -1181,6 +1741,7 @@ function render() {
     drawBackground(0.016);
     for (const m of game.monsters) drawMonster(m);
     if (game.boss) drawBoss(game.boss);
+    drawPowerups();
     drawPlayer();
     drawBullets();
     drawParticles();
@@ -1189,6 +1750,7 @@ function render() {
   drawBackground(0.016);
   for (const m of game.monsters) drawMonster(m);
   if (game.boss) drawBoss(game.boss);
+  drawPowerups();
   drawPlayer();
   drawBullets();
   drawParticles();
