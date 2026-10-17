@@ -1,9 +1,9 @@
 {
-  "name": "outrun-web",
+  "name": "mecha-vs-monsters",
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "OutRun 户外大飙车 — 纯 Canvas 伪3D赛车网页游戏，支持PC键盘与移动端触控",
+  "description": "机甲大战怪兽 — 纯 Canvas 2D 纵版飞行射击游戏，8 关卡 8 Boss，支持 PC 键盘与移动端触控",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -12,8 +12,5 @@
   },
   "devDependencies": {
     "vite": "^5.2.10"
-  },
-  "dependencies": {
-    "canvas": "^3.2.3"
   }
 }
