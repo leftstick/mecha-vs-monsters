@@ -400,21 +400,29 @@ function spawnBoss(type) {
 
 // 在预告画布上绘制 Boss 头像（复用 drawBoss）
 function drawBossAvatar(type) {
-  const cv = document.getElementById('bossAvatar');
-  if (!cv) return;
-  const av = cv.getContext('2d');
-  av.clearRect(0, 0, cv.width, cv.height);
-  // 背景圆
-  av.fillStyle = 'rgba(0,0,0,0.35)';
-  av.beginPath(); av.arc(cv.width/2, cv.height/2, 56, 0, Math.PI*2); av.fill();
-  av.strokeStyle = '#ff4444'; av.lineWidth = 2;
-  av.beginPath(); av.arc(cv.width/2, cv.height/2, 56, 0, Math.PI*2); av.stroke();
-  // 临时切换上下文绘制 Boss
-  const oldCtx = ctx;
-  ctx = av;
-  const fakeBoss = { type, size: 3.0, t: 0, x: cv.width/2, y: cv.height/2 };
-  drawBoss(fakeBoss);
-  ctx = oldCtx;
+  try {
+    const cv = document.getElementById('bossAvatar');
+    if (!cv) return;
+    const av = cv.getContext('2d');
+    av.clearRect(0, 0, cv.width, cv.height);
+    // 背景圆
+    av.fillStyle = 'rgba(0,0,0,0.35)';
+    av.beginPath(); av.arc(cv.width/2, cv.height/2, 56, 0, Math.PI*2); av.fill();
+    av.strokeStyle = '#ff4444'; av.lineWidth = 2;
+    av.beginPath(); av.arc(cv.width/2, cv.height/2, 56, 0, Math.PI*2); av.stroke();
+    // 临时切换上下文绘制 Boss（用 try-finally 保证 ctx 一定还原）
+    const oldCtx = ctx;
+    ctx = av;
+    try {
+      const fakeBoss = { type, size: 3.0, t: 0, x: cv.width/2, y: cv.height/2 };
+      drawBoss(fakeBoss);
+    } finally {
+      ctx = oldCtx;
+    }
+  } catch (e) {
+    // 头像绘制失败不影响预告界面显示
+    console.warn('drawBossAvatar failed:', e);
+  }
 }
 
 // 触发 Boss 预告（荒野大镖客风格）：暂停游戏，显示 Boss 介绍，等玩家确认
@@ -424,15 +432,21 @@ function triggerBossIntro(type) {
   game.bossPending = true;
   pendingBossType = type;
   game.state = 'bossIntro';
-  const cfg = BOSS_TYPES[type];
-  document.getElementById('bossIntroName').textContent = cfg.name;
-  document.getElementById('bossIntroDesc').textContent = cfg.desc;
-  document.getElementById('bossIntroHP').textContent = cfg.hp;
-  // 关卡序号
-  document.getElementById('bossIntroLv').textContent = '第 ' + (game.level + 1) + ' 关 · ' + LEVELS[game.level].name;
-  drawBossAvatar(type);
-  document.getElementById('ovBossIntro').classList.remove('hidden');
-  sfx('bossWarn');
+  try {
+    const cfg = BOSS_TYPES[type];
+    document.getElementById('bossIntroName').textContent = cfg.name;
+    document.getElementById('bossIntroDesc').textContent = cfg.desc;
+    document.getElementById('bossIntroHP').textContent = cfg.hp;
+    document.getElementById('bossIntroLv').textContent = '第 ' + (game.level + 1) + ' 关 · ' + LEVELS[game.level].name;
+    // 先显示 overlay，再画头像（即使头像失败也能看到预告界面）
+    document.getElementById('ovBossIntro').classList.remove('hidden');
+    drawBossAvatar(type);
+    sfx('bossWarn');
+  } catch (e) {
+    console.error('triggerBossIntro error:', e);
+    // 兜底：直接开始 Boss 战，避免卡死
+    confirmBossBattle();
+  }
 }
 
 // 玩家确认后正式开始 Boss 战
@@ -1581,8 +1595,8 @@ function checkCollisions() {
           if (b.type === 'rocket') {
             rocketExplode(b.x, b.y, 50, b.dmg);
           }
-          // 随机掉落宝盒 (15% 概率)
-          if (Math.random() < 0.15) spawnPowerup(m.x, m.y);
+          // 随机掉落宝盒 (5% 概率)
+          if (Math.random() < 0.05) spawnPowerup(m.x, m.y);
           game.monsters.splice(j, 1);
         } else {
           sfx('hit');
@@ -1666,7 +1680,7 @@ function rocketExplode(x, y, radius, dmg) {
         game.kills++;
         game.score += m.score;
         addExplosion(m.x, m.y, '#ff8800', 12, 0.8);
-        if (Math.random() < 0.15) spawnPowerup(m.x, m.y);
+        if (Math.random() < 0.05) spawnPowerup(m.x, m.y);
         game.monsters.splice(j, 1);
       }
     }
