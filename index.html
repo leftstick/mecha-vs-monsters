@@ -48,6 +48,20 @@
   .ov-stat b{color:#ffd23f;font-size:1.2em;}
   .rank{font-size:clamp(42px,12vw,80px);color:#ffd23f;text-shadow:0 0 20px #ff8800,4px 4px 0 #000;margin:6px 0;}
   .hint{font-size:11px;color:#668;margin-top:18px;line-height:1.7;}
+  /* Boss 预告 (荒野大镖客风格) */
+  #ovBossIntro{background:radial-gradient(ellipse at center,rgba(40,0,0,0.94),rgba(10,0,0,0.99));}
+  .boss-intro{animation:bossShake 0.5s ease-out;max-width:90%;}
+  .boss-warn{font-size:clamp(18px,6vw,34px);font-weight:900;color:#ff3030;letter-spacing:0.4em;
+    text-shadow:0 0 16px #ff0000,0 0 32px #aa0000,2px 2px 0 #000;animation:bossFlicker 1.2s infinite;}
+  .boss-lv{font-size:clamp(12px,3.5vw,18px);color:#ffaaaa;letter-spacing:0.2em;margin:10px 0 4px;}
+  .boss-name{font-size:clamp(34px,11vw,72px);font-weight:900;color:#fff;letter-spacing:0.1em;
+    text-shadow:0 0 24px #ff2222,0 0 48px #ff0000,4px 4px 0 #500;margin:6px 0;}
+  .boss-desc{font-size:clamp(13px,4vw,18px);color:#ffccaa;max-width:420px;line-height:1.6;margin:8px auto 12px;}
+  .boss-hp{font-size:clamp(14px,4vw,18px);color:#ffd23f;margin-bottom:18px;}
+  .boss-hp span{font-size:1.3em;font-weight:900;color:#ff5050;}
+  .boss-hint{font-size:11px;color:#a86;margin-top:14px;opacity:0.8;}
+  @keyframes bossShake{0%{transform:scale(0.6);opacity:0;}60%{transform:scale(1.08);}100%{transform:scale(1);opacity:1;}}
+  @keyframes bossFlicker{0%,100%{opacity:1;}45%{opacity:1;}50%{opacity:0.4;}55%{opacity:1;}}
   /* Boss血条 */
   #bossBar{position:fixed;top:56px;left:50%;transform:translateX(-50%);z-index:21;width:70%;max-width:360px;display:none;}
   #bossBar.show{display:block;}
@@ -110,6 +124,19 @@
   <button class="btn" id="btnNext">下一关</button>
   <button class="btn ghost" id="btnRetry">重试</button>
   <button class="btn ghost" id="btnMenu">主菜单</button>
+</div>
+
+<!-- Boss 预告 (荒野大镖客风格) -->
+<div class="ov hidden" id="ovBossIntro">
+  <div class="boss-intro">
+    <div class="boss-warn">⚠ 危 险 ⚠</div>
+    <div class="boss-lv" id="bossIntroLv">第 1 关 · 太空</div>
+    <div class="boss-name" id="bossIntroName">虚空领主</div>
+    <div class="boss-desc" id="bossIntroDesc">来自维度裂缝的异形母舰</div>
+    <div class="boss-hp">生命值 <span id="bossIntroHP">80</span></div>
+    <button class="btn" id="btnBossFight">开 始 战 斗</button>
+    <div class="boss-hint">准备好后点击按钮，Boss 将正式登场</div>
+  </div>
 </div>
 
 <script>
@@ -178,14 +205,14 @@ const MONSTER_TYPES = {
 };
 
 const BOSS_TYPES = {
-  voidlord:  { hp:80,  score:6000,  size:5.0, name:'虚空领主' },
-  leviathan: { hp:95,  score:7000,  size:5.0, name:'深海利维坦' },
-  colossus:  { hp:110, score:8000,  size:5.5, name:'沙暴巨像' },
-  dragon:    { hp:125, score:9000,  size:5.0, name:'机械巨龙' },
-  guardian:  { hp:140, score:10000, size:5.0, name:'月面守护者' },
-  beastking: { hp:155, score:11000, size:5.5, name:'百兽之王' },
-  vinetitan: { hp:170, score:12000, size:5.5, name:'藤蔓巨怪' },
-  kraken:    { hp:190, score:15000, size:6.0, name:'深渊海妖' },
+  voidlord:  { hp:80,  score:6000,  size:5.0, name:'虚空领主',   desc:'来自维度裂缝的异形母舰，以螺旋弹幕撕裂星空' },
+  leviathan: { hp:95,  score:7000,  size:5.0, name:'深海利维坦', desc:'沉睡万年的远古海蛇，一口水柱可击穿钢甲' },
+  colossus:  { hp:110, score:8000,  size:5.5, name:'沙暴巨像',   desc:'由沙岩与怨念凝聚而成的巨人，尾刺淬有剧毒' },
+  dragon:    { hp:125, score:9000,  size:5.0, name:'机械巨龙',   desc:'火星兵工厂的终极造物，龙息焚尽一切' },
+  guardian:  { hp:140, score:10000, size:5.0, name:'月面守护者', desc:'月球背面苏醒的古代机甲，红眼锁定即死' },
+  beastking: { hp:155, score:11000, size:5.5, name:'百兽之王',   desc:'草原霸主，獠牙与利爪之下无人生还' },
+  vinetitan: { hp:170, score:12000, size:5.5, name:'藤蔓巨怪',   desc:'雨林深处的食人植物，种子炸弹遍地开花' },
+  kraken:    { hp:190, score:15000, size:6.0, name:'深渊海妖',   desc:'海王星深渊的终极恐惧，八条触须粉碎舰队' },
 };
 
 /* ==================== 工具 ==================== */
@@ -366,6 +393,33 @@ function spawnBoss(type) {
   game.bossActive = true;
   document.getElementById('bossName').textContent = cfg.name;
   document.getElementById('bossBar').classList.add('show');
+}
+
+// 触发 Boss 预告（荒野大镖客风格）：暂停游戏，显示 Boss 介绍，等玩家确认
+let pendingBossType = null;
+function triggerBossIntro(type) {
+  if (game.bossPending) return;
+  game.bossPending = true;
+  pendingBossType = type;
+  game.state = 'bossIntro';
+  const cfg = BOSS_TYPES[type];
+  document.getElementById('bossIntroName').textContent = cfg.name;
+  document.getElementById('bossIntroDesc').textContent = cfg.desc;
+  document.getElementById('bossIntroHP').textContent = cfg.hp;
+  // 关卡序号
+  document.getElementById('bossIntroLv').textContent = '第 ' + (game.level + 1) + ' 关 · ' + LEVELS[game.level].name;
+  document.getElementById('ovBossIntro').classList.remove('hidden');
+  sfx('bossWarn');
+}
+
+// 玩家确认后正式开始 Boss 战
+function confirmBossBattle() {
+  if (!game.bossPending) return;
+  document.getElementById('ovBossIntro').classList.add('hidden');
+  game.bossPending = false;
+  game.state = 'playing';
+  spawnBoss(pendingBossType);
+  pendingBossType = null;
 }
 
 /* ==================== 玩家绘制: 歼20/隐身战机 ==================== */
@@ -1884,20 +1938,57 @@ function updateMonsters(dt) {
 
 /* ==================== 关卡波次 ==================== */
 function updateWaves(dt) {
-  if (game.bossActive) return;
+  if (game.bossActive || game.bossPending) return;
   const lv = LEVELS[game.level];
+
+  // 1) 按时间推进波次
   if (game.waveIdx < lv.waves.length) {
     if (game.time >= lv.waves[game.waveIdx].t) {
       spawnWave(lv.waves[game.waveIdx]);
       game.waveIdx++;
     }
-  } else if (game.monsters.length === 0) {
-    // 所有波次清完 → Boss 或 过关
+  }
+
+  // 2) 连续补怪: 场上怪兽过少时零星补 1-2 只，消除批次间空白感
+  //    仅在还有波次未出时补怪，波次全部出完后停手以便清场触发 Boss
+  const keepMin = 4; // 场上至少保持的怪兽数
+  if (game.waveIdx < lv.waves.length && game.monsters.length < keepMin) {
+    game.trickleTimer -= dt;
+    if (game.trickleTimer <= 0) {
+      spawnTrickle(lv);
+      game.trickleTimer = rand(1.4, 2.6) / (CFG.difficulty[game.level] || 1);
+    }
+  } else {
+    game.trickleTimer = 0;
+  }
+
+  // 3) 所有波次结束且怪兽清空 → 触发 Boss 预告（而非直接生成）
+  if (game.waveIdx >= lv.waves.length && game.monsters.length === 0) {
     if (lv.boss) {
-      if (!game.bossActive && !game.boss) spawnBoss(lv.boss);
+      triggerBossIntro(lv.boss);
     } else {
       endLevel(true);
     }
+  }
+}
+
+// 零星补怪: 从本关波次中随机选一种类型，生成 1-2 只
+function spawnTrickle(lv) {
+  const types = [...new Set(lv.waves.map(w => w.type))];
+  const type = types[Math.floor(Math.random() * types.length)];
+  const cfg = MONSTER_TYPES[type];
+  const diff = CFG.difficulty[game.level] || 1;
+  const count = Math.random() < 0.35 ? 2 : 1;
+  for (let i = 0; i < count; i++) {
+    const x = clamp(rand(W * 0.15, W * 0.85), 40, W - 40);
+    const shootInt = cfg.shoot ? cfg.shootInterval / diff : 0;
+    game.monsters.push({
+      type, x, y: -50 - i * 40,
+      vx: rand(-30, 30) * diff, vy: cfg.speed * CFG.baseMonsterSpeed * diff,
+      hp: cfg.hp, maxHp: cfg.hp, size: cfg.size, score: cfg.score,
+      shootCD: cfg.shoot ? rand(0.5, shootInt) : 0, shootInterval: shootInt,
+      t: Math.random() * Math.PI * 2, pattern: 'wave', phase: 'enter',
+    });
   }
 }
 
@@ -2553,7 +2644,7 @@ function endLevel(win) {
 }
 
 function hideAllOverlays() {
-  ['ovTitle','ovLevel','ovPause','ovOver'].forEach(id => document.getElementById(id).classList.add('hidden'));
+  ['ovTitle','ovLevel','ovPause','ovOver','ovBossIntro'].forEach(id => document.getElementById(id).classList.add('hidden'));
 }
 
 function togglePause() {
@@ -2615,6 +2706,12 @@ function sfx(type) {
     o.type = 'sine'; o.frequency.setValueAtTime(523, now); o.frequency.setValueAtTime(659, now+0.08); o.frequency.setValueAtTime(784, now+0.16);
     g.gain.setValueAtTime(0.12, now); g.gain.exponentialRampToValueAtTime(0.001, now+0.3);
     o.start(now); o.stop(now+0.3);
+  } else if (type === 'bossWarn') {
+    // 低沉警报音 + 上升音
+    o.type = 'sawtooth'; o.frequency.setValueAtTime(110, now); o.frequency.linearRampToValueAtTime(220, now+0.25);
+    o.frequency.linearRampToValueAtTime(110, now+0.5); o.frequency.linearRampToValueAtTime(330, now+0.75);
+    g.gain.setValueAtTime(0.18, now); g.gain.exponentialRampToValueAtTime(0.001, now+0.9);
+    o.start(now); o.stop(now+0.9);
   }
 }
 
@@ -2733,7 +2830,7 @@ function render() {
     ctx.globalAlpha = 1;
     return;
   }
-  if (game.state === 'pause' || game.state === 'over') {
+  if (game.state === 'pause' || game.state === 'over' || game.state === 'bossIntro') {
     // 暂停/结算时保留最后一帧背景
     drawBackground(0.016);
     for (const m of game.monsters) drawMonster(m);
@@ -2779,6 +2876,7 @@ document.getElementById('btnQuit').addEventListener('click', () => { game.state 
 document.getElementById('btnNext').addEventListener('click', () => startGame(game.level + 1));
 document.getElementById('btnRetry').addEventListener('click', () => startGame(game.level));
 document.getElementById('btnMenu').addEventListener('click', () => { game.state = 'title'; hideAllOverlays(); document.getElementById('ovTitle').classList.remove('hidden'); });
+document.getElementById('btnBossFight').addEventListener('click', confirmBossBattle);
 document.getElementById('pauseBtn').addEventListener('click', togglePause);
 document.getElementById('bgmBtn').addEventListener('click', toggleBGM);
 
