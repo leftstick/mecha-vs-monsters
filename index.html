@@ -264,6 +264,7 @@ let game = {
   boss: null,
   bossActive: false,
   bossPending: false, // Boss预告已触发，等待玩家确认
+  bossRetry: false, // 上一局是否在Boss战中失败（重试时直接重开Boss）
   trickleTimer: 0, // 连续刷怪计时器
   shake: 0,
   overWin: false,
@@ -2856,9 +2857,34 @@ function startGame(level) {
   updateHUD();
 }
 
+// Boss战失败后重试：直接重开Boss战，跳过小怪波次，保留当前分数
+function retryBoss() {
+  const level = game.level;
+  const lv = LEVELS[level];
+  // 保留分数、击杀、命中统计，重置战斗状态
+  game.time = 0;
+  game.waveIdx = lv.waves.length; // 跳过所有波次，直接进入Boss
+  game.monsters = []; game.bullets = []; game.enemyBullets = []; game.particles = [];
+  game.powerups = [];
+  game.boss = null; game.bossActive = false; game.bossPending = false; game.trickleTimer = 0; game.shake = 0;
+  game.bossRetry = false;
+  player.x = W / 2; player.y = H - 100;
+  player.hp = CFG.maxHP; player.invuln = 1.5; player.fireCD = 0;
+  player.weapon = 'normal'; player.weaponTime = 0;
+  initStars(level);
+  game.state = 'playing';
+  hideAllOverlays();
+  document.getElementById('bossBar').classList.remove('show');
+  updateHUD();
+  // 直接触发Boss预告
+  if (lv.boss) triggerBossIntro(lv.boss);
+}
+
 function endLevel(win) {
   game.state = 'over';
   game.overWin = win;
+  // 记录是否在Boss战中失败（用于重试时直接重开Boss）
+  game.bossRetry = !win && game.bossActive;
   document.getElementById('overTitle').textContent = win ? '关卡通过!' : '机甲损毁';
   document.getElementById('overTitle').style.color = win ? '#00ff88' : '#ff4444';
   document.getElementById('ovLv').textContent = game.level + 1;
@@ -3108,7 +3134,9 @@ document.getElementById('btnBack').addEventListener('click', () => { hideAllOver
 document.getElementById('btnResume').addEventListener('click', togglePause);
 document.getElementById('btnQuit').addEventListener('click', () => { game.state = 'title'; hideAllOverlays(); document.getElementById('ovTitle').classList.remove('hidden'); });
 document.getElementById('btnNext').addEventListener('click', () => startGame(game.level + 1));
-document.getElementById('btnRetry').addEventListener('click', () => startGame(game.level));
+document.getElementById('btnRetry').addEventListener('click', () => {
+  if (game.bossRetry) retryBoss(); else startGame(game.level);
+});
 document.getElementById('btnMenu').addEventListener('click', () => { game.state = 'title'; hideAllOverlays(); document.getElementById('ovTitle').classList.remove('hidden'); });
 document.getElementById('btnBossFight').addEventListener('click', confirmBossBattle);
 document.getElementById('pauseBtn').addEventListener('click', togglePause);
