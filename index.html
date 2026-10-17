@@ -1790,9 +1790,9 @@ function checkCollisions() {
         if (!b.pierce) { consumed = true; break; }
       }
     }
-    // vs Boss
-    if (!consumed && game.boss) {
-      if (dist(b, game.boss) < 20 * game.boss.size) {
+    // vs Boss（仅在 Boss 完全进场后才能造成伤害，缩小碰撞半径更精准）
+    if (!consumed && game.boss && game.boss.phase === 'fight') {
+      if (dist(b, game.boss) < 14 * game.boss.size) {
         game.boss.hp -= b.dmg;
         game.hits++;
         addExplosion(b.x, b.y, '#ffaa00', 4, 0.5);
@@ -1806,6 +1806,7 @@ function checkCollisions() {
           sfx('bossDie');
           game.boss = null;
           game.bossActive = false;
+          game.bossPending = true; // 阻止 updateWaves 再次触发 Boss 预告
           document.getElementById('bossBar').classList.remove('show');
           setTimeout(() => endLevel(true), 800);
         }
@@ -1871,7 +1872,7 @@ function rocketExplode(x, y, radius, dmg) {
       }
     }
   }
-  if (game.boss && dist({x,y}, game.boss) < radius) {
+  if (game.boss && game.boss.phase === 'fight' && dist({x,y}, game.boss) < radius) {
     game.boss.hp -= dmg * 0.5;
     document.getElementById('bossFill').style.width = (game.boss.hp / game.boss.maxHp * 100) + '%';
   }
