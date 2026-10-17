@@ -12,5 +12,8 @@
   },
   "devDependencies": {
     "vite": "^5.2.10"
+  },
+  "dependencies": {
+    "canvas": "^3.2.3"
   }
 }
