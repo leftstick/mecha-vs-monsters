@@ -36,6 +36,10 @@
     box-shadow:0 0 18px rgba(0,229,255,0.5),0 4px 0 #003;margin:6px;}
   .btn:active{transform:translateY(3px);box-shadow:0 0 12px rgba(0,229,255,0.4),0 1px 0 #003;}
   .btn.ghost{background:transparent;color:#00e5ff;box-shadow:none;}
+  /* 手柄选中态：高亮发光 + 轻微放大 */
+  .gp-sel{outline:3px solid #fff;outline-offset:2px;box-shadow:0 0 22px #0ff,0 0 44px #0ff;transform:scale(1.06);transition:.12s;}
+  .btn.ghost.gp-sel{background:rgba(0,229,255,0.28);color:#fff;}
+  .lv.gp-sel{background:rgba(0,80,140,0.85);box-shadow:0 0 18px #0df;border-color:#fff;}
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:340px;width:100%;}
   .lv{padding:14px 8px;border:2px solid #0af;border-radius:6px;background:rgba(0,30,60,0.4);cursor:pointer;transition:.15s;}
   .lv:hover{background:rgba(0,60,120,0.6);box-shadow:0 0 14px rgba(0,170,255,0.4);}
@@ -297,6 +301,11 @@ let input = { left:false, right:false, up:false, down:false, shoot:false };
 let gamepadConnected = false;
 let gamepadPrevButtons = []; // 上一帧按键状态，用于边沿检测
 let inputDash = false; // B键冲刺请求（边沿触发，消费后置false）
+// 手柄菜单导航
+let menuSelIndex = 0;        // 当前选中项索引
+let menuButtons = [];        // 当前可选菜单项列表
+let menuPrevOverlay = '';    // 上一帧可见的 overlay id，用于检测切换并重置选中
+let gamepadPrevDir = { up:false, down:false, left:false, right:false }; // 方向边沿检测
 
 /* ==================== 手柄输入 (Gamepad API) ==================== */
 // 检测手柄连接/断开
@@ -339,6 +348,46 @@ function vibrateGamepad(strength = 0.3, duration = 100) {
       } catch(e) {}
     }
   }
+}
+
+// 获取当前可见的 overlay 元素
+function getVisibleOverlay() {
+  for (const id of ['ovTitle','ovLevel','ovPause','ovOver','ovBossIntro']) {
+    const el = document.getElementById(id);
+    if (el && !el.classList.contains('hidden')) return el;
+  }
+  return null;
+}
+
+// 收集当前 overlay 中所有可选项（按钮 + 未锁定关卡），并应用选中态
+function refreshMenuButtons() {
+  const ov = getVisibleOverlay();
+  menuButtons = [];
+  if (!ov) { menuPrevOverlay = ''; return; }
+  // overlay 切换时重置选中到第一项
+  if (ov.id !== menuPrevOverlay) {
+    menuSelIndex = 0;
+    menuPrevOverlay = ov.id;
+  }
+  // 关卡格子（未锁定）先收集，再收集按钮，保证默认选中第一项且网格导航正确
+  ov.querySelectorAll('.lv:not(.locked)').forEach(d => menuButtons.push(d));
+  ov.querySelectorAll('button.btn').forEach(b => {
+    if (b.offsetParent !== null) menuButtons.push(b);
+  });
+  // 越界保护
+  if (menuSelIndex >= menuButtons.length) menuSelIndex = 0;
+  applyMenuSelection();
+}
+
+function applyMenuSelection() {
+  menuButtons.forEach((b, i) => b.classList.toggle('gp-sel', i === menuSelIndex));
+}
+
+// 移动选中（带循环），step 对 2 列关卡网格用 2，其余用 1
+function moveMenuSelection(step) {
+  if (menuButtons.length === 0) return;
+  menuSelIndex = (menuSelIndex + step % menuButtons.length + menuButtons.length) % menuButtons.length;
+  applyMenuSelection();
 }
 
 // 每帧轮询手柄
@@ -388,30 +437,34 @@ function pollGamepad() {
     if (game.state === 'playing' || game.state === 'pause') togglePause();
   }
 
-  // 菜单导航 (A确认 / B返回)
-  if (game.state === 'bossIntro') {
-    if (isPressed(0) && !wasPressed(0)) confirmBossBattle();
-  } else if (game.state === 'over') {
+  // 菜单导航: 方向键选择 + A确认 + B返回
+  const ov = getVisibleOverlay();
+  if (ov) {
+    refreshMenuButtons();
+    const step = ov.id === 'ovLevel' ? 2 : 1; // 关卡选择为 2 列网格
+    const up = dpadUp || ly < -DEADZONE;
+    const down = dpadDown || ly > DEADZONE;
+    const left = dpadLeft || lx < -DEADZONE;
+    const right = dpadRight || lx > DEADZONE;
+    if (up && !gamepadPrevDir.up) moveMenuSelection(-step);
+    if (down && !gamepadPrevDir.down) moveMenuSelection(step);
+    if (left && !gamepadPrevDir.left) moveMenuSelection(-1);
+    if (right && !gamepadPrevDir.right) moveMenuSelection(1);
+    gamepadPrevDir = { up, down, left, right };
+
+    // A 确认：点击当前选中项
     if (isPressed(0) && !wasPressed(0)) {
-      if (game.overWin && game.level < LEVELS.length - 1) startGame(game.level + 1);
-      else {
-        if (game.bossRetry) retryBoss(); else startGame(game.level);
+      const sel = menuButtons[menuSelIndex];
+      if (sel) sel.click();
+    }
+    // B 返回
+    if (isPressed(1) && !wasPressed(1)) {
+      if (ov.id === 'ovOver' || ov.id === 'ovPause') {
+        game.state = 'title'; hideAllOverlays();
+        document.getElementById('ovTitle').classList.remove('hidden');
+      } else if (ov.id === 'ovLevel') {
+        document.getElementById('btnBack').click();
       }
-    }
-    if (isPressed(1) && !wasPressed(1)) {
-      game.state = 'title'; hideAllOverlays();
-      document.getElementById('ovTitle').classList.remove('hidden');
-    }
-  } else if (game.state === 'pause') {
-    if (isPressed(0) && !wasPressed(0)) togglePause();
-    if (isPressed(1) && !wasPressed(1)) {
-      game.state = 'title'; hideAllOverlays();
-      document.getElementById('ovTitle').classList.remove('hidden');
-    }
-  } else if (game.state === 'title' || game.state === 'level') {
-    if (isPressed(0) && !wasPressed(0)) {
-      // 在标题页按A开始游戏
-      if (game.state === 'title') startGame(0);
     }
   }
 
@@ -3313,8 +3366,8 @@ function buildLevelGrid() {
 
 /* ==================== 事件绑定 ==================== */
 document.getElementById('btnStart').addEventListener('click', () => { initAudio(); hideAllOverlays(); startGame(0); });
-document.getElementById('btnLevel').addEventListener('click', () => { hideAllOverlays(); buildLevelGrid(); document.getElementById('ovLevel').classList.remove('hidden'); });
-document.getElementById('btnBack').addEventListener('click', () => { hideAllOverlays(); document.getElementById('ovTitle').classList.remove('hidden'); });
+document.getElementById('btnLevel').addEventListener('click', () => { game.state = 'level'; hideAllOverlays(); buildLevelGrid(); document.getElementById('ovLevel').classList.remove('hidden'); });
+document.getElementById('btnBack').addEventListener('click', () => { game.state = 'title'; hideAllOverlays(); document.getElementById('ovTitle').classList.remove('hidden'); });
 document.getElementById('btnResume').addEventListener('click', togglePause);
 document.getElementById('btnQuit').addEventListener('click', () => { game.state = 'title'; hideAllOverlays(); document.getElementById('ovTitle').classList.remove('hidden'); });
 document.getElementById('btnNext').addEventListener('click', () => startGame(game.level + 1));
