@@ -233,6 +233,8 @@ let game = {
   stars: [],
   boss: null,
   bossActive: false,
+  bossPending: false, // Boss预告已触发，等待玩家确认
+  trickleTimer: 0, // 连续刷怪计时器
   shake: 0,
   overWin: false,
   powerups: [], // 奖励宝盒
@@ -2518,7 +2520,7 @@ function startGame(level) {
   game.time = 0; game.waveIdx = 0;
   game.monsters = []; game.bullets = []; game.enemyBullets = []; game.particles = [];
   game.powerups = [];
-  game.boss = null; game.bossActive = false; game.shake = 0;
+  game.boss = null; game.bossActive = false; game.bossPending = false; game.trickleTimer = 0; game.shake = 0;
   player.x = W / 2; player.y = H - 100;
   player.hp = CFG.maxHP; player.invuln = 0; player.fireCD = 0;
   player.weapon = 'normal'; player.weaponTime = 0;
