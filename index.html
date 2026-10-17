@@ -35,7 +35,7 @@
   @keyframes wpFlash{0%{filter:brightness(2.5);}100%{filter:brightness(1);}}
   /* 连击显示 */
   .combo-row{margin-top:6px;display:flex;flex-direction:column;align-items:flex-end;line-height:1.1;transition:opacity .25s;}
-  .combo-num{font-size:clamp(20px,5vw,30px);font-weight:900;color:#ffd23f;text-shadow:0 0 10px rgba(255,180,40,0.7);}
+  .combo-num{font-size:clamp(20px,5vw,30px);font-weight:900;color:#ffd23f;text-shadow:0 0 10px rgba(255,180,40,0.7);display:inline-block;transform-origin:right center;transition:transform .2s ease,color .2s,text-shadow .2s;}
   .combo-mult{font-size:12px;font-weight:700;color:#ff9a3c;letter-spacing:1px;}
 
   /* 中上血条/护盾条 */
@@ -461,9 +461,11 @@ const GAME_CONFIG = {
 
   // 连击系统（仅作为得分奖励，不改变基础伤害）
   combo: {
-    timeout: 1.2,           // 无击杀超过该时间则清零（秒）
+    timeout: 1.2,           // 每次击杀重置倒计时（秒）
     multStep: 0.1,          // 每连击增加的得分倍率
     maxMult: 3.0,           // 最大得分倍率
+    glowThreshold: 5,       // 达到该连击数：放大+外发光
+    fireThreshold: 10,      // 达到该连击数：切换警示橙光
   },
 
   // 精英预警（精英怪/高难波次前的文字提示，不打断波次倒计时）
@@ -472,14 +474,56 @@ const GAME_CONFIG = {
     duration: 2.0,          // 预警持续时间（秒）
     eliteTypes: ['bomber'], // 触发预警的怪兽类型
     minCount: 8,            // 单波数量达到该值也触发预警
+    // 样式参数
+    yRatio: 0.22,           // 垂直位置（占屏高比例，上半区不挡机甲）
+    fontScale: 0.06,        // 字号占屏宽比例
+    color: '#ff5533',       // 文字颜色
+    glowColor: '#ff3300',   // 外发光颜色
+    pulseSpeed: 3.0,        // 呼吸脉动速度（弧度/秒）
+    glowBase: 14,           // 基础发光半径
+    glowAmp: 10,            // 发光脉动幅度
   },
 
   // 子弹配色（按武器类型区分外观，仅渲染，不改伤害逻辑）
   bulletColors: {
     normal:  '#ffffff',   // 普通弹：白色
-    laser:   '#7fdfff',   // 穿透弹：冰蓝色
+    laser:   '#88ddff',   // 穿透弹：冰蓝色
     shotgun: '#ffd23f',   // 霰弹：金黄
-    rocket:  '#ff5522',   // 爆炸弹：橙红色
+    rocket:  '#ff8833',   // 爆炸弹：橙红色
+  },
+  // 子弹击中火花配色（与子弹外观区分，普通弹浅灰、穿透弹浅蓝）
+  bulletSpark: {
+    normal:  '#cccccc',   // 普通弹火花：浅灰
+    laser:   '#aaeeff',   // 穿透弹火花：浅蓝
+    shotgun: '#ffe08a',   // 霰弹火花
+    rocket:  '#ffbb66',   // 爆炸弹火花
+  },
+  // 爆炸弹爆炸粒子配色：橙-黄-红渐变
+  explosionColors: ['#ff8833', '#ffcc33', '#ff3300'],
+
+  // 精英怪渲染（仅视觉，不改属性）
+  eliteRing: {
+    color: '#ff2222',       // 发光环颜色
+    thickness: 3,           // 环粗细
+    glow: 12,               // 发光模糊半径
+    rotSpeed: 0.8,          // 旋转速度（弧度/秒）
+    starSize: 14,           // 头顶 ★ 标记大小
+    starColor: '#ffdd33',   // ★ 颜色
+    explosionMult: 2.0,     // 精英死亡爆炸粒子倍率（数量/威力/寿命）
+  },
+
+  // 战场碎屑（仅视觉，无碰撞无伤害，独立上限）
+  debris: {
+    enabled: true,
+    max: 60,              // 最大同时存在的碎片数（独立于粒子上限）
+    count: 5,             // 每次爆炸产生的碎片数
+    gravity: 600,         // 重力加速度（像素/秒²）
+    life: 0.6,            // 碎片生命周期（秒）
+    sizeMin: 2,
+    sizeMax: 5,
+    speedMin: 80,
+    speedMax: 220,
+    color: '#8a7a6a',     // 碎片颜色（金属残片）
   },
 };
 
@@ -582,6 +626,7 @@ let game = {
   comboTimer: 0,   // 连击保持计时
   floatTexts: [],  // 伤害飘字
   warnTimer: 0,    // 精英预警剩余时间
+  debris: [],      // 战场碎屑（独立于粒子，无碰撞无伤害）
 };
 
 // 渲染侧倾斜角（仅用于绘制平滑，不写入 player，不影响碰撞/移动）
@@ -1793,6 +1838,38 @@ function drawMonster(m) {
     ctx.fillRect(30*s,6*s,6*s,4*s);
   }
 
+  // 精英怪：缓慢旋转的红色发光环 + 头顶 ★ 标记（仅渲染，不改属性）
+  const isElite = GAME_CONFIG.eliteWarning.eliteTypes.includes(m.type);
+  if (isElite) {
+    const er = GAME_CONFIG.eliteRing;
+    const ringR = 24 * s;
+    ctx.save();
+    ctx.rotate(m.t * er.rotSpeed);
+    ctx.strokeStyle = er.color;
+    ctx.shadowColor = er.color;
+    ctx.shadowBlur = er.glow;
+    ctx.lineWidth = er.thickness;
+    // 6 段圆弧，留出间隙形成旋转感
+    for (let i = 0; i < 6; i++) {
+      const a0 = (i / 6) * Math.PI * 2;
+      const a1 = a0 + (Math.PI * 2 / 6) * 0.6;
+      ctx.beginPath();
+      ctx.arc(0, 0, ringR, a0, a1);
+      ctx.stroke();
+    }
+    ctx.restore();
+    // 头顶 ★ 标记
+    ctx.save();
+    ctx.fillStyle = er.starColor;
+    ctx.shadowColor = er.starColor;
+    ctx.shadowBlur = 8;
+    ctx.font = '900 ' + (er.starSize * s) + 'px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('★', 0, -30 * s);
+    ctx.restore();
+  }
+
   // 血条 (多血怪兽)
   if (m.maxHp > 1) {
     const bw = 26 * s;
@@ -2470,14 +2547,14 @@ function drawBullets() {
 }
 
 /* ==================== 粒子 ==================== */
-function addExplosion(x, y, color, count = 12, power = 1) {
+function addExplosion(x, y, color, count = 12, power = 1, lifeMult = 1) {
   for (let i = 0; i < count; i++) {
     const a = Math.random() * Math.PI * 2;
     const sp = rand(60, 200) * power;
     game.particles.push({
       x, y,
       vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
-      life: rand(0.3, 0.7),
+      life: rand(0.3, 0.7) * lifeMult,
       color, size: rand(2, 5) * power,
     });
   }
@@ -2557,22 +2634,25 @@ function drawFloatTexts() {
   ctx.restore();
 }
 
-// 精英预警文字：居中，呼吸发光
+// 精英预警文字：上半区居中，平滑呼吸发光，固定时长后消失（不阻塞波次）
 function drawWarning() {
   if (game.warnTimer <= 0) return;
   const ew = GAME_CONFIG.eliteWarning;
   const t = performance.now() / 1000;
-  const pulse = 0.6 + 0.4 * Math.sin(t * 6); // 呼吸发光
-  const a = clamp(game.warnTimer / ew.duration, 0, 1);
+  // 平滑呼吸脉动（余弦缓动，0~1 之间柔和过渡，非硬闪烁）
+  const pulse = 0.5 + 0.5 * Math.sin(t * ew.pulseSpeed);
+  // 整体透明度 = 剩余时间占比 × 呼吸亮度
+  const timeAlpha = clamp(game.warnTimer / ew.duration, 0, 1);
+  const a = timeAlpha * (0.7 + 0.3 * pulse);
   ctx.save();
   ctx.globalAlpha = a;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = '900 ' + Math.round(W * 0.06) + 'px Arial, sans-serif';
-  ctx.fillStyle = '#ff5533';
-  ctx.shadowColor = '#ff3300';
-  ctx.shadowBlur = 20 + pulse * 20;
-  ctx.fillText(ew.text, W / 2, H * 0.32);
+  ctx.font = '900 ' + Math.round(W * ew.fontScale) + 'px Arial, sans-serif';
+  ctx.fillStyle = ew.color;
+  ctx.shadowColor = ew.glowColor;
+  ctx.shadowBlur = ew.glowBase + pulse * ew.glowAmp;
+  ctx.fillText(ew.text, W / 2, H * ew.yRatio);
   ctx.shadowBlur = 0;
   ctx.restore();
 }
@@ -2604,6 +2684,74 @@ function drawParticles() {
   ctx.globalAlpha = 1;
 }
 
+/* ==================== 战场碎屑（仅视觉，无碰撞无伤害，独立上限） ==================== */
+function addDebris(x, y) {
+  const db = GAME_CONFIG.debris;
+  if (!db.enabled) return;
+  for (let i = 0; i < db.count; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const sp = rand(db.speedMin, db.speedMax);
+    const size = rand(db.sizeMin, db.sizeMax);
+    // 不规则多边形顶点（3~5 边）
+    const vCount = 3 + Math.floor(Math.random() * 3);
+    const verts = [];
+    for (let k = 0; k < vCount; k++) {
+      const va = (k / vCount) * Math.PI * 2 + rand(-0.3, 0.3);
+      const vr = size * rand(0.5, 1);
+      verts.push({ x: Math.cos(va) * vr, y: Math.sin(va) * vr });
+    }
+    game.debris.push({
+      x, y,
+      vx: Math.cos(a) * sp,
+      vy: Math.sin(a) * sp - rand(20, 80), // 略向上抛
+      rot: Math.random() * Math.PI * 2,
+      rotSpeed: rand(-6, 6),
+      verts,
+      size,
+      life: db.life,
+      maxLife: db.life,
+      color: db.color,
+    });
+  }
+  // 超出独立上限时淘汰最旧碎屑
+  if (game.debris.length > db.max) {
+    game.debris.splice(0, game.debris.length - db.max);
+  }
+}
+
+function updateDebris(dt) {
+  const db = GAME_CONFIG.debris;
+  for (let i = game.debris.length - 1; i >= 0; i--) {
+    const d = game.debris[i];
+    d.vy += db.gravity * dt;       // 重力
+    d.x += d.vx * dt;
+    d.y += d.vy * dt;
+    d.rot += d.rotSpeed * dt;
+    d.life -= dt;
+    if (d.life <= 0) game.debris.splice(i, 1);
+  }
+}
+
+function drawDebris() {
+  for (const d of game.debris) {
+    const a = clamp(d.life / d.maxLife, 0, 1);
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.translate(d.x, d.y);
+    ctx.rotate(d.rot);
+    ctx.fillStyle = d.color;
+    ctx.beginPath();
+    ctx.moveTo(d.verts[0].x, d.verts[0].y);
+    for (let k = 1; k < d.verts.length; k++) {
+      ctx.lineTo(d.verts[k].x, d.verts[k].y);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+}
+
 /* ==================== 碰撞 ==================== */
 function checkCollisions() {
   // 玩家子弹 vs 怪兽
@@ -2625,8 +2773,8 @@ function checkCollisions() {
         const kd = Math.hypot(kdx, kdy) || 1;
         m.kbVX = kdx / kd * GAME_CONFIG.monsterKnockbackForce;
         m.kbVY = kdy / kd * GAME_CONFIG.monsterKnockbackForce;
-        // 命中喷溅：颜色与子弹类型匹配，沿击退方向崩裂
-        addHitSparks(b.x, b.y, GAME_CONFIG.bulletColors[b.type] || '#aaddff', kdx / kd, kdy / kd, m.size);
+        // 命中喷溅：颜色与子弹火花配色匹配，沿击退方向崩裂
+        addHitSparks(b.x, b.y, GAME_CONFIG.bulletSpark[b.type] || GAME_CONFIG.bulletSpark.normal, kdx / kd, kdy / kd, m.size);
         // 伤害飘字
         addFloatText(b.x, b.y - 10, Math.round(dmg), isCrit);
         hitCount++;
@@ -2639,12 +2787,16 @@ function checkCollisions() {
           const gained = Math.round(m.score * comboMult);
           game.score += gained;
           floatScore(m.x, m.y, gained);
-          // 死亡爆炸：多层粒子（橙主爆 + 黄外圈 + 亮白核）
-          addExplosion(m.x, m.y, '#ff8800', GAME_CONFIG.deathExplosionCount, GAME_CONFIG.deathExplosionPower);
-          addExplosion(m.x, m.y, '#ffdd44', 14, 1.0);
-          addExplosion(m.x, m.y, '#ffffff', 10, 0.9);
+          // 死亡爆炸：多层粒子（橙主爆 + 黄外圈 + 亮白核）；精英怪更大更持久
+          const mIsElite = GAME_CONFIG.eliteWarning.eliteTypes.includes(m.type);
+          const em = mIsElite ? GAME_CONFIG.eliteRing.explosionMult : 1;
+          addExplosion(m.x, m.y, '#ff8800', Math.round(GAME_CONFIG.deathExplosionCount * em), GAME_CONFIG.deathExplosionPower * em, em);
+          addExplosion(m.x, m.y, '#ffdd44', Math.round(14 * em), 1.0 * em, em);
+          addExplosion(m.x, m.y, '#ffffff', Math.round(10 * em), 0.9 * em, em);
           // 金属残块：少量较大较慢的碎片，增强崩裂感
-          addExplosion(m.x, m.y, '#8a7a6a', 6, 1.1);
+          addExplosion(m.x, m.y, '#8a7a6a', Math.round(6 * em), 1.1 * em, em);
+          // 战场碎屑（不规则碎片，带重力，无碰撞无伤害）
+          addDebris(m.x, m.y);
           sfx('explode');
           vibrateGamepad(0.12, 40); // 击杀怪兽轻微震动
           // 火箭爆炸范围伤害
@@ -2670,7 +2822,7 @@ function checkCollisions() {
         game.hits++;
         const bdx = game.boss.x - b.x, bdy = game.boss.y - b.y;
         const bd = Math.hypot(bdx, bdy) || 1;
-        addHitSparks(b.x, b.y, GAME_CONFIG.bulletColors[b.type] || '#ffcc66', bdx / bd, bdy / bd, game.boss.size);
+        addHitSparks(b.x, b.y, GAME_CONFIG.bulletSpark[b.type] || GAME_CONFIG.bulletSpark.normal, bdx / bd, bdy / bd, game.boss.size);
         addFloatText(b.x, b.y - 10, Math.round(dmg), isCrit);
         hitCount++;
         if (b.type === 'rocket') rocketExplode(b.x, b.y, 60, b.dmg);
@@ -2733,7 +2885,11 @@ function checkCollisions() {
 
 // 火箭爆炸范围伤害
 function rocketExplode(x, y, radius, dmg) {
-  addExplosion(x, y, '#ff6600', 20, 1.2);
+  // 爆炸弹爆炸：橙-黄-红渐变粒子
+  const ec = GAME_CONFIG.explosionColors;
+  addExplosion(x, y, ec[0], 20, 1.2);
+  addExplosion(x, y, ec[1], 14, 1.0);
+  addExplosion(x, y, ec[2], 10, 0.9);
   game.shake = Math.max(game.shake, 0.15);
   for (let j = game.monsters.length - 1; j >= 0; j--) {
     const m = game.monsters[j];
@@ -3809,12 +3965,31 @@ function updateHUD() {
     wr.style.opacity = '0';
   }
 
-  // 连击显示：仅 combo >= 2 时显示
+  // 连击显示：仅 combo >= 2 时显示；>=5 放大+外发光；>=10 切换警示橙光
   const comboRow = document.getElementById('comboRow');
+  const hCombo = document.getElementById('hCombo');
+  const hComboMult = document.getElementById('hComboMult');
   if (game.combo >= 2) {
     comboRow.style.opacity = '1';
-    document.getElementById('hCombo').textContent = game.combo + ' COMBO';
-    document.getElementById('hComboMult').textContent = '×' + getComboMult().toFixed(1);
+    hCombo.textContent = game.combo + ' COMBO';
+    hComboMult.textContent = '×' + getComboMult().toFixed(1);
+    const cb = GAME_CONFIG.combo;
+    if (game.combo >= cb.fireThreshold) {
+      hCombo.style.color = '#ff5533';
+      hCombo.style.textShadow = '0 0 14px rgba(255,80,40,0.9),0 0 28px rgba(255,40,20,0.6)';
+      hCombo.style.transform = 'scale(1.25)';
+      hComboMult.style.color = '#ff7744';
+    } else if (game.combo >= cb.glowThreshold) {
+      hCombo.style.color = '#ffd23f';
+      hCombo.style.textShadow = '0 0 10px rgba(255,200,60,0.8)';
+      hCombo.style.transform = 'scale(1.12)';
+      hComboMult.style.color = '#ff9a3c';
+    } else {
+      hCombo.style.color = '#ffd23f';
+      hCombo.style.textShadow = '0 0 6px rgba(255,180,40,0.5)';
+      hCombo.style.transform = 'scale(1)';
+      hComboMult.style.color = '#ff9a3c';
+    }
   } else {
     comboRow.style.opacity = '0';
   }
@@ -3860,7 +4035,7 @@ function startGame(level) {
   game.monsters = []; game.bullets = []; game.enemyBullets = []; game.particles = [];
   game.powerups = [];
   game.boss = null; game.bossActive = false; game.bossPending = false; game.trickleTimer = 0; game.shake = 0;
-  game.combo = 0; game.comboTimer = 0; game.floatTexts = []; game.warnTimer = 0;
+  game.combo = 0; game.comboTimer = 0; game.floatTexts = []; game.warnTimer = 0; game.debris = [];
   renderTilt = 0;
   player.x = W / 2; player.y = H - 100;
   player.hp = CFG.maxHP; player.shield = GAME_CONFIG.maxShield; player.shieldRegenTimer = 0; player.invuln = 0; player.fireCD = 0;
@@ -3883,7 +4058,7 @@ function retryBoss() {
   game.monsters = []; game.bullets = []; game.enemyBullets = []; game.particles = [];
   game.powerups = [];
   game.boss = null; game.bossActive = false; game.bossPending = false; game.trickleTimer = 0; game.shake = 0;
-  game.combo = 0; game.comboTimer = 0; game.floatTexts = []; game.warnTimer = 0;
+  game.combo = 0; game.comboTimer = 0; game.floatTexts = []; game.warnTimer = 0; game.debris = [];
   renderTilt = 0;
   game.bossRetry = false;
   player.x = W / 2; player.y = H - 100;
@@ -4171,6 +4346,7 @@ function update(dt) {
   updateWaves(dt);
   updateParticles(dt);
   updateFloatTexts(dt);
+  updateDebris(dt);
   updatePowerups(dt);
   checkCollisions();
   updateHUD();
@@ -4245,6 +4421,7 @@ function render() {
   drawPlayer();
   drawBullets();
   drawParticles();
+  drawDebris();
   drawFloatTexts();
   drawWarning();
   drawTouchUI();
