@@ -22,6 +22,9 @@
   #hpBar{display:flex;gap:3px;align-items:center;}
   .hp{width:clamp(10px,2.6vw,16px);height:clamp(10px,2.6vw,16px);background:#ff3050;clip-path:polygon(50% 0,100% 38%,82% 100%,18% 100%,0 38%);box-shadow:0 0 6px #ff3050;}
   .hp.empty{background:#331020;box-shadow:none;}
+  #shieldBar{display:flex;gap:3px;align-items:center;}
+  .sd{width:clamp(9px,2.2vw,13px);height:clamp(9px,2.2vw,13px);background:#00e5ff;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);box-shadow:0 0 6px #00e5ff;}
+  .sd.empty{background:#0a2030;box-shadow:none;}
   /* 触控 */
   #touchArea{position:fixed;inset:0;z-index:15;display:none;}
   /* 覆盖层 */
@@ -91,6 +94,7 @@
   <div class="hud-cell">关卡 <b id="hLv">1</b></div>
   <div class="hud-cell">分数 <b id="hSc">0</b></div>
   <div id="hpBar"></div>
+  <div id="shieldBar"></div>
   <div class="hud-cell" id="weaponCell" style="display:none">武器 <b id="hWp">普通</b></div>
   <div class="hud-cell">怪兽 <b id="hMst">0</b></div>
 </div>
@@ -184,6 +188,21 @@ const CFG = {
   baseMonsterSpeed: 80,
   // 难度曲线: 每关递增, 速度倍率 & 射击间隔缩短
   difficulty: [1.0, 1.1, 1.2, 1.35, 1.5, 1.65, 1.85, 2.1],
+};
+
+/* ==================== 战斗手感参数 ==================== */
+const GAME_CONFIG = {
+  // 玩家护盾
+  maxShield: 3,
+  shieldRegenDelay: 2.5,   // 受伤后多少秒开始回盾
+  shieldRegenRate: 1.0,    // 每秒恢复护盾点数
+  // 怪兽受击
+  monsterHitFlashTime: 0.12,
+  monsterKnockbackForce: 200,
+  monsterKnockbackFriction: 0.86,
+  // 怪兽死亡爆炸
+  deathExplosionCount: 26,
+  deathExplosionPower: 1.4,
 };
 
 /* ==================== 8 关卡定义 ==================== */
@@ -284,6 +303,9 @@ let game = {
 let player = {
   x: 0, y: 0,
   hp: CFG.maxHP,
+  shield: GAME_CONFIG.maxShield,
+  maxShield: GAME_CONFIG.maxShield,
+  shieldRegenTimer: 0, // 受伤后回盾冷却
   invuln: 0,
   fireCD: 0,
   tilt: 0,
@@ -569,6 +591,9 @@ function spawnWave(wave) {
       t: Math.random() * Math.PI * 2,
       pattern: wave.pattern,
       phase: 'enter',
+      hitFlash: 0,   // 受击闪烁计时
+      kbVX: 0,       // 击退速度X
+      kbVY: 0,       // 击退速度Y
     });
   }
 }
@@ -581,6 +606,7 @@ function spawnBoss(type) {
     size: cfg.size, score: cfg.score, name: cfg.name,
     t: 0, shootCD: 1.5, phase: 'enter',
     atkPhase: 0, atkTimer: 0, charging: false, chargeX: 0, chargeY: 0,
+    hitFlash: 0,
   };
   game.bossActive = true;
   document.getElementById('bossName').textContent = cfg.name;
@@ -980,6 +1006,28 @@ function drawPlayer() {
     ctx.globalAlpha = 1; ctx.shadowBlur = 0;
   }
 
+  // 护盾环（护盾 > 0 时显示，残盾时闪烁）
+  if (player.shield > 0) {
+    const ratio = player.shield / player.maxShield;
+    const pulse = 0.7 + Math.sin(game.time * (ratio < 0.4 ? 10 : 5)) * 0.3;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = `rgba(0,220,255,${0.5 * ratio + 0.2})`;
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = '#00ddff';
+    ctx.shadowBlur = 14 * pulse;
+    ctx.beginPath();
+    ctx.arc(0, 0, 34, 0, Math.PI * 2);
+    ctx.stroke();
+    // 内圈淡光
+    ctx.strokeStyle = `rgba(120,240,255,${0.25 * ratio * pulse})`;
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.arc(0, 0, 34, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
   ctx.restore();
 }
 
@@ -1282,6 +1330,16 @@ function drawMonster(m) {
     ctx.fillRect(-bw/2, -22 * s, bw, 3);
     ctx.fillStyle = '#ff3030';
     ctx.fillRect(-bw/2, -22 * s, bw * (m.hp / m.maxHp), 3);
+  }
+  // 受击闪烁：加色白色覆盖
+  if (m.hitFlash > 0) {
+    const fa = clamp(m.hitFlash / GAME_CONFIG.monsterHitFlashTime, 0, 1);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = `rgba(255,255,255,${0.7 * fa})`;
+    ctx.beginPath();
+    ctx.arc(0, 0, 20 * s, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
   }
   ctx.restore();
 }
@@ -1763,6 +1821,16 @@ function drawBoss(b) {
       ctx.closePath(); ctx.fill();
     }
   }
+  // Boss 受击闪烁
+  if (b.hitFlash > 0) {
+    const fa = clamp(b.hitFlash / GAME_CONFIG.monsterHitFlashTime, 0, 1);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = `rgba(255,180,80,${0.6 * fa})`;
+    ctx.beginPath();
+    ctx.arc(0, 0, 60 * S, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+  }
   ctx.restore();
 }
 
@@ -1969,12 +2037,22 @@ function checkCollisions() {
       if (dist(b, m) < 18 * m.size) {
         m.hp -= b.dmg;
         game.hits++;
+        // 受击闪烁 + 击退（方向：远离子弹）
+        m.hitFlash = GAME_CONFIG.monsterHitFlashTime;
+        const kdx = m.x - b.x, kdy = m.y - b.y;
+        const kd = Math.hypot(kdx, kdy) || 1;
+        m.kbVX = kdx / kd * GAME_CONFIG.monsterKnockbackForce;
+        m.kbVY = kdy / kd * GAME_CONFIG.monsterKnockbackForce;
         addExplosion(b.x, b.y, '#88ccff', 4, 0.5);
         hitCount++;
         if (m.hp <= 0) {
           game.kills++;
           game.score += m.score;
-          addExplosion(m.x, m.y, '#ff8800', 16, 1);
+          // 死亡爆炸：多层粒子（橙主爆 + 黄外圈 + 亮白核）
+          addExplosion(m.x, m.y, '#ff8800', GAME_CONFIG.deathExplosionCount, GAME_CONFIG.deathExplosionPower);
+          addExplosion(m.x, m.y, '#ffdd44', 14, 1.0);
+          addExplosion(m.x, m.y, '#ffffff', 10, 0.9);
+          game.shake = Math.max(game.shake, 0.12);
           sfx('explode');
           vibrateGamepad(0.12, 40); // 击杀怪兽轻微震动
           // 火箭爆炸范围伤害
@@ -1994,6 +2072,7 @@ function checkCollisions() {
     if (!consumed && game.boss && game.boss.phase === 'fight') {
       if (dist(b, game.boss) < 14 * game.boss.size) {
         game.boss.hp -= b.dmg;
+        game.boss.hitFlash = GAME_CONFIG.monsterHitFlashTime;
         game.hits++;
         addExplosion(b.x, b.y, '#ffaa00', 4, 0.5);
         hitCount++;
@@ -2122,12 +2201,24 @@ function applyPowerup(type) {
 }
 
 function playerHit() {
-  player.hp--;
+  // 受伤后重置护盾恢复冷却
+  player.shieldRegenTimer = GAME_CONFIG.shieldRegenDelay;
+  if (player.shield > 0) {
+    // 护盾吸收伤害
+    player.shield--;
+    game.shake = 0.15;
+    addExplosion(player.x, player.y, '#00ddff', 8, 0.6);
+    sfx('hit');
+    vibrateGamepad(0.2, 80);
+  } else {
+    // 护盾耗尽，扣血
+    player.hp--;
+    game.shake = 0.3;
+    addExplosion(player.x, player.y, '#ff4466', 10, 0.8);
+    sfx('hurt');
+    vibrateGamepad(0.45, 150); // 中弹中等震动
+  }
   player.invuln = CFG.invulnTime;
-  game.shake = 0.3;
-  addExplosion(player.x, player.y, '#00aaff', 10, 0.8);
-  sfx('hurt');
-  vibrateGamepad(0.45, 150); // 中弹中等震动
   updateHUD();
   if (player.hp <= 0) endLevel(false);
 }
@@ -2138,6 +2229,18 @@ function updateMonsters(dt) {
   for (let i = game.monsters.length - 1; i >= 0; i--) {
     const m = game.monsters[i];
     m.t += dt;
+    // 受击闪烁衰减
+    if (m.hitFlash > 0) m.hitFlash -= dt;
+    // 受击击退（脉冲速度，带摩擦衰减）
+    if (m.kbVX || m.kbVY) {
+      m.x += m.kbVX * dt;
+      m.y += m.kbVY * dt;
+      m.kbVX *= GAME_CONFIG.monsterKnockbackFriction;
+      m.kbVY *= GAME_CONFIG.monsterKnockbackFriction;
+      if (Math.abs(m.kbVX) < 5) m.kbVX = 0;
+      if (Math.abs(m.kbVY) < 5) m.kbVY = 0;
+      m.x = clamp(m.x, 35, W - 35);
+    }
     if (m.phase === 'enter') {
       m.y += m.vy * dt;
       if (m.y > 60) { m.phase = 'fight'; }
@@ -2180,6 +2283,7 @@ function updateMonsters(dt) {
   if (game.boss) {
     const b = game.boss;
     b.t += dt;
+    if (b.hitFlash > 0) b.hitFlash -= dt;
     const diff = CFG.difficulty[game.level] || 1;
     if (b.phase === 'enter') {
       b.y += 60 * dt;
@@ -3025,6 +3129,15 @@ function updateHUD() {
     h.className = 'hp' + (i >= player.hp ? ' empty' : '');
     hp.appendChild(h);
   }
+  // 护盾条
+  const sb = document.getElementById('shieldBar');
+  sb.innerHTML = '';
+  const shieldPips = Math.round(player.shield);
+  for (let i = 0; i < player.maxShield; i++) {
+    const s = document.createElement('div');
+    s.className = 'sd' + (i >= shieldPips ? ' empty' : '');
+    sb.appendChild(s);
+  }
   // 武器状态
   const wc = document.getElementById('weaponCell');
   if (player.weapon !== 'normal') {
@@ -3048,7 +3161,7 @@ function startGame(level) {
   game.powerups = [];
   game.boss = null; game.bossActive = false; game.bossPending = false; game.trickleTimer = 0; game.shake = 0;
   player.x = W / 2; player.y = H - 100;
-  player.hp = CFG.maxHP; player.invuln = 0; player.fireCD = 0;
+  player.hp = CFG.maxHP; player.shield = GAME_CONFIG.maxShield; player.shieldRegenTimer = 0; player.invuln = 0; player.fireCD = 0;
   player.weapon = 'normal'; player.weaponTime = 0;
   player.dashTime = 0; player.dashCD = 0; player.dashVX = 0; player.dashVY = 0;
   initStars(level);
@@ -3070,7 +3183,7 @@ function retryBoss() {
   game.boss = null; game.bossActive = false; game.bossPending = false; game.trickleTimer = 0; game.shake = 0;
   game.bossRetry = false;
   player.x = W / 2; player.y = H - 100;
-  player.hp = CFG.maxHP; player.invuln = 1.5; player.fireCD = 0;
+  player.hp = CFG.maxHP; player.shield = GAME_CONFIG.maxShield; player.shieldRegenTimer = 0; player.invuln = 1.5; player.fireCD = 0;
   player.weapon = 'normal'; player.weaponTime = 0;
   player.dashTime = 0; player.dashCD = 0; player.dashVX = 0; player.dashVY = 0;
   initStars(level);
@@ -3301,6 +3414,12 @@ function update(dt) {
   player.y = clamp(player.y, H * 0.25, H - 40);
 
   if (player.invuln > 0) player.invuln -= dt;
+  // 护盾缓慢恢复（受伤后延迟一段时间再开始）
+  if (player.shieldRegenTimer > 0) {
+    player.shieldRegenTimer -= dt;
+  } else if (player.shield < player.maxShield) {
+    player.shield = Math.min(player.maxShield, player.shield + GAME_CONFIG.shieldRegenRate * dt);
+  }
   player.fireCD -= dt;
   // 武器持续时间
   if (player.weaponTime > 0) {
