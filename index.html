@@ -60,6 +60,8 @@
   .boss-hp{font-size:clamp(14px,4vw,18px);color:#ffd23f;margin-bottom:18px;}
   .boss-hp span{font-size:1.3em;font-weight:900;color:#ff5050;}
   .boss-hint{font-size:11px;color:#a86;margin-top:14px;opacity:0.8;}
+  .boss-avatar{width:clamp(120px,38vw,180px);height:auto;margin:8px 0;
+    filter:drop-shadow(0 0 12px rgba(255,60,60,0.6));border-radius:8px;}
   @keyframes bossShake{0%{transform:scale(0.6);opacity:0;}60%{transform:scale(1.08);}100%{transform:scale(1);opacity:1;}}
   @keyframes bossFlicker{0%,100%{opacity:1;}45%{opacity:1;}50%{opacity:0.4;}55%{opacity:1;}}
   /* Boss血条 */
@@ -131,6 +133,7 @@
   <div class="boss-intro">
     <div class="boss-warn">⚠ 危 险 ⚠</div>
     <div class="boss-lv" id="bossIntroLv">第 1 关 · 太空</div>
+    <canvas class="boss-avatar" id="bossAvatar" width="160" height="120"></canvas>
     <div class="boss-name" id="bossIntroName">虚空领主</div>
     <div class="boss-desc" id="bossIntroDesc">来自维度裂缝的异形母舰</div>
     <div class="boss-hp">生命值 <span id="bossIntroHP">80</span></div>
@@ -395,6 +398,25 @@ function spawnBoss(type) {
   document.getElementById('bossBar').classList.add('show');
 }
 
+// 在预告画布上绘制 Boss 头像（复用 drawBoss）
+function drawBossAvatar(type) {
+  const cv = document.getElementById('bossAvatar');
+  if (!cv) return;
+  const av = cv.getContext('2d');
+  av.clearRect(0, 0, cv.width, cv.height);
+  // 背景圆
+  av.fillStyle = 'rgba(0,0,0,0.35)';
+  av.beginPath(); av.arc(cv.width/2, cv.height/2, 56, 0, Math.PI*2); av.fill();
+  av.strokeStyle = '#ff4444'; av.lineWidth = 2;
+  av.beginPath(); av.arc(cv.width/2, cv.height/2, 56, 0, Math.PI*2); av.stroke();
+  // 临时切换上下文绘制 Boss
+  const oldCtx = ctx;
+  ctx = av;
+  const fakeBoss = { type, size: 3.0, t: 0, x: cv.width/2, y: cv.height/2 };
+  drawBoss(fakeBoss);
+  ctx = oldCtx;
+}
+
 // 触发 Boss 预告（荒野大镖客风格）：暂停游戏，显示 Boss 介绍，等玩家确认
 let pendingBossType = null;
 function triggerBossIntro(type) {
@@ -408,6 +430,7 @@ function triggerBossIntro(type) {
   document.getElementById('bossIntroHP').textContent = cfg.hp;
   // 关卡序号
   document.getElementById('bossIntroLv').textContent = '第 ' + (game.level + 1) + ' 关 · ' + LEVELS[game.level].name;
+  drawBossAvatar(type);
   document.getElementById('ovBossIntro').classList.remove('hidden');
   sfx('bossWarn');
 }
@@ -876,6 +899,15 @@ function drawBoss(b) {
   ctx.save();
   ctx.translate(b.x, b.y);
   const S = b.size / 5; // 缩放基准
+
+  // 高对比光晕: 确保Boss在任何背景下都清晰可见（不与背景色融合）
+  const auraR = 78 * S;
+  const aura = ctx.createRadialGradient(0, 0, 8*S, 0, 0, auraR);
+  aura.addColorStop(0, 'rgba(255,240,200,0.30)');
+  aura.addColorStop(0.45, 'rgba(255,180,80,0.16)');
+  aura.addColorStop(1, 'rgba(255,120,40,0)');
+  ctx.fillStyle = aura;
+  ctx.beginPath(); ctx.arc(0, 0, auraR, 0, Math.PI*2); ctx.fill();
 
   if (b.type === 'voidlord') {
     // 虚空领主: 巨型菱形外星母舰 + 发光核心 + 侧翼
@@ -1560,7 +1592,7 @@ function checkCollisions() {
     }
     // vs Boss
     if (!consumed && game.boss) {
-      if (dist(b, game.boss) < 45 * game.boss.size) {
+      if (dist(b, game.boss) < 20 * game.boss.size) {
         game.boss.hp -= b.dmg;
         game.hits++;
         addExplosion(b.x, b.y, '#ffaa00', 4, 0.5);
@@ -1706,19 +1738,20 @@ function updateMonsters(dt) {
     m.t += dt;
     if (m.phase === 'enter') {
       m.y += m.vy * dt;
-      if (m.y > 80) { m.phase = 'fight'; m.baseY = m.y; }
+      if (m.y > 60) { m.phase = 'fight'; }
     } else {
-      // 战斗模式: 左右移动+射击
+      // 战斗模式: 持续缓慢下降 + 左右穿梭（不再固定在某条线上）
       if (m.pattern === 'wave') {
         m.x += m.vx * dt;
         // 边界反弹
         if (m.x < 35) { m.x = 35; m.vx = Math.abs(m.vx); }
         if (m.x > W - 35) { m.x = W - 35; m.vx = -Math.abs(m.vx); }
       } else {
-        m.x += Math.sin(m.t * 1.5) * 30 * dt;
+        m.x += Math.sin(m.t * 1.5) * 40 * dt;
         m.x = clamp(m.x, 35, W - 35);
       }
-      m.y = m.baseY + Math.sin(m.t) * 10;
+      // 持续向玩家方向下压，制造压迫感；上下小幅波动
+      m.y += m.vy * 0.4 * dt + Math.sin(m.t * 2) * 6 * dt;
 
       const cfg = MONSTER_TYPES[m.type];
       if (cfg.shoot) {
