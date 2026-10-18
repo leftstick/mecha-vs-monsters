@@ -886,7 +886,7 @@ function vibrateGamepad(strength = 0.3, duration = 100) {
 
 // 获取当前可见的 overlay 元素
 function getVisibleOverlay() {
-  for (const id of ['ovTitle','ovLevel','ovPause','ovOver','ovBossIntro']) {
+  for (const id of ['ovTitle','ovLevel','ovPause','ovOver','ovBossIntro','ovResume','ovSettings']) {
     const el = document.getElementById(id);
     if (el && !el.classList.contains('hidden')) return el;
   }
@@ -905,7 +905,7 @@ function refreshMenuButtons() {
   }
   // 关卡格子（未锁定）先收集，再收集按钮，保证默认选中第一项且网格导航正确
   ov.querySelectorAll('.lv:not(.locked)').forEach(d => menuButtons.push(d));
-  ov.querySelectorAll('button.btn').forEach(b => {
+  ov.querySelectorAll('button.btn, button.opt-btn').forEach(b => {
     if (b.offsetParent !== null) menuButtons.push(b);
   });
   // 越界保护
@@ -998,6 +998,15 @@ function pollGamepad() {
         document.getElementById('ovTitle').classList.remove('hidden');
       } else if (ov.id === 'ovLevel') {
         document.getElementById('btnBack').click();
+      } else if (ov.id === 'ovResume') {
+        // 进度恢复对话框：B = 重新开始
+        document.getElementById('btnRestartRun').click();
+      } else if (ov.id === 'ovSettings') {
+        document.getElementById('btnSetBack').click();
+      } else if (ov.id === 'ovBossIntro') {
+        // Boss 预告：B = 返回标题
+        game.state = 'title'; hideAllOverlays();
+        document.getElementById('ovTitle').classList.remove('hidden');
       }
     }
   }
