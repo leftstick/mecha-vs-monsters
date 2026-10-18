@@ -3921,11 +3921,16 @@ function drawBackground(dt) {
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
 
-  // 视差远景层
-  drawFarLayer(lv.ground, lv);
-
-  // 统一四层机甲末世视差（叠加在关卡背景之上，冷灰蓝霓虹风）
-  drawParallaxLayers();
+  // 前三关（深空 / 深海俯视 / 沙漠俯视）使用专属三层视差背景；
+  // 其余关卡沿用通用远景层 + 统一四层机甲末世视差
+  if (game.level <= 2) {
+    drawAerialLayers();
+  } else {
+    // 视差远景层
+    drawFarLayer(lv.ground, lv);
+    // 统一四层机甲末世视差（叠加在关卡背景之上，冷灰蓝霓虹风）
+    drawParallaxLayers();
+  }
 
   // 星空/粒子 (中景) — 带闪烁
   for (const s of game.stars) {
@@ -4102,6 +4107,400 @@ function drawParallaxLayers() {
   ctx.globalAlpha = 0.3;
   ctx.fillRect(0, H - 19, W, 1);
   ctx.globalAlpha = 1;
+
+  ctx.restore();
+}
+
+/* ============================================================
+   前三关专属三层视差背景（远景 / 中景透明 / 近景透明）
+   第 0 关 深空  ·  第 1 关 深海(高空俯视)  ·  第 2 关 沙漠(高空俯视)
+   纯渲染：仅用 game.time 推导偏移，不写任何状态
+   ============================================================ */
+function drawAerialLayers() {
+  const t = game.time;
+  const lvl = game.level;
+  // 确定性伪随机（避免逐帧闪烁）
+  const pr = (n) => {
+    const x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+    return x - Math.floor(x);
+  };
+  // 循环取模（支持负值）
+  const wrap = (v, span) => { let m = v % span; if (m < 0) m += span; return m; };
+
+  ctx.save();
+
+  if (lvl === 0) {
+    /* ---------------- 第 1 关 · 深空 ---------------- */
+    // ===== 远景层：深紫墨蓝星云 + 稀疏暗淡星点 + 巨大气态行星边缘 =====
+    for (let i = 0; i < 4; i++) {
+      const nx = wrap(pr(i * 3 + 1) * W - t * (6 + i * 4), W + 320) - 160;
+      const ny = H * (0.12 + pr(i * 3 + 2) * 0.55);
+      const nr = 140 + pr(i * 3 + 3) * 130;
+      const col = ['96,44,170', '30,52,120', '128,64,196', '24,44,104'][i];
+      const ngd = ctx.createRadialGradient(nx, ny, 6, nx, ny, nr);
+      ngd.addColorStop(0, `rgba(${col},0.26)`);
+      ngd.addColorStop(1, `rgba(${col},0)`);
+      ctx.fillStyle = ngd;
+      ctx.fillRect(0, 0, W, H);
+    }
+    // 稀疏暗淡星点
+    ctx.fillStyle = '#ffffff';
+    for (let i = 0; i < 42; i++) {
+      const sx = pr(i * 7 + 1) * W;
+      const sy = wrap(pr(i * 7 + 2) * H + t * (2 + (i % 3)), H);
+      ctx.globalAlpha = 0.06 + pr(i * 7 + 3) * 0.14;
+      ctx.fillRect(sx, sy, 1, 1);
+    }
+    ctx.globalAlpha = 1;
+    // 巨大气态行星边缘（圆心在画面外，仅露弧形边缘）
+    const planetR = Math.max(W, H) * 0.62;
+    const pcx = W * 1.04, pcy = -H * 0.32;
+    const pgd = ctx.createRadialGradient(pcx - planetR * 0.4, pcy + planetR * 0.25, planetR * 0.2, pcx, pcy, planetR);
+    pgd.addColorStop(0, '#cf9360');
+    pgd.addColorStop(0.55, '#96603c');
+    pgd.addColorStop(1, '#38201a');
+    ctx.fillStyle = pgd;
+    ctx.beginPath(); ctx.arc(pcx, pcy, planetR, 0, Math.PI * 2); ctx.fill();
+    ctx.save();
+    ctx.beginPath(); ctx.arc(pcx, pcy, planetR, 0, Math.PI * 2); ctx.clip();
+    for (let i = 0; i < 7; i++) {
+      const by = pcy - planetR + i * planetR * 0.3;
+      ctx.globalAlpha = 0.28;
+      ctx.fillStyle = i % 2 ? '#e7bb8c' : '#7c422a';
+      ctx.beginPath(); ctx.ellipse(pcx, by, planetR, planetR * 0.06, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+    const rim = ctx.createRadialGradient(pcx, pcy, planetR * 0.95, pcx, pcy, planetR * 1.12);
+    rim.addColorStop(0, 'rgba(255,205,155,0)');
+    rim.addColorStop(0.5, 'rgba(255,175,120,0.34)');
+    rim.addColorStop(1, 'rgba(255,140,90,0)');
+    ctx.fillStyle = rim;
+    ctx.beginPath(); ctx.arc(pcx, pcy, planetR * 1.12, 0, Math.PI * 2); ctx.fill();
+
+    // ===== 中景层（透明）：悬浮陨石带 + 破碎太空站残骸 =====
+    const midSpd = 26;
+    for (let i = 0; i < 16; i++) {
+      const ax = pr(i * 5 + 1) * W;
+      const ay = wrap(pr(i * 5 + 2) * H + t * midSpd * (0.6 + (i % 3) * 0.2), H + 70) - 35;
+      const as = 3 + pr(i * 5 + 3) * 9;
+      ctx.save();
+      ctx.translate(ax, ay);
+      ctx.rotate(t * 0.3 + i);
+      ctx.fillStyle = 'rgba(122,112,102,0.75)';
+      ctx.strokeStyle = 'rgba(58,52,46,0.8)'; ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let k = 0; k < 6; k++) {
+        const va = k / 6 * Math.PI * 2;
+        const vr = as * (0.6 + pr(i * 10 + k) * 0.6);
+        const px = Math.cos(va) * vr, py = Math.sin(va) * vr;
+        if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = 'rgba(58,52,46,0.5)';
+      ctx.beginPath(); ctx.arc(as * 0.2, -as * 0.1, as * 0.25, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    // 破碎太空站残骸
+    const stX = wrap(W + 160 - t * 20, W + 520) - 210;
+    const stY = H * 0.33;
+    ctx.save();
+    ctx.translate(stX, stY);
+    ctx.rotate(Math.sin(t * 0.1) * 0.05);
+    ctx.strokeStyle = 'rgba(150,155,172,0.85)'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(-30, 0); ctx.lineTo(-92, 0); ctx.moveTo(30, 0); ctx.lineTo(96, 0); ctx.stroke();
+    ctx.fillStyle = 'rgba(136,141,158,0.92)';
+    ctx.fillRect(-30, -22, 60, 44);
+    ctx.fillStyle = 'rgba(96,101,116,0.92)';
+    ctx.fillRect(-30, -22, 60, 10);
+    ctx.fillStyle = 'rgba(92,205,235,0.5)';
+    for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.arc(-18 + k * 12, 4, 3, 0, Math.PI * 2); ctx.fill(); }
+    for (let k = 0; k < 3; k++) {
+      const px = -95 - k * 22;
+      ctx.fillStyle = `rgba(40,92,142,${0.72 - k * 0.13})`;
+      ctx.strokeStyle = 'rgba(160,170,190,0.8)'; ctx.lineWidth = 1;
+      ctx.fillRect(px, -30, 18, 60); ctx.strokeRect(px, -30, 18, 60);
+      ctx.beginPath();
+      for (let g = 1; g < 4; g++) { ctx.moveTo(px, -30 + g * 15); ctx.lineTo(px + 18, -30 + g * 15); }
+      ctx.moveTo(px + 9, -30); ctx.lineTo(px + 9, 30);
+      ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(40,92,142,0.72)';
+    ctx.fillRect(98, -30, 12, 60);
+    ctx.fillStyle = 'rgba(136,141,158,0.92)';
+    ctx.beginPath(); ctx.moveTo(96, -7); ctx.lineTo(110, 0); ctx.lineTo(96, 7); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(150,155,172,0.6)'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.arc(0, -60, 34, 0.4, 4.6); ctx.stroke();
+    for (let k = 0; k < 5; k++) {
+      const fx = Math.sin(t * 0.5 + k * 1.3) * 40 + (pr(k + 50) - 0.5) * 120;
+      const fy = Math.cos(t * 0.4 + k) * 30 - 10 + (pr(k + 60) - 0.5) * 60;
+      ctx.save(); ctx.translate(fx, fy); ctx.rotate(t * 0.6 + k);
+      ctx.fillStyle = 'rgba(140,145,160,0.7)';
+      ctx.fillRect(-4, -2, 8, 4);
+      ctx.restore();
+    }
+    ctx.restore();
+
+    // ===== 近景层（透明）：边缘掠过的大块金属碎片带（运动模糊） =====
+    for (let i = 0; i < 3; i++) {
+      const spd = 260 + i * 90;
+      const span = W + 360;
+      const dsz = 12 + pr(i * 11 + 3) * 11;
+      const dir = (i % 2 === 0) ? -1 : 1;
+      const raw = W + 180 - t * spd - i * 180;
+      const dx = dir < 0 ? (wrap(raw, span) - 180) : (W - (wrap(raw, span) - 180));
+      const dy = H * (0.14 + pr(i * 11 + 2) * 0.66);
+      ctx.save();
+      ctx.translate(dx, dy);
+      ctx.rotate(dir < 0 ? 0 : Math.PI);
+      const blurLen = 80 + dsz * 3.4;
+      const bg2 = ctx.createLinearGradient(0, 0, blurLen, 0);
+      bg2.addColorStop(0, 'rgba(175,180,195,0)');
+      bg2.addColorStop(0.7, 'rgba(175,180,195,0.16)');
+      bg2.addColorStop(1, 'rgba(200,205,222,0.32)');
+      ctx.fillStyle = bg2;
+      ctx.beginPath();
+      ctx.moveTo(0, -dsz * 0.5); ctx.lineTo(blurLen, -dsz * 0.14);
+      ctx.lineTo(blurLen, dsz * 0.14); ctx.lineTo(0, dsz * 0.5);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(200,212,232,0.22)'; ctx.lineWidth = 1;
+      for (let k = -1; k <= 1; k++) {
+        ctx.beginPath(); ctx.moveTo(10, k * dsz * 0.4); ctx.lineTo(blurLen * 0.9, k * dsz * 0.2); ctx.stroke();
+      }
+      ctx.fillStyle = 'rgba(162,167,182,0.95)';
+      ctx.strokeStyle = 'rgba(92,97,112,0.9)'; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(-dsz, -dsz * 0.6); ctx.lineTo(dsz * 0.7, -dsz * 0.9);
+      ctx.lineTo(dsz, dsz * 0.4); ctx.lineTo(-dsz * 0.5, dsz * 0.7);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
+  } else if (lvl === 1) {
+    /* ---------------- 第 2 关 · 深海（高空俯视） ---------------- */
+    // ===== 远景层：深青海面波纹 + 光影交散 + 水下巨大生物剪影 =====
+    const ripGap = 46;
+    const ripScroll = (t * 14) % ripGap;
+    for (let i = 0; i < Math.ceil(H / ripGap) + 2; i++) {
+      const yy = i * ripGap - ripGap + ripScroll;
+      ctx.strokeStyle = `rgba(46,158,176,${0.09 + (i % 3) * 0.03})`;
+      ctx.lineWidth = 1 + (i % 2) * 0.6;
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += 12) ctx.lineTo(x, yy + Math.sin(x * 0.02 + t * 1.2 + i * 0.7) * 5);
+      ctx.stroke();
+    }
+    // 光影交散
+    for (let i = 0; i < 6; i++) {
+      const cxx = wrap(pr(i * 4 + 1) * W + t * 10, W);
+      const cyy = wrap(pr(i * 4 + 2) * H + t * 7, H);
+      const rr = 40 + pr(i * 4 + 3) * 70;
+      const lg = ctx.createRadialGradient(cxx, cyy, 2, cxx, cyy, rr);
+      lg.addColorStop(0, 'rgba(152,240,255,0.15)');
+      lg.addColorStop(1, 'rgba(120,220,240,0)');
+      ctx.fillStyle = lg;
+      ctx.fillRect(cxx - rr, cyy - rr, rr * 2, rr * 2);
+    }
+    // 水下巨大生物剪影
+    const gx = wrap(W * 0.72 - t * 13, W + 720) - 360;
+    const gyc = H * 0.42 + Math.sin(t * 0.3) * 18;
+    ctx.save();
+    ctx.globalAlpha = 0.16;
+    ctx.fillStyle = '#02121c';
+    ctx.beginPath();
+    ctx.moveTo(gx - 120, gyc);
+    ctx.quadraticCurveTo(gx - 30, gyc - 62, gx + 90, gyc - 22);
+    ctx.quadraticCurveTo(gx + 150, gyc - 10, gx + 182, gyc + 14);
+    ctx.quadraticCurveTo(gx + 120, gyc + 42, gx + 40, gyc + 34);
+    ctx.quadraticCurveTo(gx - 40, gyc + 52, gx - 120, gyc);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(gx - 120, gyc); ctx.lineTo(gx - 196, gyc - 42);
+    ctx.lineTo(gx - 172, gyc); ctx.lineTo(gx - 196, gyc + 42);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+
+    // ===== 中景层（透明）：零散礁石、小岛 + 深沉船残骸 =====
+    const midSpd2 = 30;
+    for (let i = 0; i < 6; i++) {
+      const ix = pr(i * 8 + 1) * W;
+      const iy = wrap(pr(i * 8 + 2) * H + t * midSpd2 * (0.7 + (i % 3) * 0.2), H + 170) - 85;
+      const isz = 16 + pr(i * 8 + 3) * 26;
+      ctx.fillStyle = 'rgba(10,42,46,0.75)';
+      ctx.beginPath();
+      for (let k = 0; k < 7; k++) {
+        const a = k / 7 * Math.PI * 2;
+        const r = isz * (0.7 + pr(i * 20 + k) * 0.5);
+        const px = ix + Math.cos(a) * r, py = iy + Math.sin(a) * r * 0.7;
+        if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(92,192,202,0.22)'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = 'rgba(36,82,60,0.8)';
+      ctx.beginPath(); ctx.ellipse(ix, iy, isz * 0.5, isz * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    // 深沉船残骸（俯视）
+    const sx2 = wrap(W * 0.62 - t * 21, W + 640) - 320;
+    const sy2 = H * 0.62;
+    ctx.save();
+    ctx.translate(sx2, sy2);
+    ctx.rotate(0.42);
+    ctx.globalAlpha = 0.6;
+    ctx.fillStyle = '#182830';
+    ctx.beginPath();
+    ctx.moveTo(-80, 0);
+    ctx.quadraticCurveTo(-60, -20, 60, -20);
+    ctx.quadraticCurveTo(95, -10, 110, 0);
+    ctx.quadraticCurveTo(95, 10, 60, 20);
+    ctx.quadraticCurveTo(-60, 20, -80, 0);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(50,60,66,0.85)';
+    ctx.fillRect(-30, -12, 50, 24);
+    ctx.fillStyle = 'rgba(0,20,26,0.9)';
+    ctx.beginPath();
+    ctx.moveTo(30, -20); ctx.lineTo(60, -8); ctx.lineTo(34, -2);
+    ctx.lineTo(58, 6); ctx.lineTo(30, 20); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(92,112,118,0.6)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(-10, 0, 8, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    // ===== 近景层（透明）：低空薄云 + 海鸟群 =====
+    const nearSpd2 = 120;
+    for (let i = 0; i < 4; i++) {
+      const cyy2 = H * (0.2 + pr(i * 6 + 1) * 0.6);
+      const cxx2 = wrap(W + 260 - t * nearSpd2 * (0.8 + i * 0.25), W + 520) - 260;
+      ctx.save();
+      ctx.globalAlpha = 0.1 + pr(i * 6 + 2) * 0.08;
+      ctx.fillStyle = '#cfeef2';
+      for (let k = 0; k < 5; k++) {
+        ctx.beginPath();
+        ctx.ellipse(cxx2 + (k - 2) * 26, cyy2 + Math.sin(k * 1.3 + i) * 6, 34, 12, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    // 海鸟群（V 形剪影，振翅）
+    const flockX = wrap(W + 200 - t * nearSpd2 * 1.2, W + 520) - 260;
+    const flockY = H * 0.28 + Math.sin(t * 0.7) * 14;
+    ctx.strokeStyle = 'rgba(240,250,255,0.85)';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 7; i++) {
+      const bx = flockX + (i % 4) * 22 + (i > 3 ? 12 : 0);
+      const by = flockY + Math.floor(i / 4) * 16 + Math.sin(t * 2 + i) * 3;
+      const flap = Math.sin(t * 8 + i * 1.2) * 4;
+      ctx.beginPath();
+      ctx.moveTo(bx - 7, by - flap); ctx.lineTo(bx, by); ctx.lineTo(bx + 7, by - flap);
+      ctx.stroke();
+    }
+  } else if (lvl === 2) {
+    /* ---------------- 第 3 关 · 沙漠（高空俯视） ---------------- */
+    // ===== 远景层：连绵沙丘 + 赭石/暗金风吹沙纹 =====
+    for (let L = 0; L < 4; L++) {
+      const baseY = H * (0.12 + L * 0.22);
+      const colTop = ['#c89151', '#b87e40', '#a8703a', '#965f30'][L];
+      const colBot = ['#8a5a2a', '#7a4c22', '#6a4020', '#5a381a'][L];
+      const gg = ctx.createLinearGradient(0, baseY, 0, baseY + 100);
+      gg.addColorStop(0, colTop); gg.addColorStop(1, colBot);
+      ctx.fillStyle = gg;
+      ctx.beginPath();
+      ctx.moveTo(0, baseY);
+      for (let x = 0; x <= W; x += 20)
+        ctx.lineTo(x, baseY + Math.sin(x * 0.012 + L * 1.7 + t * 0.15) * 18 + Math.sin(x * 0.03 + L) * 6);
+      ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath(); ctx.fill();
+    }
+    // 风吹沙纹（赭石↔暗金交替细纹）
+    const drGap = H * 0.86 / 22;
+    const drScroll = (t * 10) % drGap;
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 24; i++) {
+      const ry = H * 0.13 + i * drGap - drGap + drScroll;
+      ctx.strokeStyle = (i % 2) ? 'rgba(120,80,36,0.22)' : 'rgba(232,192,124,0.20)';
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += 16) ctx.lineTo(x, ry + Math.sin(x * 0.025 + i * 0.9 + t * 0.2) * 4);
+      ctx.stroke();
+    }
+
+    // ===== 中景层（透明）：半埋神殿遗迹 + 断裂石柱 + 废弃车辆残骸 =====
+    const midSpd3 = 30;
+    // 神殿遗迹（半埋）
+    {
+      const tx = wrap(W * 0.28 - t * midSpd3 * 0.5, W + 760) - 380;
+      const ty = H * 0.5;
+      ctx.save();
+      ctx.translate(tx, ty);
+      ctx.fillStyle = 'rgba(182,152,102,0.85)';
+      ctx.beginPath(); ctx.moveTo(-72, 26); ctx.lineTo(72, 26); ctx.lineTo(56, 8); ctx.lineTo(-56, 8); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(205,168,108,0.92)';
+      ctx.beginPath(); ctx.ellipse(0, 34, 86, 18, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(208,182,132,0.92)';
+      for (let k = -2; k <= 2; k++) {
+        if (k === 1) { ctx.fillRect(22 - 5, 4, 10, 22); continue; } // 断柱半截
+        ctx.fillRect(k * 22 - 5, -30, 10, 40);
+        ctx.fillRect(k * 22 - 8, -34, 16, 6);
+      }
+      ctx.fillStyle = 'rgba(192,164,114,0.85)';
+      ctx.fillRect(-42, -42, 74, 8);
+      ctx.beginPath(); ctx.moveTo(-42, -42); ctx.lineTo(-6, -58); ctx.lineTo(32, -42); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+    // 断裂石柱（散落）
+    for (let i = 0; i < 4; i++) {
+      const px = pr(i * 13 + 1) * W;
+      const py = wrap(pr(i * 13 + 2) * H + t * midSpd3 * (0.6 + i * 0.1), H + 130) - 65;
+      const h = 20 + pr(i * 13 + 3) * 40;
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.rotate(pr(i * 13 + 4) * 0.6 - 0.3);
+      if (pr(i * 13 + 5) > 0.5) {
+        ctx.fillStyle = 'rgba(202,174,122,0.85)';
+        ctx.fillRect(-h / 2, -6, h, 12);
+      } else {
+        ctx.fillStyle = 'rgba(202,174,122,0.9)';
+        ctx.fillRect(-6, -h, 12, h);
+        ctx.fillRect(-9, -h - 3, 18, 5);
+      }
+      ctx.restore();
+    }
+    // 废弃车辆残骸（半埋）
+    for (let i = 0; i < 3; i++) {
+      const vx = wrap(pr(i * 17 + 1) * W - t * midSpd3, W + 220) - 110;
+      const vy = H * 0.7 + pr(i * 17 + 2) * H * 0.18;
+      ctx.save();
+      ctx.translate(vx, vy);
+      ctx.rotate(pr(i * 17 + 3) * 1.4 - 0.7);
+      ctx.fillStyle = 'rgba(62,46,30,0.85)';
+      ctx.fillRect(-22, -12, 44, 24);
+      ctx.fillStyle = 'rgba(92,72,46,0.9)';
+      ctx.fillRect(-16, -9, 24, 18);
+      ctx.fillStyle = 'rgba(30,40,46,0.8)';
+      ctx.fillRect(-14, -6, 8, 12);
+      ctx.fillStyle = 'rgba(25,20,14,0.9)';
+      ctx.fillRect(-24, -14, 8, 5); ctx.fillRect(14, -14, 8, 5);
+      ctx.fillRect(-24, 9, 8, 5); ctx.fillRect(14, 9, 8, 5);
+      ctx.fillStyle = 'rgba(205,170,110,0.7)';
+      ctx.beginPath(); ctx.ellipse(0, 13, 26, 9, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+
+    // ===== 近景层（透明）：飘过的沙尘云 =====
+    const nearSpd3 = 130;
+    for (let i = 0; i < 4; i++) {
+      const cyy3 = H * (0.18 + pr(i * 6 + 1) * 0.6);
+      const cxx3 = wrap(W + 280 - t * nearSpd3 * (0.9 + i * 0.3), W + 560) - 280;
+      ctx.save();
+      ctx.globalAlpha = 0.14 + pr(i * 6 + 2) * 0.1;
+      const cg2 = ctx.createRadialGradient(cxx3, cyy3, 6, cxx3, cyy3, 92);
+      cg2.addColorStop(0, 'rgba(226,192,130,0.9)');
+      cg2.addColorStop(1, 'rgba(226,192,130,0)');
+      ctx.fillStyle = cg2;
+      ctx.fillRect(cxx3 - 92, cyy3 - 92, 184, 184);
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = 'rgba(230,200,140,0.22)'; ctx.lineWidth = 1;
+      for (let k = 0; k < 6; k++) {
+        ctx.beginPath(); ctx.moveTo(cxx3 - 70, cyy3 - 20 + k * 7); ctx.lineTo(cxx3 + 70, cyy3 - 24 + k * 7); ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
 
   ctx.restore();
 }
