@@ -2678,11 +2678,11 @@ function updateBullets(dt) {
       if (ns > curSpeed * 1.3) { b.vx = b.vx / ns * curSpeed * 1.3; b.vy = b.vy / ns * curSpeed * 1.3; }
     }
     b.x += b.vx * dt; b.y += b.vy * dt;
-    // 分裂弹 (到达玩家y附近时分裂)
+    // 分裂弹 (到达玩家y附近时分裂，全向扩散)
     if (b.split && b.y >= player.y - 30 && b.y <= player.y + 30) {
       b.split = false;
       for (let k = 0; k < b.splitCount; k++) {
-        const ang = -Math.PI/2 + (k - (b.splitCount-1)/2) * (Math.PI / (b.splitCount-1));
+        const ang = (k / b.splitCount) * Math.PI * 2;
         const sp = b.splitSpeed || 220;
         game.enemyBullets.push({ x: b.x, y: b.y, vx: Math.cos(ang)*sp, vy: Math.sin(ang)*sp });
       }
@@ -3467,7 +3467,7 @@ function updateMonsters(dt) {
         if (b.atkTimer >= specialCD) {
           b.atkTimer = 0;
           for (let i = 0; i < 5; i++) {
-            const ang = -Math.PI/2 + (i-2) * 0.25;
+            const ang = Math.PI/2 + (i-2) * 0.25;
             game.enemyBullets.push({ x:b.x, y:b.y+10, vx:Math.cos(ang)*160, vy:Math.sin(ang)*160, color:'#ffaa00', radius:5, homing:80 });
           }
         }
@@ -3478,7 +3478,7 @@ function updateMonsters(dt) {
         if (b.shootCD <= 0) {
           b.shootCD = 1.4 / diff;
           for (let k = -2; k <= 2; k++) {
-            const ang = -Math.PI/2 + k * 0.22;
+            const ang = Math.PI/2 + k * 0.22;
             game.enemyBullets.push({ x:b.x, y:b.y+15, vx:Math.cos(ang)*210, vy:Math.sin(ang)*210, color:'#a07040', radius:6 });
           }
         }
@@ -3509,7 +3509,7 @@ function updateMonsters(dt) {
         if (b.shootCD <= 0) {
           b.shootCD = 1.3 / diff;
           for (let k = -3; k <= 3; k++) {
-            const ang = -Math.PI/2 + k * 0.18;
+            const ang = Math.PI/2 + k * 0.18;
             game.enemyBullets.push({ x:b.x, y:b.y+15, vx:Math.cos(ang)*190, vy:Math.sin(ang)*190, color:'#66ff44', radius:5 });
           }
         }
@@ -3711,6 +3711,9 @@ function drawParallaxLayers() {
 
   ctx.save();
 
+  // 城市废墟层仅在太空关（第 0 关）显示，避免沙漠/月球/雨林/海王星等出现高楼大厦
+  const showCity = game.level === 0;
+
   // ---- 第 1 层：远景深空星云（最慢） ----
   ctx.globalAlpha = 0.22;
   const farOff = (t * P.farSpeed) % H;
@@ -3725,7 +3728,8 @@ function drawParallaxLayers() {
   }
   ctx.globalAlpha = 1;
 
-  // ---- 第 2 层：中景城市剪影 + 霓虹窗（中速） ----
+  // ---- 第 2 层：中景城市剪影 + 霓虹窗（中速）—— 仅太空关 ----
+  if (showCity) {
   const midOff = (t * P.midSpeed) % H;
   ctx.fillStyle = 'rgba(12,18,30,0.55)';
   const midBaseY = H * 0.42;
@@ -3753,8 +3757,10 @@ function drawParallaxLayers() {
       ctx.fillStyle = 'rgba(12,18,30,0.55)';
     }
   }
+  }
 
-  // ---- 第 3 层：近景建筑废墟（较快，更暗更实） ----
+  // ---- 第 3 层：近景建筑废墟（较快，更暗更实）—— 仅太空关 ----
+  if (showCity) {
   const nearOff = (t * P.nearSpeed) % H;
   ctx.fillStyle = 'rgba(8,12,22,0.78)';
   const nearBaseY = H * 0.72;
@@ -3780,6 +3786,7 @@ function drawParallaxLayers() {
       ctx.globalAlpha = 1;
       ctx.fillStyle = 'rgba(8,12,22,0.78)';
     }
+  }
   }
 
   // ---- 第 4 层：地面杂物（最快，贴底） ----
