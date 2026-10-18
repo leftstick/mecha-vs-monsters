@@ -317,6 +317,19 @@
   </div>
 </div>
 
+<!-- 续玩提示（页面意外关闭后重新打开时显示） -->
+<div class="ov hidden" id="ovResume">
+  <div class="panel-card">
+    <div class="panel-title">发现未完成的进度</div>
+    <div class="ov-stat" id="resumeInfo">第 1 关 · 得分 0</div>
+    <div class="hint">上次游戏未正常结束，可继续上次的进度接着玩，或重新开始。</div>
+    <div class="over-btns">
+      <button class="btn" id="btnResumeRun">继续上次进度 <span class="gp-hint">(A)</span></button>
+      <button class="btn ghost" id="btnRestartRun">重新开始 <span class="gp-hint">(B)</span></button>
+    </div>
+  </div>
+</div>
+
 <!-- Boss 预告 (荒野大镖客风格) -->
 <div class="ov hidden" id="ovBossIntro">
   <div class="boss-intro">
@@ -709,6 +722,60 @@ function recordBest(idx, score) {
     saveSave(save);
   }
 }
+
+/* ==================== 实时进度存档 (localStorage) ==================== */
+// 与永久存档(save)分离：RUN_KEY 仅保存“进行中的对局快照”，
+// 用于页面被意外关闭后，下次打开时提示玩家「继续 / 重新开始」。
+const RUN_KEY = 'mecha_vs_monsters_run_v1';
+let runSaveTimer = 0; // 自动保存节流计时（秒），初值 0 使开局首帧立即落盘
+
+function loadRun() {
+  try {
+    const raw = localStorage.getItem(RUN_KEY);
+    if (!raw) return null;
+    const snap = JSON.parse(raw);
+    if (snap && typeof snap.level === 'number' &&
+        snap.level >= 0 && snap.level < LEVELS.length) {
+      return snap;
+    }
+  } catch (e) {}
+  return null;
+}
+
+function clearRunSave() {
+  try { localStorage.removeItem(RUN_KEY); } catch (e) {}
+}
+
+// 仅在“进行中”(playing) 采集快照；结算/暂停态不覆盖，避免误存
+function saveRunSnapshot() {
+  if (game.state !== 'playing') return;
+  try {
+    const snap = {
+      v: 1,
+      level: game.level,
+      score: game.score,
+      kills: game.kills,
+      shots: game.shots,
+      hits: game.hits,
+      waveIdx: game.waveIdx,
+      time: game.time,
+      hp: player.hp,
+      shield: player.shield,
+      weapon: player.weapon,
+      weaponTime: player.weaponTime,
+      bossActive: game.bossActive,
+      bossHp: game.boss ? game.boss.hp : null,
+      savedAt: Date.now(),
+    };
+    localStorage.setItem(RUN_KEY, JSON.stringify(snap));
+  } catch (e) {}
+}
+
+// 页面被关闭 / 切到后台时立即落盘，保证“突然关闭”也能续玩
+function flushRunSave() { saveRunSnapshot(); }
+window.addEventListener('pagehide', flushRunSave);
+window.addEventListener('beforeunload', flushRunSave);
+document.addEventListener('visibilitychange', () => { if (document.hidden) flushRunSave(); });
 
 /* ==================== 游戏状态 ==================== */
 let game = {
@@ -5209,6 +5276,51 @@ function startGame(level) {
   updateHUD();
 }
 
+// 恢复“进行中”的进度：以上一局快照续玩（关卡/分数/波次/血量/武器）
+function resumeGame(snap) {
+  if (!snap) { startGame(0); return; }
+  const lvIdx = clamp(snap.level | 0, 0, LEVELS.length - 1);
+  const lv = LEVELS[lvIdx];
+  // 先用 startGame 建立干净的关卡初始态（星空、HUD、状态切换等）
+  startGame(lvIdx);
+  // 还原累计统计
+  game.score = Math.max(0, snap.score | 0);
+  game.kills = Math.max(0, snap.kills | 0);
+  game.shots = Math.max(0, snap.shots | 0);
+  game.hits  = Math.max(0, snap.hits  | 0);
+  game.time  = Math.max(0, +snap.time || 0);
+  game.waveIdx = clamp(snap.waveIdx | 0, 0, lv.waves.length);
+  // 还原玩家状态
+  player.maxShield = GAME_CONFIG.maxShield;
+  player.hp = clamp(+snap.hp || CFG.maxHP, 1, CFG.maxHP);
+  player.shield = clamp(+snap.shield || 0, 0, player.maxShield);
+  player.shieldRegenTimer = GAME_CONFIG.shieldRegenDelay;
+  player.invuln = 1.5; // 续玩后短暂无敌，避免加载即受击
+  const wpn = ['normal', 'laser', 'shotgun', 'rocket'].includes(snap.weapon) ? snap.weapon : 'normal';
+  if (wpn !== 'normal' && (+snap.weaponTime || 0) > 0) {
+    player.weapon = wpn;
+    player.weaponTime = +snap.weaponTime;
+  }
+  // 若存档时正在进行 Boss 战，直接续战并还原 Boss 剩余血量
+  if (snap.bossActive && lv.boss) {
+    game.waveIdx = lv.waves.length;
+    spawnBoss(lv.boss);
+    if (game.boss && snap.bossHp != null) {
+      game.boss.hp = clamp(+snap.bossHp || game.boss.maxHp, 1, game.boss.maxHp);
+    }
+  }
+  updateHUD();
+}
+
+// 生成续玩提示文案
+function resumeSummary(snap) {
+  const lvIdx = clamp(snap.level | 0, 0, LEVELS.length - 1);
+  const lv = LEVELS[lvIdx];
+  const total = lv.waves.length;
+  const stage = snap.bossActive ? 'BOSS 战' : `波次 ${Math.min(snap.waveIdx | 0, total)}/${total}`;
+  return `第 ${lvIdx + 1} 关 · ${lv.name} · ${stage} · 得分 ${(snap.score | 0).toLocaleString()}`;
+}
+
 // Boss战失败后重试：直接重开Boss战，跳过小怪波次，保留当前分数
 function retryBoss() {
   const level = game.level;
@@ -5236,6 +5348,8 @@ function retryBoss() {
 }
 
 function endLevel(win) {
+  // 本局已结束（通关或阵亡），清除“进行中”快照，避免下次误提示续玩
+  clearRunSave();
   game.state = 'over';
   game.overWin = win;
   // 记录是否在Boss战中失败（用于重试时直接重开Boss）
@@ -5266,7 +5380,7 @@ function endLevel(win) {
 }
 
 function hideAllOverlays() {
-  ['ovTitle','ovLevel','ovPause','ovOver','ovBossIntro','ovSettings'].forEach(id => document.getElementById(id).classList.add('hidden'));
+  ['ovTitle','ovLevel','ovPause','ovOver','ovBossIntro','ovSettings','ovResume'].forEach(id => document.getElementById(id).classList.add('hidden'));
 }
 
 function togglePause() {
@@ -5430,6 +5544,10 @@ function loop(t) {
 }
 
 function update(dt) {
+  // 实时进度自动存档：首帧立即落盘，随后约每 1.2s 覆盖一次
+  runSaveTimer -= dt;
+  if (runSaveTimer <= 0) { runSaveTimer = 1.2; saveRunSnapshot(); }
+
   // 冲刺冷却
   if (player.dashCD > 0) player.dashCD -= dt;
 
@@ -5690,15 +5808,27 @@ document.getElementById('btnStart').addEventListener('click', () => { initAudio(
 document.getElementById('btnLevel').addEventListener('click', () => { game.state = 'level'; hideAllOverlays(); buildLevelGrid(); document.getElementById('ovLevel').classList.remove('hidden'); });
 document.getElementById('btnBack').addEventListener('click', () => { game.state = 'title'; hideAllOverlays(); document.getElementById('ovTitle').classList.remove('hidden'); });
 document.getElementById('btnResume').addEventListener('click', togglePause);
-document.getElementById('btnQuit').addEventListener('click', () => { game.state = 'title'; hideAllOverlays(); document.getElementById('ovTitle').classList.remove('hidden'); });
+document.getElementById('btnQuit').addEventListener('click', () => { clearRunSave(); game.state = 'title'; hideAllOverlays(); document.getElementById('ovTitle').classList.remove('hidden'); });
 document.getElementById('btnNext').addEventListener('click', () => startGame(game.level + 1));
 document.getElementById('btnRetry').addEventListener('click', () => {
   if (game.bossRetry) retryBoss(); else startGame(game.level);
 });
-document.getElementById('btnMenu').addEventListener('click', () => { game.state = 'title'; hideAllOverlays(); document.getElementById('ovTitle').classList.remove('hidden'); });
+document.getElementById('btnMenu').addEventListener('click', () => { clearRunSave(); game.state = 'title'; hideAllOverlays(); document.getElementById('ovTitle').classList.remove('hidden'); });
 document.getElementById('btnBossFight').addEventListener('click', confirmBossBattle);
 document.getElementById('pauseBtn').addEventListener('click', togglePause);
 document.getElementById('bgmBtn').addEventListener('click', toggleBGM);
+
+// 续玩提示：继续上次进度 / 重新开始
+document.getElementById('btnResumeRun').addEventListener('click', () => {
+  const snap = loadRun();
+  if (snap) resumeGame(snap); else startGame(0);
+});
+document.getElementById('btnRestartRun').addEventListener('click', () => {
+  clearRunSave();
+  game.state = 'title';
+  hideAllOverlays();
+  document.getElementById('ovTitle').classList.remove('hidden');
+});
 
 // 操作设置面板
 document.getElementById('btnSettings').addEventListener('click', () => {
@@ -5726,6 +5856,14 @@ setTouchMode(GAME_CONFIG.touch.mode);
 
 buildLevelGrid();
 initStars(0);
+// 若存在未完成的进度快照，开场优先询问玩家「继续 / 重新开始」
+const pendingRun = loadRun();
+if (pendingRun) {
+  game.state = 'title';
+  hideAllOverlays();
+  document.getElementById('resumeInfo').textContent = resumeSummary(pendingRun);
+  document.getElementById('ovResume').classList.remove('hidden');
+}
 requestAnimationFrame(loop);
 </script>
 </body>
