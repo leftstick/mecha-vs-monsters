@@ -21,7 +21,8 @@
     mix-blend-mode:multiply;}
 
   /* ============ HUD 三段式 ============ */
-  #hud{position:fixed;top:0;left:0;right:0;bottom:0;z-index:20;padding:8px 10px 12px;
+  #hud{position:fixed;top:0;left:0;right:0;bottom:0;z-index:20;
+    padding:calc(8px + env(safe-area-inset-top)) calc(10px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(10px + env(safe-area-inset-left));
     display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:1fr auto 1fr;
     align-items:start;gap:8px;pointer-events:none;}
   .hud-panel{background:linear-gradient(180deg,rgba(12,18,30,0.82),rgba(6,10,18,0.7));
@@ -34,8 +35,6 @@
   .hud-label{font-size:10px;letter-spacing:2px;color:#5a7a9a;text-transform:uppercase;}
   .hud-val{font-size:clamp(14px,4vw,20px);font-weight:900;color:#00e5ff;text-shadow:0 0 8px rgba(0,229,255,0.5);
     display:inline-block;transition:transform .15s ease;}
-  .hud-val.bounce{animation:valBounce .28s ease;}
-  @keyframes valBounce{0%{transform:scale(1);}40%{transform:scale(1.28);}100%{transform:scale(1);}}
   .score-val{font-size:clamp(16px,4.5vw,22px);}
   .weapon-row{margin-top:4px;transition:opacity .3s;}
   .weapon-row.flash{animation:wpFlash .3s;}
@@ -76,9 +75,13 @@
   @keyframes shieldHit{0%{box-shadow:0 0 16px #00e5ff;}100%{box-shadow:inset 0 1px 3px rgba(0,0,0,0.6);}}
 
   /* ============ 覆盖层 ============ */
-  .ov{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  .ov{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;justify-content:safe center;
     background:radial-gradient(ellipse at center,rgba(8,12,22,0.85),rgba(4,6,12,0.97));
-    text-align:center;padding:20px;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);}
+    text-align:center;overflow-y:auto;overflow-x:hidden;touch-action:pan-y;-webkit-overflow-scrolling:touch;
+    padding:calc(20px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) calc(20px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left));
+    backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);}
+  .ov > *{flex-shrink:0;}
+  .ov *{touch-action:pan-y;}
   .ov.hidden{display:none;}
   .ov::before,.ov::after{content:'';position:absolute;width:24px;height:24px;border:2px solid rgba(0,229,255,0.4);pointer-events:none;}
   .ov::before{top:12px;left:12px;border-right:none;border-bottom:none;}
@@ -175,9 +178,10 @@
   @keyframes bossFlicker{0%,100%{opacity:1;}48%{opacity:1;}50%{opacity:0.4;}52%{opacity:1;}}
 
   /* Boss血条 */
-  #bossBar{position:fixed;top:62px;left:50%;transform:translateX(-50%);z-index:21;width:72%;max-width:360px;display:none;}
+  #bossBar{position:fixed;top:calc(62px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:21;width:72%;max-width:360px;display:none;}
   #bossBar.show{display:block;}
-  #bossBar .name{text-align:center;color:#ff8855;font-size:11px;letter-spacing:3px;margin-bottom:3px;text-shadow:1px 1px 0 #000;}
+  #bossBar .name{display:inline-block;padding:1px 12px;border-radius:4px;background:rgba(8,0,0,0.55);
+    text-align:center;color:#ff8855;font-size:11px;letter-spacing:3px;margin-bottom:3px;text-shadow:1px 1px 0 #000;}
   #bossBar .track{height:9px;background:#1a0808;border:1px solid #ff5500;border-radius:5px;overflow:hidden;
     box-shadow:0 0 10px rgba(255,80,0,0.3);}
   #bossBar .fill{height:100%;background:linear-gradient(90deg,#c62828,#ff6b3b,#ffaa00);transition:width .2s;box-shadow:0 0 8px #ff5500;}
@@ -193,8 +197,8 @@
     border:1px solid rgba(0,229,255,0.5);color:#00e5ff;font-size:15px;cursor:pointer;
     display:flex;align-items:center;justify-content:center;
     box-shadow:0 0 8px rgba(0,170,255,0.2);transition:.12s;}
-  #pauseBtn{top:112px;right:8px;}
-  #bgmBtn{top:112px;right:48px;}
+  #pauseBtn{top:calc(112px + env(safe-area-inset-top));right:calc(8px + env(safe-area-inset-right));}
+  #bgmBtn{top:calc(112px + env(safe-area-inset-top));right:calc(48px + env(safe-area-inset-right));}
   #pauseBtn:hover,#bgmBtn:hover{box-shadow:0 0 14px rgba(0,229,255,0.5);border-color:#00e5ff;}
   #bgmBtn.off{opacity:0.4;}
 
@@ -262,8 +266,8 @@
 <canvas id="uiCanvas"></canvas>
 
 <!-- 手柄按键图例（仅手柄连接时显示） -->
-<div id="gpLegend" style="display:none;position:fixed;bottom:12px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.55);color:#9ff;padding:6px 14px;border-radius:10px;font-size:12px;z-index:50;pointer-events:none;white-space:nowrap;border:1px solid rgba(0,255,255,0.25);">
-  🎮 移动:摇杆/十字键 · 射击:<b style="color:#0f0">A</b>/<b style="color:#0f0">X</b> · 冲刺:<b style="color:#f80">B</b> · 暂停:Start
+<div id="gpLegend" style="display:none;position:fixed;bottom:calc(12px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.55);color:#9ff;padding:6px 14px;border-radius:10px;font-size:12px;z-index:50;pointer-events:none;white-space:nowrap;border:1px solid rgba(0,255,255,0.25);">
+  🎮 移动:摇杆/十字键 · 射击:<b style="color:#0f0">A</b>/<b style="color:#0f0">X</b> · 冲刺:<b style="color:#f80">B</b> · 磁极:<b style="color:#58f">Y</b> · 暂停:Start
 </div>
 
 <!-- 标题 -->
@@ -275,7 +279,7 @@
     <button class="btn ghost" id="btnLevel">选择关卡</button>
     <button class="btn ghost" id="btnSettings">操作设置</button>
   </div>
-  <div class="hint">桌面: 方向键/WASD 移动 · 空格 射击<br/>手机: 触摸拖动移动 · 自动射击</div>
+  <div class="hint">桌面: 方向键/WASD 移动 · 空格 射击<br/>手机: 触摸拖动移动 · 自动射击<br/>第11关: Shift / 手柄 Y / 右侧按钮切换磁极</div>
 </div>
 
 <!-- 操作设置 -->
@@ -543,7 +547,7 @@ const GAME_CONFIG = {
   eliteWarning: {
     text: '精英来袭！',
     duration: 2.0,          // 预警持续时间（秒）
-    eliteTypes: ['bomber'], // 触发预警的怪兽类型
+    eliteTypes: ['bomber', 'queen'], // 触发预警的怪兽类型
     minCount: 8,            // 单波数量达到该值也触发预警
     // 样式参数
     yRatio: 0.22,           // 垂直位置（占屏高比例，上半区不挡机甲）
@@ -728,7 +732,7 @@ const MONSTER_TYPES = {
   discharger:{ hp:2, score:350, speed:1.8, size:0.9, shoot:false },
   // ---- 第12关 蜂巢虫群 ----
   drone:     { hp:1, score:250, speed:0.8, size:0.85, shoot:true, shootInterval:2.8 },
-  queen:     { hp:9, score:900, speed:0.3, size:1.9, shoot:true, shootInterval:2.4 },
+  queen:     { hp:9, score:900, speed:0.3, size:1.9, shoot:true, shootInterval:2.4, trickle:false },
   kamikaze:  { hp:2, score:300, speed:2.0, size:0.9, shoot:false },
 };
 
@@ -770,16 +774,31 @@ const SAVE_KEY = 'mecha_vs_monsters_save_v1';
 function loadSave() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const data = JSON.parse(raw);
+      if (data && typeof data === 'object') {
+        // 兼容旧版/损坏存档：字段缺失或越界时回落到安全值
+        const unlocked = Math.max(1, Math.min(LEVELS.length, Math.floor(Number(data.unlocked)) || 1));
+        const bestScores = {};
+        if (data.bestScores && typeof data.bestScores === 'object' && !Array.isArray(data.bestScores)) {
+          for (const [k, v] of Object.entries(data.bestScores)) {
+            const n = Number(v);
+            if (Number.isFinite(n) && n >= 0) bestScores[k] = Math.floor(n);
+          }
+        }
+        return { v: 1, unlocked, bestScores };
+      }
+    }
   } catch(e) {}
-  return { unlocked: 1, bestScores: {} }; // 默认解锁第 1 关
+  return { v: 1, unlocked: 1, bestScores: {} }; // 默认解锁第 1 关
 }
 function saveSave(data) {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch(e) {}
 }
 let save = loadSave();
 function unlockLevel(idx) {
-  if (idx + 1 > save.unlocked) { save.unlocked = idx + 1; saveSave(save); }
+  const next = Math.min(LEVELS.length, idx + 1);
+  if (next > save.unlocked) { save.unlocked = next; saveSave(save); }
 }
 function recordBest(idx, score) {
   // 默认值为 0；saveSave 内部已 try-catch，存储禁用时静默降级不报错
@@ -830,6 +849,7 @@ function saveRunSnapshot() {
       shield: player.shield,
       weapon: player.weapon,
       weaponTime: player.weaponTime,
+      polarity: player.polarity,
       bossActive: game.bossActive,
       bossHp: game.boss ? game.boss.hp : null,
       savedAt: Date.now(),
@@ -913,6 +933,18 @@ let player = {
 };
 
 let input = { left:false, right:false, up:false, down:false, shoot:false, kbShoot:false };
+// 独立输入源：每帧合并，避免手柄轮询把键盘/触控状态覆盖掉
+let kbInput = { left:false, right:false, up:false, down:false, shoot:false };
+let padInput = { left:false, right:false, up:false, down:false, shoot:false };
+let stickInput = { left:false, right:false, up:false, down:false };
+function mergeInput() {
+  input.left = kbInput.left || padInput.left || stickInput.left;
+  input.right = kbInput.right || padInput.right || stickInput.right;
+  input.up = kbInput.up || padInput.up || stickInput.up;
+  input.down = kbInput.down || padInput.down || stickInput.down;
+  input.shoot = kbInput.shoot || padInput.shoot || shootBtn.pressed || touchActive;
+  input.kbShoot = kbInput.shoot;
+}
 // 手柄状态
 let gamepadConnected = false;
 let gamepadPrevButtons = []; // 上一帧按键状态，用于边沿检测
@@ -933,6 +965,10 @@ addEventListener('gamepadconnected', e => {
 });
 addEventListener('gamepaddisconnected', () => {
   gamepadConnected = false;
+  padInput.left = padInput.right = padInput.up = padInput.down = padInput.shoot = false;
+  inputDash = false;
+  gamepadPrevButtons = [];
+  gamepadPrevDir = { up:false, down:false, left:false, right:false };
   showGamepadToast('手柄已断开');
 });
 
@@ -942,7 +978,7 @@ function showGamepadToast(msg) {
   if (!el) {
     el = document.createElement('div');
     el.id = 'gpToast';
-    el.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.8);color:#0ff;padding:8px 16px;border-radius:8px;font-size:14px;z-index:200;transition:opacity .4s;pointer-events:none;border:1px solid #0ff4';
+    el.style.cssText = 'position:fixed;top:calc(60px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.8);color:#0ff;padding:8px 16px;border-radius:8px;font-size:14px;z-index:200;transition:opacity .4s;pointer-events:none;border:1px solid #0ff4';
     document.body.appendChild(el);
   }
   el.textContent = msg;
@@ -1030,16 +1066,16 @@ function pollGamepad() {
   const dpadLeft = pad.buttons[14] && pad.buttons[14].pressed;
   const dpadRight = pad.buttons[15] && pad.buttons[15].pressed;
 
-  input.left = lx < -DEADZONE || dpadLeft;
-  input.right = lx > DEADZONE || dpadRight;
-  input.up = ly < -DEADZONE || dpadUp;
-  input.down = ly > DEADZONE || dpadDown;
+  padInput.left = lx < -DEADZONE || dpadLeft;
+  padInput.right = lx > DEADZONE || dpadRight;
+  padInput.up = ly < -DEADZONE || dpadUp;
+  padInput.down = ly > DEADZONE || dpadDown;
 
   // 射击: A(0), X(2), RT(7) 任意一个按住 — 每帧重算，释放即停
   const aPressed = pad.buttons[0] && pad.buttons[0].pressed;
   const xPressed = pad.buttons[2] && pad.buttons[2].pressed;
   const rtPressed = pad.buttons[7] && pad.buttons[7].pressed && pad.buttons[7].value > 0.3;
-  input.shoot = input.kbShoot || touchActive || aPressed || xPressed || rtPressed;
+  padInput.shoot = aPressed || xPressed || rtPressed;
 
   // 边沿检测按键
   const wasPressed = (i) => gamepadPrevButtons[i] && gamepadPrevButtons[i].pressed;
@@ -1092,7 +1128,9 @@ function pollGamepad() {
       } else if (ov.id === 'ovSettings') {
         document.getElementById('btnSetBack').click();
       } else if (ov.id === 'ovBossIntro') {
-        // Boss 预告：B = 返回标题
+        // Boss 预告：B = 返回标题（同时清空待生成 Boss，避免下次开局误触发）
+        game.bossPending = false;
+        pendingBossType = null;
         game.state = 'title'; hideAllOverlays();
         document.getElementById('ovTitle').classList.remove('hidden');
       }
@@ -1109,11 +1147,11 @@ addEventListener('keydown', e => {
   // 非游戏中状态屏蔽移动和射击指令（但允许 ESC 暂停）
   const canControl = game.state === 'playing';
   if (canControl) {
-    if (k==='arrowleft'||k==='a') input.left=true;
-    if (k==='arrowright'||k==='d') input.right=true;
-    if (k==='arrowup'||k==='w') input.up=true;
-    if (k==='arrowdown'||k==='s') input.down=true;
-    if (k===' '||k==='j') { input.kbShoot = true; input.shoot = true; }
+    if (k==='arrowleft'||k==='a') kbInput.left=true;
+    if (k==='arrowright'||k==='d') kbInput.right=true;
+    if (k==='arrowup'||k==='w') kbInput.up=true;
+    if (k==='arrowdown'||k==='s') kbInput.down=true;
+    if (k===' '||k==='j') kbInput.shoot = true;
     // 磁极切换（第11关）：Shift 边沿触发
     if (k==='shift' && !polarityKeyDown) { polarityKeyDown = true; inputPolarity = true; }
   }
@@ -1122,11 +1160,11 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => {
   const k = e.key.toLowerCase();
-  if (k==='arrowleft'||k==='a') input.left=false;
-  if (k==='arrowright'||k==='d') input.right=false;
-  if (k==='arrowup'||k==='w') input.up=false;
-  if (k==='arrowdown'||k==='s') input.down=false;
-  if (k===' '||k==='j') { input.kbShoot = false; input.shoot = false; }
+  if (k==='arrowleft'||k==='a') kbInput.left=false;
+  if (k==='arrowright'||k==='d') kbInput.right=false;
+  if (k==='arrowup'||k==='w') kbInput.up=false;
+  if (k==='arrowdown'||k==='s') kbInput.down=false;
+  if (k===' '||k==='j') kbInput.shoot = false;
   if (k==='shift') polarityKeyDown = false;
 });
 
@@ -1180,20 +1218,17 @@ ta.addEventListener('pointerdown', e => {
     const tc = GAME_CONFIG.touch;
     if (distShoot <= tc.shootBtnSize/2 + 10) {
       shootBtn.active = true; shootBtn.id = e.pointerId; shootBtn.pressed = true;
-      input.shoot = true;
     } else if (distStick <= tc.stickSize/2 + 30) {
       stick.active = true; stick.id = e.pointerId;
       stick.dx = dx; stick.dy = dy;
     } else {
       // 其他区域：拖动移动
       touchActive = true; touchId = e.pointerId;
-      input.shoot = true;
       movePlayerTo(e.clientX, e.clientY);
     }
   } else {
     // 拖动模式
     touchActive = true; touchId = e.pointerId;
-    input.shoot = true;
     movePlayerTo(e.clientX, e.clientY);
   }
   e.preventDefault();
@@ -1211,10 +1246,10 @@ ta.addEventListener('pointermove', e => {
       // 死区外才移动
       if (d > maxR * tc.stickDeadZone) {
         const nx = dx/maxR, ny = dy/maxR;
-        input.left = nx < -0.3; input.right = nx > 0.3;
-        input.up = ny < -0.3; input.down = ny > 0.3;
+        stickInput.left = nx < -0.3; stickInput.right = nx > 0.3;
+        stickInput.up = ny < -0.3; stickInput.down = ny > 0.3;
       } else {
-        input.left = input.right = input.up = input.down = false;
+        stickInput.left = stickInput.right = stickInput.up = stickInput.down = false;
       }
     }
   } else {
@@ -1225,14 +1260,13 @@ ta.addEventListener('pointermove', e => {
 function releaseTouchPointer(id) {
   if (stick.active && id === stick.id) {
     stick.active = false; stick.id = null; stick.dx = 0; stick.dy = 0;
-    input.left = input.right = input.up = input.down = false;
+    stickInput.left = stickInput.right = stickInput.up = stickInput.down = false;
   }
   if (shootBtn.active && id === shootBtn.id) {
     shootBtn.active = false; shootBtn.id = null; shootBtn.pressed = false;
-    input.shoot = false;
   }
   if (touchActive && id === touchId) {
-    touchActive = false; touchId = null; input.shoot = false;
+    touchActive = false; touchId = null;
   }
 }
 
@@ -1241,7 +1275,7 @@ ta.addEventListener('pointercancel', e => releaseTouchPointer(e.pointerId));
 ta.addEventListener('lostpointercapture', e => releaseTouchPointer(e.pointerId));
 // 兜底：指针在窗口外抬起 / 切后台时清理残留输入
 window.addEventListener('pointerup', e => releaseTouchPointer(e.pointerId));
-window.addEventListener('blur', () => resetInput());
+window.addEventListener('blur', () => { resetInput(); pauseIfPlaying(); });
 // 禁止长按菜单、双指缩放等浏览器手势抢走触控
 ta.addEventListener('contextmenu', e => e.preventDefault());
 ta.addEventListener('touchmove', e => e.preventDefault(), {passive:false});
@@ -2135,6 +2169,29 @@ function drawPlayer() {
   ctx.translate(x, y);
   ctx.rotate(tilt);
   ctx.scale(1.08, 1.08);
+
+  // ---- 磁极立场（第11关）：机体外圈极色光环，切换瞬间爆发 ----
+  if (game.level === 10) {
+    const pc = POLAR_COLOR[player.polarity];
+    const lockA = player.polarityLock > 0 ? 0.4 : 1;
+    const pulse = 0.78 + 0.22 * Math.sin(game.time * 6);
+    const flash = clamp(player.polarityFlash / 0.4, 0, 1);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const pr = 46 + flash * 22;
+    const pg = ctx.createRadialGradient(0, 4, 6, 0, 4, pr);
+    pg.addColorStop(0, hexToRgba(pc, 0));
+    pg.addColorStop(0.6, hexToRgba(pc, 0.15 * pulse * lockA));
+    pg.addColorStop(1, hexToRgba(pc, 0));
+    ctx.fillStyle = pg;
+    ctx.beginPath(); ctx.ellipse(0, 4, pr, pr * 0.82, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = hexToRgba(pc, (0.45 + flash * 0.55) * lockA);
+    ctx.lineWidth = 1.4 + flash * 1.6;
+    ctx.setLineDash([6, 6]);
+    ctx.lineDashOffset = -game.time * 24;
+    ctx.beginPath(); ctx.ellipse(0, 4, 34 + flash * 14, (34 + flash * 14) * 0.82, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
 
   // ---- 引擎长尾迹（加色渐变，向屏幕下方拖曳）----
   const trailPulse = 0.82 + 0.18 * Math.sin(game.time * 16);
@@ -5509,6 +5566,76 @@ function drawBoss(b) {
         ctx.fillStyle = 'rgba(2,0,8,0.85)';
         ctx.beginPath(); ctx.arc(lx, ly, 9, 0, Math.PI * 2); ctx.fill();
       }
+    } else if (b.teleKind === 'magnetar') {
+      if (b.teleMode === 0) {
+        // 极性风暴：以 Boss 为中心的极色场域 + 向外扩张的极性环
+        const pc = POLAR_COLOR[b.polarity];
+        const fg = ctx.createRadialGradient(0, 0, 20 * S, 0, 0, 150 * S);
+        fg.addColorStop(0, hexToRgba(pc, 0.16 * prog));
+        fg.addColorStop(1, hexToRgba(pc, 0));
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = fg;
+        ctx.beginPath(); ctx.arc(0, 0, 150 * S, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = pc;
+        ctx.shadowColor = pc; ctx.shadowBlur = 12 * S;
+        for (let i = 0; i < 3; i++) {
+          const rr = (60 + ((prog * 90 + i * 30) % 90)) * S;
+          ctx.globalAlpha = (0.34 - i * 0.08) * (0.5 + prog * 0.5);
+          ctx.lineWidth = (1.4 + prog * 1.2) * S;
+          ctx.beginPath(); ctx.arc(0, 0, rr, 0, Math.PI * 2); ctx.stroke();
+        }
+        ctx.shadowBlur = 0;
+      } else {
+        // EMP：白青色收缩脉冲，并在玩家位置标出影响圈
+        ctx.globalAlpha = 0.45 + 0.45 * prog;
+        ctx.strokeStyle = 'rgba(200,245,255,0.9)';
+        ctx.lineWidth = (1.5 + prog * 2) * S;
+        ctx.shadowColor = '#9fe8ff'; ctx.shadowBlur = 14 * S;
+        const rr = (170 - prog * 120) * S;
+        ctx.beginPath(); ctx.arc(0, 0, rr, 0, Math.PI * 2); ctx.stroke();
+        for (let i = 0; i < 8; i++) {
+          const a = i * Math.PI / 4 + tNow * 2;
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(a) * rr * 0.82, Math.sin(a) * rr * 0.82);
+          ctx.lineTo(Math.cos(a) * rr * 1.08, Math.sin(a) * rr * 1.08);
+          ctx.stroke();
+        }
+        ctx.shadowBlur = 0;
+        const px = player.x - b.x, py = player.y - b.y;
+        ctx.globalAlpha = 0.4 + 0.45 * prog;
+        ctx.strokeStyle = 'rgba(160,230,255,0.9)';
+        ctx.setLineDash([6, 6]);
+        ctx.lineDashOffset = -tNow * 60;
+        ctx.beginPath(); ctx.arc(px, py, (26 + prog * 10) * S, 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    } else if (b.teleKind === 'swarmmother') {
+      if (b.teleMode === 0) {
+        // 召唤自爆蜂：在四个生成点画落点圈和向下箭头
+        for (let i = 0; i < 4; i++) {
+          const ang = i * Math.PI / 2 + b.t * 0.8;
+          const lx = Math.cos(ang) * 70 * (b.size / 5);
+          const ly = 46 + Math.sin(ang) * 18;
+          ctx.globalAlpha = 0.4 + 0.4 * prog;
+          ctx.strokeStyle = '#ffaa55';
+          ctx.lineWidth = 1.6 * S;
+          ctx.beginPath(); ctx.arc(lx, ly, (10 + 6 * prog) * S, 0, Math.PI * 2); ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(lx - 6 * S, ly + 12 * S);
+          ctx.lineTo(lx, ly + 20 * S);
+          ctx.lineTo(lx + 6 * S, ly + 12 * S);
+          ctx.stroke();
+        }
+      } else {
+        // 护卫环收缩：画一圈收缩虚线，提示即将收紧
+        ctx.globalAlpha = 0.35 + 0.45 * prog;
+        ctx.strokeStyle = '#ffcc44';
+        ctx.lineWidth = 1.6 * S;
+        ctx.setLineDash([8 * S, 6 * S]);
+        const rr = (b.guardRBase || 92) - prog * 22;
+        ctx.beginPath(); ctx.ellipse(0, 0, rr, rr * 0.66, 0, 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]);
+      }
     } else if (b.teleTargets && b.teleTargets.length) {
       // 天降弹幕：标记顶部落点并画出下落通道
       for (const t of b.teleTargets) {
@@ -5998,7 +6125,11 @@ function updateBossDeath(dt) {
     if (Math.random() < 0.35) addShockwave(ex, ey, '#ffaa55', 30 + Math.random() * 26, 0.35, 2);
     game.shake = Math.max(game.shake, 0.1);
   }
-  if (d.t >= d.maxT + 0.5) game.bossDeath = null;
+  if (d.t >= d.maxT + 0.5) {
+    game.bossDeath = null;
+    // 由演出计时驱动结算，避免独立 setTimeout 在退出/重开后误触发
+    if (game.state === 'playing') endLevel(true);
+  }
 }
 
 function drawBossDeath() {
@@ -6307,6 +6438,36 @@ function drawDebris() {
 }
 
 /* ==================== 碰撞 ==================== */
+// Boss 击杀结算（子弹直击 / 火箭溅射共用，避免负血 Boss 卡住不爆）
+function destroyBoss(dead) {
+  if (!dead) return;
+  game.score += dead.score;
+  game.bossDeath = {
+    x: dead.x, y: dead.y, size: dead.size, type: dead.type,
+    t: 0, maxT: 1.7, nextBoom: 0,
+  };
+  addExplosion(dead.x, dead.y, '#ff5500', 60, 2);
+  addShockwave(dead.x, dead.y, '#ffddaa', 250 * (dead.size / 5), 1.15, 12);
+  game.flash = 0.55; game.flashColor = '#ffddaa';
+  game.hitStop = 0.12;
+  game.shake = 0.65;
+  game.enemyBullets.length = 0;
+  game.gravityWells = [];
+  // Boss 已死：清场并给玩家无敌，避免庆祝演出期间被残余小怪/子弹反杀
+  for (const g of game.monsters) {
+    addExplosion(g.x, g.y, g.orbit ? '#ffcc44' : '#ff9944', 8, 0.7);
+  }
+  game.monsters.length = 0;
+  player.invuln = Math.max(player.invuln, 3);
+  sfx('bossDie');
+  game.boss = null;
+  game.bossActive = false;
+  game.bossPending = true; // 阻止 updateWaves 再次触发 Boss 预告
+  const bb = document.getElementById('bossBar');
+  bb.classList.remove('show');
+  bb.classList.remove('enraged');
+}
+
 function checkCollisions() {
   // 玩家子弹 vs 怪兽
   for (let i = game.bullets.length - 1; i >= 0; i--) {
@@ -6370,7 +6531,9 @@ function checkCollisions() {
     }
     // vs Boss（仅在 Boss 完全进场后才能造成伤害，缩小碰撞半径更精准）
     if (!consumed && game.boss && game.boss.phase === 'fight') {
-      if (dist(b, game.boss) < 14 * game.boss.size) {
+      // 虫群之母有护卫环，本体判定收得更紧，避免隔着护卫直接打中心
+      const bossHitR = game.boss.type === 'swarmmother' ? 9 * game.boss.size : 14 * game.boss.size;
+      if (dist(b, game.boss) < bossHitR) {
         const isCrit = Math.random() < GAME_CONFIG.crit.chance;
         let dmg = isCrit ? b.dmg * GAME_CONFIG.crit.mult : b.dmg;
         // 磁极核心：玩家与 Boss 同极时同性相斥，穿透安全但伤害减半
@@ -6383,39 +6546,9 @@ function checkCollisions() {
         addHitSparks(b.x, b.y, GAME_CONFIG.bulletSpark[b.type] || GAME_CONFIG.bulletSpark.normal, bdx / bd, bdy / bd, game.boss.size);
         addFloatText(b.x, b.y - 10, Math.round(dmg), isCrit);
         hitCount++;
+        hudEl('bossFill').style.width = (Math.max(0, game.boss.hp) / game.boss.maxHp * 100) + '%';
         if (b.type === 'rocket') rocketExplode(b.x, b.y, 60, b.dmg);
-        document.getElementById('bossFill').style.width = (game.boss.hp / game.boss.maxHp * 100) + '%';
-        if (game.boss.hp <= 0) {
-          const dead = game.boss;
-          game.score += dead.score;
-          game.bossDeath = {
-            x: dead.x, y: dead.y, size: dead.size, type: dead.type,
-            t: 0, maxT: 1.7, nextBoom: 0,
-          };
-          addExplosion(dead.x, dead.y, '#ff5500', 60, 2);
-          addShockwave(dead.x, dead.y, '#ffddaa', 250 * (dead.size / 5), 1.15, 12);
-          game.flash = 0.55; game.flashColor = '#ffddaa';
-          game.hitStop = 0.12;
-          game.shake = 0.65;
-          game.enemyBullets.length = 0;
-          game.gravityWells = [];
-          // 清理仍环绕 Boss 的护卫蜂
-          for (let k = game.monsters.length - 1; k >= 0; k--) {
-            const g = game.monsters[k];
-            if (g.orbit && g.orbit.owner === 'boss') {
-              addExplosion(g.x, g.y, '#ffcc44', 10, 0.7);
-              game.monsters.splice(k, 1);
-            }
-          }
-          sfx('bossDie');
-          game.boss = null;
-          game.bossActive = false;
-          game.bossPending = true; // 阻止 updateWaves 再次触发 Boss 预告
-          const bb = document.getElementById('bossBar');
-          bb.classList.remove('show');
-          bb.classList.remove('enraged');
-          setTimeout(() => endLevel(true), 1700);
-        }
+        if (game.boss && game.boss.hp <= 0) destroyBoss(game.boss);
         if (!b.pierce) consumed = true;
       }
     }
@@ -6493,7 +6626,8 @@ function rocketExplode(x, y, radius, dmg) {
   }
   if (game.boss && game.boss.phase === 'fight' && dist({x,y}, game.boss) < radius) {
     game.boss.hp -= dmg * 0.5;
-    document.getElementById('bossFill').style.width = (game.boss.hp / game.boss.maxHp * 100) + '%';
+    hudEl('bossFill').style.width = (game.boss.hp / game.boss.maxHp * 100) + '%';
+    if (game.boss.hp <= 0) destroyBoss(game.boss);
   }
 }
 
@@ -6918,7 +7052,7 @@ function updateMonsters(dt) {
             }
           } else if (m.type === 'stormcloud') {
             // 雷云：三条固定纵向雷链，逐条延迟落下，极性交替
-            m.shootAlt = (m.shootAlt + 1) % 2;
+            m.shootAlt = ((m.shootAlt || 0) + 1) % 2;
             const lanes = [W * 0.22, W * 0.5, W * 0.78];
             for (let lane = 0; lane < 3; lane++) {
               const lx = lanes[lane] + Math.sin(m.t * 2 + lane) * 10;
@@ -7181,7 +7315,8 @@ function updateMonsters(dt) {
       } else if (b.type === 'magnetar') {
         // 磁极核心: 悬浮 + 周期翻转磁极 + 极性弹幕 / 极性风暴 / EMP
         b.x = W/2 + Math.sin(b.t * 0.5) * (W * 0.26);
-        b.y = 98 + Math.sin(b.t * 0.95) * 16;
+        // 核心体较大，悬停位略低，避免压住顶部 Boss 血条
+        b.y = 136 + Math.sin(b.t * 0.95) * 16;
         if (b.polFlash > 0) b.polFlash -= dt;
         b.polarityTimer -= dt;
         if (b.polarityTimer <= 0) {
@@ -7217,12 +7352,13 @@ function updateMonsters(dt) {
       } else if (b.type === 'swarmmother') {
         // 虫群之母: 悬浮 + 护卫环收缩/回填 + 幼虫散弹 + 召唤自爆蜂
         b.x = W/2 + Math.sin(b.t * 0.55) * (W * 0.24);
-        b.y = 100 + Math.sin(b.t * 0.9) * 14;
+        // 本体较大，悬停位略低，避免头部/翅膀压住顶部的 Boss 血条
+        b.y = 136 + Math.sin(b.t * 0.9) * 14;
         if (b.guardR === undefined) b.guardR = 92;
         if (b.guardRBase === undefined) b.guardRBase = 92;
         // 护卫环收缩脉冲：冲刺时收拢，结束后回到原半径
         if (b.guardPulse > 0) b.guardPulse -= dt;
-        b.guardRTarget = b.guardPulse > 0 ? 54 : b.guardRBase;
+        b.guardRTarget = b.guardPulse > 0 ? 70 : b.guardRBase;
         b.guardR += (b.guardRTarget - b.guardR) * Math.min(1, 6 * dt);
         for (const g of game.monsters) {
           if (g.orbit && g.orbit.owner === 'boss') g.orbit.r = b.guardR;
@@ -7375,7 +7511,9 @@ function updateWaves(dt) {
 
 // 零星补怪: 从本关波次中随机选一种类型，生成 1-2 只
 function spawnTrickle(lv) {
-  const types = [...new Set(lv.waves.map(w => w.type))];
+  // 蜂后这类高价值精英不参与补怪，避免难度与奖励随机失控
+  const types = [...new Set(lv.waves.map(w => w.type))].filter(t => MONSTER_TYPES[t].trickle !== false);
+  if (types.length === 0) return;
   const type = types[Math.floor(Math.random() * types.length)];
   const cfg = MONSTER_TYPES[type];
   const bal = getBalance();
@@ -7390,6 +7528,7 @@ function spawnTrickle(lv) {
       hp: cfg.hp, maxHp: cfg.hp, size: cfg.size, score: cfg.score,
       shootCD: cfg.shoot ? rand(0.5, shootInt) : 0, shootInterval: shootInt,
       t: Math.random() * Math.PI * 2, t0: Math.random() * Math.PI * 2, pattern: 'wave', phase: 'enter',
+      hitFlash: 0, kbVX: 0, kbVY: 0, shootAlt: 0,
     });
   }
 }
@@ -9791,20 +9930,32 @@ function getComboMult() {
 
 /* ==================== HUD ==================== */
 let _lastHudScore = 0;
+let _lastHudWave = '';
+let _lastScoreBounceAt = 0;
+const _reduceMotion = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+// HUD 元素缓存：updateHUD 每帧调用，避免重复查询 DOM 触发样式计算
+const _hudCache = {};
+function hudEl(id) {
+  let el = _hudCache[id];
+  if (!el || !el.isConnected) { el = document.getElementById(id); _hudCache[id] = el; }
+  return el;
+}
+
 function updateHUD() {
   // 左上面板：波次编号
   const lv = LEVELS[game.level];
   const totalWaves = lv ? lv.waves.length : 0;
   const waveNum = game.bossActive ? 'BOSS' : (Math.min(game.waveIdx, totalWaves) + '/' + totalWaves);
-  document.getElementById('hLv').textContent = waveNum;
-  // 右上面板：得分
-  document.getElementById('hSc').textContent = game.score.toLocaleString();
+  if (waveNum !== _lastHudWave) {
+    _lastHudWave = waveNum;
+    hudEl('hLv').textContent = waveNum;
+  }
 
   // 血条进度
   const hpPct = Math.max(0, player.hp / CFG.maxHP) * 100;
-  const hpFill = document.getElementById('hpFill');
+  const hpFill = hudEl('hpFill');
   hpFill.style.width = hpPct + '%';
-  const hpWrap = document.getElementById('hpWrap');
+  const hpWrap = hudEl('hpWrap');
   if (player.hp / CFG.maxHP <= GAME_CONFIG.ui.hpLowThreshold) {
     hpWrap.classList.add('low');
   } else {
@@ -9813,8 +9964,8 @@ function updateHUD() {
 
   // 护盾条进度
   const shPct = Math.max(0, player.shield / player.maxShield) * 100;
-  document.getElementById('shieldFill').style.width = shPct + '%';
-  const sw = document.getElementById('shieldWrap');
+  hudEl('shieldFill').style.width = shPct + '%';
+  const sw = hudEl('shieldWrap');
   if (sw) {
     if (player.shield / player.maxShield <= GAME_CONFIG.ui.hpLowThreshold) {
       sw.classList.add('shield-low');
@@ -9823,22 +9974,30 @@ function updateHUD() {
     }
   }
 
-  // 数值变化弹跳动效（得分变化时）
+  // 得分变化时才写 DOM，并用 WAAPI 做弹跳，避免强制同步重排
   if (game.score !== _lastHudScore) {
     _lastHudScore = game.score;
-    const scEl = document.getElementById('hSc');
-    scEl.classList.remove('bounce');
-    void scEl.offsetWidth;
-    scEl.classList.add('bounce');
+    hudEl('hSc').textContent = game.score.toLocaleString();
+    const now = performance.now();
+    if (now - _lastScoreBounceAt > 140 && !_reduceMotion) {
+      _lastScoreBounceAt = now;
+      const scEl = hudEl('hSc');
+      if (scEl && scEl.animate) {
+        scEl.animate(
+          [{ transform: 'scale(1)' }, { transform: 'scale(1.28)', offset: 0.4 }, { transform: 'scale(1)' }],
+          { duration: 280, easing: 'ease' }
+        );
+      }
+    }
   }
 
   // 武器状态
-  const wr = document.getElementById('weaponRow');
+  const wr = hudEl('weaponRow');
   if (player.weapon !== 'normal') {
     wr.style.opacity = '1';
     const names = { laser: '激光', shotgun: '霰弹', rocket: '火箭' };
     const colors = { laser: '#00e5ff', shotgun: '#ffd23f', rocket: '#ff8844' };
-    const el = document.getElementById('hWp');
+    const el = hudEl('hWp');
     el.textContent = names[player.weapon] + ' ' + Math.ceil(player.weaponTime) + 's';
     el.style.color = colors[player.weapon];
   } else {
@@ -9846,9 +10005,9 @@ function updateHUD() {
   }
 
   // 连击显示：仅 combo >= 2 时显示；>=5 放大+外发光；>=10 切换警示橙光
-  const comboRow = document.getElementById('comboRow');
-  const hCombo = document.getElementById('hCombo');
-  const hComboMult = document.getElementById('hComboMult');
+  const comboRow = hudEl('comboRow');
+  const hCombo = hudEl('hCombo');
+  const hComboMult = hudEl('hComboMult');
   if (game.combo >= 2) {
     comboRow.style.opacity = '1';
     hCombo.textContent = game.combo + ' COMBO';
@@ -9909,6 +10068,7 @@ function floatScore(x, y, text) {
 
 /* ==================== 游戏流程 ==================== */
 function startGame(level) {
+  initAudio(); // 覆盖关卡选择/下一关等不经过标题页的开局路径
   game.level = level;
   game.score = 0; game.kills = 0; game.shots = 0; game.hits = 0;
   game.time = 0; game.waveIdx = 0;
@@ -9960,6 +10120,8 @@ function resumeGame(snap) {
     player.weapon = wpn;
     player.weaponTime = +snap.weaponTime;
   }
+  // 第11关的磁极状态也需要续上，否则续玩后与弹幕颜色对不上
+  player.polarity = snap.polarity === 1 ? 1 : 0;
   // 若存档时正在进行 Boss 战，直接续战并还原 Boss 剩余血量
   if (snap.bossActive && lv.boss) {
     game.waveIdx = lv.waves.length;
@@ -9982,6 +10144,7 @@ function resumeSummary(snap) {
 
 // Boss战失败后重试：直接重开Boss战，跳过小怪波次，保留当前分数
 function retryBoss() {
+  initAudio();
   const level = game.level;
   const lv = LEVELS[level];
   // 保留分数、击杀、命中统计，重置战斗状态
@@ -10014,6 +10177,7 @@ function retryBoss() {
 }
 
 function endLevel(win) {
+  if (game.state === 'over') return; // 防重复结算（Boss 演出与阵亡同时触发）
   // 本局已结束（通关或阵亡），清除“进行中”快照，避免下次误提示续玩
   clearRunSave();
   game.state = 'over';
@@ -10038,6 +10202,7 @@ function endLevel(win) {
   nrEl.style.display = isRecord ? 'block' : 'none';
 
   document.getElementById('btnNext').style.display = (win && game.level < LEVELS.length - 1) ? '' : 'none';
+  hideAllOverlays();
   document.getElementById('ovOver').classList.remove('hidden');
   // 存档: 解锁下一关 + 记录最高分
   if (win) {
@@ -10064,13 +10229,18 @@ function togglePause() {
 
 // 清空所有输入状态，防止暂停/弹窗时残留指令造成异常
 function resetInput() {
+  kbInput.left = kbInput.right = kbInput.up = kbInput.down = kbInput.shoot = false;
+  padInput.left = padInput.right = padInput.up = padInput.down = padInput.shoot = false;
+  stickInput.left = stickInput.right = stickInput.up = stickInput.down = false;
   input.left = input.right = input.up = input.down = false;
   input.shoot = false;
   input.kbShoot = false;
   inputDash = false;
+  inputPolarity = false;
+  polarityKeyDown = false;
   touchActive = false; touchId = null;
-  stick.active = false; stick.dx = 0; stick.dy = 0;
-  shootBtn.active = false; shootBtn.pressed = false;
+  stick.active = false; stick.id = null; stick.dx = 0; stick.dy = 0;
+  shootBtn.active = false; shootBtn.id = null; shootBtn.pressed = false;
 }
 
 /* ==================== 音频 (Web Audio 合成) ==================== */
@@ -10216,14 +10386,15 @@ function loop(t) {
   }
   // 手柄轮询（每帧都执行，支持菜单导航）
   pollGamepad();
-  // 每帧末重置射击（键盘/手柄可能未释放，但下一帧会重新设置）
-  // 注意：input.shoot 由键盘 keyup 和手柄轮询共同维护
+  // 合并键盘 / 手柄 / 触控输入源
+  mergeInput();
   render();
   ctx.restore();
   requestAnimationFrame(loop);
 }
 
 function update(dt) {
+  mergeInput();
   // 实时进度自动存档：首帧立即落盘，随后约每 1.2s 覆盖一次
   runSaveTimer -= dt;
   if (runSaveTimer <= 0) { runSaveTimer = 1.2; saveRunSnapshot(); }
