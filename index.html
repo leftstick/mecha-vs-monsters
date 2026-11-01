@@ -855,6 +855,7 @@ function saveRunSnapshot() {
       weaponTime: player.weaponTime,
       polarity: player.polarity,
       wingmen: player.wingmen.map(w => ({ side: w.side, slot: w.slot, hp: w.hp, maxHp: w.maxHp })),
+      pity: game.powerupPity,
       bossActive: game.bossActive,
       bossHp: game.boss ? game.boss.hp : null,
       savedAt: Date.now(),
@@ -897,6 +898,7 @@ let game = {
   shake: 0,
   overWin: false,
   powerups: [], // 奖励宝盒
+  powerupPity: 0, // 连续武器宝箱计数（保底：满 3 个后下一个必为特殊宝箱）
   laserWall: null, // 清屏激光墙
   inkCloud: null,  // 深海 Boss 墨雾
   combo: 0,        // 连击数
@@ -6509,6 +6511,8 @@ function destroyBoss(dead) {
   }
   game.monsters.length = 0;
   player.invuln = Math.max(player.invuln, 3);
+  // Boss 必掉 1 个特殊宝箱（僚机/清屏），自动飞向玩家
+  spawnBossReward(dead.x, dead.y);
   sfx('bossDie');
   game.boss = null;
   game.bossActive = false;
@@ -6570,8 +6574,8 @@ function checkCollisions() {
           if (b.type === 'rocket') {
             rocketExplode(b.x, b.y, 50, b.dmg);
           }
-          // 随机掉落宝盒 (5% 概率)
-          if (Math.random() < 0.05) spawnPowerup(m.x, m.y);
+          // 随机掉落宝盒（6% 基础概率，特殊宝箱受保底机制保护）
+          if (Math.random() < POWERUP_DROP_CHANCE) spawnPowerup(m.x, m.y);
           game.monsters.splice(j, 1);
         } else {
           sfx('hit');
@@ -6698,7 +6702,7 @@ function rocketExplode(x, y, radius, dmg) {
         game.kills++;
         game.score += m.score;
         addExplosion(m.x, m.y, '#ff8800', 12, 0.8);
-        if (Math.random() < 0.05) spawnPowerup(m.x, m.y);
+        if (Math.random() < POWERUP_DROP_CHANCE) spawnPowerup(m.x, m.y);
         game.monsters.splice(j, 1);
       }
     }
@@ -6711,28 +6715,56 @@ function rocketExplode(x, y, radius, dmg) {
 }
 
 /* ==================== 奖励宝盒 ==================== */
-// 权重池：武器 72% / 僚机 18% / 清屏炸弹 10%
+const POWERUP_DROP_CHANCE = 0.06; // 每次击杀掉落宝箱的基础概率
+const POWERUP_PITY_LIMIT = 3;     // 连续 3 个武器宝箱后，第 4 个必为特殊宝箱
+// 权重池：武器 60% / 僚机 25% / 清屏炸弹 15%
 const POWERUP_POOL = [
-  { type: 'laser',   w: 24 },
-  { type: 'shotgun', w: 24 },
-  { type: 'rocket',  w: 24 },
-  { type: 'wingman', w: 18 },
-  { type: 'bomb',    w: 10 },
+  { type: 'laser',   w: 20 },
+  { type: 'shotgun', w: 20 },
+  { type: 'rocket',  w: 20 },
+  { type: 'wingman', w: 25 },
+  { type: 'bomb',    w: 15 },
 ];
 function rollPowerupType() {
+  // 保底：连续多个武器宝箱后强制出特殊宝箱（僚机 60% / 炸弹 40%）
+  if (game.powerupPity >= POWERUP_PITY_LIMIT) {
+    game.powerupPity = 0;
+    return Math.random() < 0.6 ? 'wingman' : 'bomb';
+  }
   let sum = 0;
   for (const p of POWERUP_POOL) sum += p.w;
   let r = Math.random() * sum;
-  for (const p of POWERUP_POOL) { r -= p.w; if (r < 0) return p.type; }
-  return 'laser';
+  let type = 'laser';
+  for (const p of POWERUP_POOL) { r -= p.w; if (r < 0) { type = p.type; break; } }
+  if (type === 'wingman' || type === 'bomb') game.powerupPity = 0;
+  else game.powerupPity++;
+  return type;
 }
 function spawnPowerup(x, y) {
   game.powerups.push({ x, y, vy: 80, type: rollPowerupType(), t: 0 });
 }
+// Boss 击杀奖励：必掉 1 个特殊宝箱，并主动飞向玩家（避免结算演出期间错过）
+function spawnBossReward(x, y) {
+  game.powerupPity = 0;
+  game.powerups.push({
+    x, y, vy: 0,
+    type: Math.random() < 0.6 ? 'wingman' : 'bomb',
+    t: 0, toPlayer: true,
+  });
+  addFloatText(x, y, 'Boss 奖励', true);
+}
 function updatePowerups(dt) {
   for (let i = game.powerups.length - 1; i >= 0; i--) {
     const p = game.powerups[i];
-    p.y += p.vy * dt;
+    if (p.toPlayer) {
+      // 追踪玩家：结算前自动送到手中
+      const dx = player.x - p.x, dy = player.y - p.y;
+      const d = Math.hypot(dx, dy) || 1;
+      p.x += dx / d * 520 * dt;
+      p.y += dy / d * 520 * dt;
+    } else {
+      p.y += p.vy * dt;
+    }
     p.t += dt;
     if (p.y > H + 30) game.powerups.splice(i, 1);
   }
@@ -6824,7 +6856,7 @@ function updateLaserWall(dt) {
     addExplosion(m.x, m.y, '#ffcf66', 18, 1.0);
     addExplosion(m.x, m.y, '#ffffff', 8, 0.8);
     addShockwave(m.x, m.y, '#ffb347', 40 * m.size, 0.3, 2);
-    if (Math.random() < 0.05) spawnPowerup(m.x, m.y);
+    if (Math.random() < POWERUP_DROP_CHANCE) spawnPowerup(m.x, m.y);
     game.monsters.splice(i, 1);
   }
   // Boss 在墙带内持续受到灼烧
@@ -10583,6 +10615,8 @@ function startGame(level, opts) {
   // 僚机：默认清空；从“下一关”进入时保留存活僚机与剩余血量
   if (!keepWingmen) player.wingmen = [];
   else player.wingmen = player.wingmen.filter(w => w.hp > 0);
+  // 宝箱保底计数：新开一局重置；连续闯关时沿用
+  if (!keepWingmen) game.powerupPity = 0;
   for (const w of player.wingmen) {
     w.x = clamp(player.x + w.side * (w.slot ? WINGMAN.outerX : WINGMAN.innerX), 24, W - 24);
     w.y = clamp(player.y + (w.slot ? WINGMAN.outerY : WINGMAN.innerY), 40, H - 20);
@@ -10627,6 +10661,8 @@ function resumeGame(snap) {
   }
   // 第11关的磁极状态也需要续上，否则续玩后与弹幕颜色对不上
   player.polarity = snap.polarity === 1 ? 1 : 0;
+  // 还原宝箱保底计数
+  game.powerupPity = clamp(snap.pity | 0, 0, POWERUP_PITY_LIMIT);
   // 还原僚机（数量 / 左右槽位 / 剩余生命）
   player.wingmen = [];
   for (const s of (snap.wingmen || [])) {
