@@ -38,6 +38,10 @@
   .score-val{font-size:clamp(16px,4.5vw,22px);}
   .weapon-row{margin-top:4px;transition:opacity .3s;}
   .weapon-row.flash{animation:wpFlash .3s;}
+  /* 救援目标提示：场上有幸存者时脉冲 */
+  .weapon-row.rescue-alert .hud-val{color:#66ff99;text-shadow:0 0 10px rgba(80,255,150,0.8);
+    animation:rescuePulse .8s ease-in-out infinite;}
+  @keyframes rescuePulse{0%,100%{opacity:1;}50%{opacity:0.45;}}
   @keyframes wpFlash{0%{filter:brightness(2.5);}100%{filter:brightness(1);}}
   /* 连击显示 */
   .combo-row{margin-top:6px;display:flex;flex-direction:column;align-items:flex-end;line-height:1.1;transition:opacity .25s;}
@@ -127,8 +131,63 @@
   .lv .num{font-size:clamp(20px,6vw,32px);font-weight:900;color:#00e5ff;text-shadow:0 0 8px rgba(0,229,255,0.5);}
   .lv .nm{font-size:clamp(11px,3vw,14px);color:#80d8ff;margin-top:2px;}
   .lv .best{font-size:10px;color:#5a7a9a;margin-top:3px;}
+  /* 关卡勋章：通/准/韧/救 四枚，点亮表示已达成 */
+  .lv .medals{display:flex;gap:3px;justify-content:center;margin-top:5px;}
+  .lv .medals i{display:block;width:7px;height:7px;border-radius:50%;background:#1d3145;
+    border:1px solid rgba(0,229,255,0.18);}
+  .lv .medals i.on{background:#ffd23f;border-color:#ffe89a;box-shadow:0 0 6px rgba(255,180,40,0.85);}
   .lv.locked{opacity:0.4;border-color:#333;cursor:not-allowed;}
   .lv.locked .num{color:#666;text-shadow:none;}
+
+  /* 任务简报 */
+  .brief-card{background:linear-gradient(180deg,rgba(10,18,30,0.95),rgba(5,9,16,0.97));
+    border:1px solid rgba(0,229,255,0.45);border-radius:14px;padding:20px 20px 18px;
+    width:min(92vw,440px);text-align:center;
+    box-shadow:0 0 28px rgba(0,170,255,0.22),inset 0 0 18px rgba(0,50,80,0.15);}
+  .brief-tag{font-size:10px;letter-spacing:0.35em;color:#00e5ff;opacity:0.8;}
+  .brief-title{font-size:clamp(22px,6.5vw,32px);font-weight:900;color:#eaf6ff;
+    text-shadow:0 0 14px rgba(0,229,255,0.5);margin:4px 0 2px;}
+  .brief-sub{font-size:12px;color:#6fa8c8;margin-bottom:12px;}
+  .brief-sec{font-size:11px;letter-spacing:0.2em;color:#00e5ff;text-align:left;margin:12px 0 6px;
+    border-left:3px solid #00e5ff;padding-left:8px;}
+  .brief-goals{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+  .brief-goal{display:flex;align-items:center;gap:8px;padding:7px 8px;border:1px solid rgba(0,229,255,0.18);
+    border-radius:8px;background:rgba(0,30,50,0.35);text-align:left;min-width:0;}
+  .brief-goal .g-ico{width:24px;height:24px;flex:0 0 24px;border-radius:50%;display:flex;align-items:center;
+    justify-content:center;font-size:12px;font-weight:900;color:#4d6377;background:#16222e;border:1px solid #2b4155;}
+  .brief-goal.on .g-ico{color:#3a2500;background:linear-gradient(180deg,#fff3b0,#ffc02e);
+    border-color:#ffe89a;box-shadow:0 0 8px rgba(255,190,60,0.7);}
+  .brief-goal .g-txt{display:flex;flex-direction:column;line-height:1.25;min-width:0;}
+  .brief-goal .g-txt b{font-size:12px;color:#c8e6ff;}
+  .brief-goal.on .g-txt b{color:#ffd88a;}
+  .brief-goal .g-txt span{font-size:10px;color:#6a8aa5;}
+  .brief-boss{text-align:left;padding:9px 10px;border:1px solid rgba(255,90,90,0.25);border-radius:8px;
+    background:rgba(40,10,10,0.35);display:flex;flex-direction:column;gap:4px;}
+  .brief-boss b{font-size:13px;color:#ff9a9a;letter-spacing:0.05em;}
+  .brief-boss span{font-size:11px;color:#b08a90;line-height:1.5;}
+  .brief-side{text-align:left;font-size:11px;color:#8fefb5;line-height:1.5;margin-top:8px;padding:8px 10px;
+    border:1px dashed rgba(90,255,150,0.35);border-radius:8px;background:rgba(10,45,25,0.35);}
+  .brief-side b{color:#b9ffd4;}
+  .brief-tip{font-size:10px;color:#6a8aa5;line-height:1.6;margin-top:8px;text-align:left;}
+  .brief-btns{display:flex;flex-direction:column;gap:8px;margin-top:14px;}
+  /* 横屏短视口：压缩简报高度，保证出击按钮首屏可见 */
+  @media (max-height:520px){
+    .brief-card{padding:10px 14px;}
+    .brief-title{font-size:clamp(17px,3.4vw,24px);}
+    .brief-sub{margin-bottom:5px;}
+    .brief-sec{margin:6px 0 3px;}
+    .brief-goal{padding:4px 6px;}
+    .brief-goal .g-ico{width:20px;height:20px;flex-basis:20px;font-size:10px;}
+    .brief-goal .g-txt b{font-size:11px;}
+    .brief-goal .g-txt span{font-size:9px;}
+    .brief-boss{padding:6px 8px;}
+    .brief-boss b{font-size:12px;}
+    .brief-boss span{font-size:10px;}
+    .brief-side{font-size:10px;margin-top:5px;padding:5px 8px;}
+    .brief-tip{display:none;}
+    .brief-btns{flex-direction:row;margin-top:8px;}
+    .brief-btns .btn{flex:1;padding:8px 10px;}
+  }
 
   /* 操作设置 */
   .panel-title{font-size:clamp(20px,6vw,30px);color:#00e5ff;font-weight:900;letter-spacing:3px;margin-bottom:20px;
@@ -157,6 +216,18 @@
   .new-record{font-size:clamp(14px,4.5vw,22px);color:#ffd23f;font-weight:900;letter-spacing:4px;margin:4px 0;
     text-shadow:0 0 12px #ff8800;animation:recBlink 0.8s steps(2) infinite;}
   @keyframes recBlink{0%{opacity:1;}50%{opacity:0.3;}}
+  /* 结算勋章：通关 / 精准 / 无伤 / 救援 */
+  .medal-row{display:flex;gap:10px;justify-content:center;margin:8px 0 2px;}
+  .medal{display:flex;flex-direction:column;align-items:center;gap:3px;opacity:0.35;transition:.2s;}
+  .medal b{width:clamp(30px,8vw,40px);height:clamp(30px,8vw,40px);border-radius:50%;
+    display:flex;align-items:center;justify-content:center;font-size:clamp(14px,4vw,18px);
+    color:#4d6377;background:radial-gradient(circle at 35% 30%,#243444,#101a24);
+    border:1px solid #2b4155;}
+  .medal em{font-size:10px;color:#5a7a9a;font-style:normal;letter-spacing:1px;}
+  .medal.on{opacity:1;}
+  .medal.on b{color:#3a2500;background:radial-gradient(circle at 35% 30%,#fff3b0,#ffc02e 55%,#b87400);
+    border-color:#ffe89a;box-shadow:0 0 14px rgba(255,190,60,0.7);}
+  .medal.on em{color:#ffd88a;}
   .hint{font-size:11px;color:#5a7a9a;margin-top:18px;line-height:1.7;}
 
   /* Boss 预告 */
@@ -232,6 +303,10 @@
       <span class="hud-label">WING</span>
       <span class="hud-val" id="hWing">0/4</span>
     </div>
+    <div class="hud-row weapon-row" id="rescueRow" style="opacity:0">
+      <span class="hud-label">SOS</span>
+      <span class="hud-val" id="hRescue">0/2</span>
+    </div>
   </div>
 
   <!-- 中上：血量 + 护盾 进度条 -->
@@ -283,7 +358,7 @@
     <button class="btn ghost" id="btnLevel">选择关卡</button>
     <button class="btn ghost" id="btnSettings">操作设置</button>
   </div>
-  <div class="hint">桌面: 方向键/WASD 移动 · 空格 射击<br/>手机: 触摸拖动移动 · 自动射击<br/>第11关: Shift / 手柄 Y / 右侧按钮切换磁极</div>
+  <div class="hint">桌面: 方向键/WASD 移动 · 空格 射击<br/>手机: 触摸拖动移动 · 自动射击<br/>第11关: Shift / 手柄 Y / 右侧按钮切换磁极<br/>每关 4 枚勋章: 通关 / 精准 / 无伤 / 救援</div>
 </div>
 
 <!-- 操作设置 -->
@@ -309,6 +384,25 @@
   <button class="btn ghost" id="btnBack" style="margin-top:20px">返回</button>
 </div>
 
+<!-- 任务简报 -->
+<div class="ov hidden" id="ovBrief">
+  <div class="brief-card">
+    <div class="brief-tag">MISSION BRIEFING</div>
+    <div class="brief-title" id="briefName">轨道坟场</div>
+    <div class="brief-sub" id="briefSub">第 1 关</div>
+    <div class="brief-sec">任务目标</div>
+    <div class="brief-goals" id="briefGoals"></div>
+    <div class="brief-sec">BOSS 情报</div>
+    <div class="brief-boss" id="briefBoss"></div>
+    <div class="brief-side" id="briefSide" style="display:none"></div>
+    <div class="brief-tip">提示：摧毁 BOSS 两侧炮台可暴露核心，命中核心造成 1.35 倍伤害。</div>
+    <div class="brief-btns">
+      <button class="btn" id="btnDeploy">出击 <span class="gp-hint">(A)</span></button>
+      <button class="btn ghost" id="btnBriefBack">返回 <span class="gp-hint">(B)</span></button>
+    </div>
+  </div>
+</div>
+
 <!-- 暂停 -->
 <div class="ov hidden" id="ovPause">
   <div class="panel-card">
@@ -324,8 +418,10 @@
     <div class="title" id="overTitle" style="font-size:clamp(26px,8vw,56px)">胜利!</div>
     <div class="new-record" id="newRecord" style="display:none">★ 新 纪 录 ★</div>
     <div class="rank" id="rank">S</div>
+    <div class="medal-row" id="medalRow"></div>
     <div class="ov-stat">关卡 <b id="ovLv">1</b> · 得分 <b id="ovSc">0</b></div>
     <div class="ov-stat">消灭怪兽 <b id="ovKill">0</b> · 命中率 <b id="ovHit">0%</b></div>
+    <div class="ov-stat">救援 <b id="ovRescue">0/0</b> · 受击 <b id="ovHitTaken">0</b></div>
     <div class="over-btns">
       <button class="btn" id="btnNext">下一关 <span class="gp-hint">(A)</span></button>
       <button class="btn ghost" id="btnRetry">重试 <span class="gp-hint">(A)</span></button>
@@ -790,11 +886,19 @@ function loadSave() {
             if (Number.isFinite(n) && n >= 0) bestScores[k] = Math.floor(n);
           }
         }
-        return { v: 1, unlocked, bestScores };
+        // 勋章按关卡存为 4 位掩码，旧存档缺失时默认 0
+        const medals = {};
+        if (data.medals && typeof data.medals === 'object' && !Array.isArray(data.medals)) {
+          for (const [k, v] of Object.entries(data.medals)) {
+            const n = Number(v);
+            if (Number.isFinite(n)) medals[k] = Math.max(0, Math.min(15, Math.floor(n)));
+          }
+        }
+        return { v: 1, unlocked, bestScores, medals };
       }
     }
   } catch(e) {}
-  return { v: 1, unlocked: 1, bestScores: {} }; // 默认解锁第 1 关
+  return { v: 1, unlocked: 1, bestScores: {}, medals: {} }; // 默认解锁第 1 关
 }
 function saveSave(data) {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch(e) {}
@@ -811,6 +915,41 @@ function recordBest(idx, score) {
     save.bestScores[idx] = score;
     saveSave(save);
   }
+}
+
+/* ==================== 关卡勋章 ==================== */
+// 掩码位：1 通关 / 2 精准（命中率≥60%） / 4 无伤（全程未受击） / 8 救援全清
+const MEDAL = { CLEAR: 1, ACE: 2, FLAWLESS: 4, RESCUE: 8 };
+const MEDAL_META = [
+  { bit: MEDAL.CLEAR,    icon: '通', label: '通关' },
+  { bit: MEDAL.ACE,      icon: '准', label: '精准' },
+  { bit: MEDAL.FLAWLESS, icon: '韧', label: '无伤' },
+  { bit: MEDAL.RESCUE,   icon: '救', label: '救援' },
+];
+function getMedalMask(idx) {
+  return (save.medals && save.medals[idx]) | 0;
+}
+// 单局达成情况；救援勋章要求本关确实存在救援目标且全部救回
+function computeMedalMask(win, hitRate) {
+  if (!win) return 0;
+  let mask = MEDAL.CLEAR;
+  if (hitRate >= 60) mask |= MEDAL.ACE;
+  if (game.hitsTaken === 0) mask |= MEDAL.FLAWLESS;
+  if (game.rescueTotal > 0 && game.rescued >= game.rescueTotal) mask |= MEDAL.RESCUE;
+  return mask;
+}
+function mergeMedals(idx, mask) {
+  if (!mask) return;
+  if (!save.medals || typeof save.medals !== 'object') save.medals = {};
+  save.medals[idx] = (getMedalMask(idx) | mask) & 15;
+  saveSave(save);
+}
+function renderMedalRow(mask) {
+  const row = document.getElementById('medalRow');
+  if (!row) return;
+  row.innerHTML = MEDAL_META.map(m =>
+    `<div class="medal ${mask & m.bit ? 'on' : ''}" title="${m.label}"><b>${m.icon}</b><em>${m.label}</em></div>`
+  ).join('');
 }
 
 /* ==================== 实时进度存档 (localStorage) ==================== */
@@ -856,6 +995,13 @@ function saveRunSnapshot() {
       polarity: player.polarity,
       wingmen: player.wingmen.map(w => ({ side: w.side, slot: w.slot, hp: w.hp, maxHp: w.maxHp })),
       pity: game.powerupPity,
+      rescues: game.rescues.map(r => ({ x: r.x, y: r.y, vy: r.vy, t: r.t, hold: r.hold })),
+      rescueTotal: game.rescueTotal,
+      rescued: game.rescued,
+      rescueLost: game.rescueLost,
+      rescueSpawned: game.rescueSpawned,
+      rescueClock: game.rescueClock,
+      hitsTaken: game.hitsTaken,
       bossActive: game.bossActive,
       bossHp: game.boss ? game.boss.hp : null,
       savedAt: Date.now(),
@@ -899,6 +1045,15 @@ let game = {
   overWin: false,
   powerups: [], // 奖励宝盒
   powerupPity: 0, // 连续武器宝箱计数（保底：满 3 个后下一个必为特殊宝箱）
+  rescues: [],      // 场上待救援的幸存者
+  rescueTotal: 0,   // 本关救援目标总数
+  rescued: 0,       // 已救回数量
+  rescueLost: 0,    // 救援失败数量
+  rescueSpawned: 0, // 已生成的救援目标数
+  rescueClock: 0,   // 救援生成计时
+  hitsTaken: 0,     // 本局受击次数（无伤勋章判定）
+  groundTargets: [], // 地面目标（仅地面关卡）：悬浮炮台/坦克/补给车
+  groundClock: 0,    // 地面目标生成计时
   laserWall: null, // 清屏激光墙
   inkCloud: null,  // 深海 Boss 墨雾
   combo: 0,        // 连击数
@@ -1016,7 +1171,7 @@ function vibrateGamepad(strength = 0.3, duration = 100) {
 
 // 获取当前可见的 overlay 元素
 function getVisibleOverlay() {
-  for (const id of ['ovTitle','ovLevel','ovPause','ovOver','ovBossIntro','ovResume','ovSettings']) {
+  for (const id of ['ovTitle','ovLevel','ovBrief','ovPause','ovOver','ovBossIntro','ovResume','ovSettings']) {
     const el = document.getElementById(id);
     if (el && !el.classList.contains('hidden')) return el;
   }
@@ -1132,6 +1287,8 @@ function pollGamepad() {
         document.getElementById('ovTitle').classList.remove('hidden');
       } else if (ov.id === 'ovLevel') {
         document.getElementById('btnBack').click();
+      } else if (ov.id === 'ovBrief') {
+        cancelBriefing();
       } else if (ov.id === 'ovResume') {
         // 进度恢复对话框：B = 重新开始
         document.getElementById('btnRestartRun').click();
@@ -1568,8 +1725,16 @@ function spawnBoss(type) {
     atkPhase: 0, atkTimer: 0, charging: false, chargeX: 0, chargeY: 0,
     hitFlash: 0, enraged: false, tele: 0, teleMax: 0, teleKind: null, teleTargets: null,
     vx: 0, vy: 0, shootAlt: 0,
+    // 可破坏部位：左右炮台，存活时独立索敌射击；全部摧毁后本体核心暴露
+    parts: [
+      { ox: -58, oy: 6, hp: Math.max(5, Math.round(cfg.hp * 0.06)), maxHp: Math.max(5, Math.round(cfg.hp * 0.06)), r: 16 * (cfg.size / 5), cd: 1.6, flash: 0, dead: false },
+      { ox: 58, oy: 6, hp: Math.max(5, Math.round(cfg.hp * 0.06)), maxHp: Math.max(5, Math.round(cfg.hp * 0.06)), r: 16 * (cfg.size / 5), cd: 2.1, flash: 0, dead: false },
+    ],
+    coreOpen: false,
   };
   game.bossActive = true;
+  // Boss 战开始，清空地面目标，避免战斗焦点被分散
+  if (game.groundTargets) game.groundTargets.length = 0;
   game.bossDeath = null;
   game.bossRageTimer = 0;
   const bb = document.getElementById('bossBar');
@@ -5803,6 +5968,76 @@ function drawBoss(b) {
     }
     ctx.restore();
   }
+
+  // ---- 可破坏炮台 / 核心暴露 ----
+  if (b.phase === 'fight' && b.parts) {
+    for (const p of b.parts) {
+      const px = p.ox * S, py = p.oy * S;
+      if (p.dead) {
+        // 焦黑残骸 + 余烟
+        ctx.save();
+        ctx.translate(px, py);
+        ctx.fillStyle = 'rgba(30,22,18,0.9)';
+        ctx.strokeStyle = 'rgba(120,80,60,0.6)';
+        ctx.lineWidth = 1.5 * S;
+        ctx.beginPath();
+        ctx.moveTo(-10 * S, -6 * S); ctx.lineTo(8 * S, -8 * S);
+        ctx.lineTo(11 * S, 4 * S); ctx.lineTo(-6 * S, 9 * S);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.globalAlpha = 0.25 + 0.1 * Math.sin(b.t * 3);
+        ctx.fillStyle = '#553322';
+        ctx.beginPath(); ctx.arc(0, -10 * S, 5 * S, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        continue;
+      }
+      ctx.save();
+      ctx.translate(px, py);
+      // 炮台底座
+      ctx.fillStyle = '#2a1a14';
+      ctx.strokeStyle = themeCol;
+      ctx.lineWidth = 1.6 * S;
+      ctx.beginPath();
+      ctx.moveTo(-11 * S, -8 * S); ctx.lineTo(11 * S, -8 * S);
+      ctx.lineTo(14 * S, 2 * S); ctx.lineTo(8 * S, 10 * S);
+      ctx.lineTo(-8 * S, 10 * S); ctx.lineTo(-14 * S, 2 * S);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      // 炮口朝向玩家
+      const ang = Math.atan2(player.y - (b.y + py), player.x - (b.x + px));
+      ctx.rotate(ang);
+      ctx.fillStyle = '#553322';
+      ctx.fillRect(0, -3.5 * S, 18 * S, 7 * S);
+      ctx.fillStyle = '#ffd08a';
+      ctx.beginPath(); ctx.arc(18 * S, 0, 3 * S, 0, Math.PI * 2); ctx.fill();
+      ctx.rotate(-ang);
+      // 核心灯 + 剩余血量环
+      ctx.fillStyle = p.flash > 0 ? '#ffffff' : '#ff8844';
+      ctx.beginPath(); ctx.arc(0, 0, 4.5 * S, 0, Math.PI * 2); ctx.fill();
+      const rat = clamp(p.hp / p.maxHp, 0, 1);
+      ctx.strokeStyle = 'rgba(255,180,90,0.85)';
+      ctx.lineWidth = 2.2 * S;
+      ctx.beginPath();
+      ctx.arc(0, 0, 13 * S, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * rat);
+      ctx.stroke();
+      ctx.restore();
+    }
+    // 双炮台摧毁后：本体核心暴露的脉冲准星
+    if (b.coreOpen) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const cp = 0.5 + 0.5 * Math.sin(b.t * 7);
+      ctx.strokeStyle = `rgba(255,220,110,${0.55 + 0.35 * cp})`;
+      ctx.lineWidth = 2.5 * S;
+      ctx.beginPath(); ctx.arc(0, 0, (26 + cp * 5) * S, 0, Math.PI * 2); ctx.stroke();
+      for (let i = 0; i < 4; i++) {
+        const a = b.t * 1.6 + i * Math.PI / 2;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * 18 * S, Math.sin(a) * 18 * S);
+        ctx.lineTo(Math.cos(a) * 36 * S, Math.sin(a) * 36 * S);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
   ctx.restore();
 }
 
@@ -6583,6 +6818,88 @@ function checkCollisions() {
         if (!b.pierce) { consumed = true; break; }
       }
     }
+    // vs 地面目标：击毁补给车掉落宝箱，炮台/坦克给分并累积连击
+    if (!consumed && game.groundTargets && game.groundTargets.length) {
+      for (let j = game.groundTargets.length - 1; j >= 0; j--) {
+        const g = game.groundTargets[j];
+        if (dist(b, g) < g.r + 7) {
+          const isCrit = Math.random() < GAME_CONFIG.crit.chance;
+          const dmg = isCrit ? b.dmg * GAME_CONFIG.crit.mult : b.dmg;
+          g.hp -= dmg;
+          g.hitFlash = GAME_CONFIG.monsterHitFlashTime;
+          game.hits++;
+          hitCount++;
+          const gdx = g.x - b.x, gdy = g.y - b.y;
+          const gd = Math.hypot(gdx, gdy) || 1;
+          addHitSparks(b.x, b.y, GAME_CONFIG.bulletSpark[b.type] || GAME_CONFIG.bulletSpark.normal, gdx / gd, gdy / gd, 1.1);
+          addFloatText(b.x, b.y - 10, Math.round(dmg), isCrit);
+          if (g.hp <= 0) {
+            game.kills++;
+            game.combo++;
+            game.comboTimer = GAME_CONFIG.combo.timeout;
+            const gained = Math.round(g.score * getComboMult());
+            game.score += gained;
+            floatScore(g.x, g.y, gained);
+            addExplosion(g.x, g.y, g.color, 22, 1.15);
+            addExplosion(g.x, g.y, '#ffffff', 8, 0.8);
+            addShockwave(g.x, g.y, g.color, 52, 0.4, 3);
+            sfx('explode');
+            vibrateGamepad(0.1, 35);
+            if (g.type === 'supply') spawnPowerup(g.x, g.y);
+            game.groundTargets.splice(j, 1);
+          } else {
+            sfx('hit');
+          }
+          if (!b.pierce) { consumed = true; break; }
+        }
+      }
+    }
+    // vs Boss 可破坏部位：炮台优先吸收伤害，摧毁后本体核心暴露
+    if (!consumed && game.boss && game.boss.phase === 'fight' && game.boss.parts) {
+      const boss = game.boss;
+      const S = boss.size / 5;
+      for (const p of boss.parts) {
+        if (p.dead) continue;
+        const px = boss.x + p.ox * S, py = boss.y + p.oy * S;
+        if (dist(b, { x: px, y: py }) < p.r) {
+          const isCrit = Math.random() < GAME_CONFIG.crit.chance;
+          const dmg = isCrit ? b.dmg * GAME_CONFIG.crit.mult : b.dmg;
+          p.hp -= dmg;
+          p.flash = GAME_CONFIG.monsterHitFlashTime;
+          game.hits++;
+          hitCount++;
+          const pdx = px - b.x, pdy = py - b.y;
+          const pd = Math.hypot(pdx, pdy) || 1;
+          addHitSparks(b.x, b.y, '#ffcc88', pdx / pd, pdy / pd, 0.9);
+          addFloatText(b.x, b.y - 10, Math.round(dmg), isCrit);
+          if (p.hp <= 0) {
+            p.dead = true;
+            const bonus = 400 + game.level * 40;
+            game.score += bonus;
+            floatScore(px, py, bonus);
+            addExplosion(px, py, '#ffaa44', 20, 1.1);
+            addExplosion(px, py, '#ffe0a0', 10, 0.8);
+            addShockwave(px, py, '#ffaa55', 56, 0.4, 3);
+            game.shake = Math.max(game.shake, 0.2);
+            sfx('explode');
+            // 部位破坏对本体造成少量结构性伤害
+            boss.hp -= boss.maxHp * 0.008;
+            hudEl('bossFill').style.width = (Math.max(0, boss.hp) / boss.maxHp * 100) + '%';
+            if (boss.parts.every(pp => pp.dead)) {
+              boss.coreOpen = true;
+              addFloatText(boss.x, boss.y, '核心暴露 · 伤害提升', true);
+              addShockwave(boss.x, boss.y, '#ffdd66', 120, 0.7, 6);
+              game.hitStop = Math.max(game.hitStop, 0.08);
+              game.flash = Math.max(game.flash, 0.16);
+              game.flashColor = '#ffcc66';
+            }
+            if (boss.hp <= 0) destroyBoss(boss);
+          }
+          if (!b.pierce) consumed = true;
+          break;
+        }
+      }
+    }
     // vs Boss（仅在 Boss 完全进场后才能造成伤害，缩小碰撞半径更精准）
     if (!consumed && game.boss && game.boss.phase === 'fight') {
       // 虫群之母有护卫环，本体判定收得更紧，避免隔着护卫直接打中心
@@ -6592,6 +6909,8 @@ function checkCollisions() {
         let dmg = isCrit ? b.dmg * GAME_CONFIG.crit.mult : b.dmg;
         // 磁极核心：玩家与 Boss 同极时同性相斥，穿透安全但伤害减半
         if (game.boss.type === 'magnetar' && player.polarity === game.boss.polarity) dmg *= 0.5;
+        // 炮台全毁后核心暴露：本体承受额外伤害，奖励优先拆部位的决策
+        if (game.boss.coreOpen) dmg *= 1.35;
         game.boss.hp -= dmg;
         game.boss.hitFlash = GAME_CONFIG.monsterHitFlashTime;
         game.hits++;
@@ -6714,6 +7033,303 @@ function rocketExplode(x, y, radius, dmg) {
   }
 }
 
+/* ==================== 幸存者救援（致敬《傲气雄鹰》人质救援） ==================== */
+// 每关固定投放 2 名幸存者：靠近并悬停读条即可救回；被弹幕/怪兽命中或飘出屏幕则失败。
+const RESCUE_CFG = {
+  times: [9, 27],      // 生成时间点（秒）
+  fallSpeed: 34,       // 基础下落速度
+  hoverRadius: 86,     // 救援判定半径
+  holdTime: 1.15,      // 悬停读条时长
+  bodyRadius: 20,      // 受击/碰撞半径
+  score: 1500,         // 基础救援得分
+};
+function spawnRescue() {
+  game.rescues.push({
+    x: rand(W * 0.18, W * 0.82),
+    y: -42,
+    vy: RESCUE_CFG.fallSpeed + game.level * 1.6,
+    t: 0, hold: 0, lost: 0,
+  });
+  game.rescueSpawned++;
+  addFloatText(W / 2, H * 0.7, '发现幸存者 · 靠近救援', false);
+  sfx('powerup');
+}
+function failRescue(r, reason) {
+  game.rescueLost++;
+  addExplosion(r.x, r.y, '#ff5566', 14, 0.9);
+  addShockwave(r.x, r.y, '#ff5566', 50, 0.35, 2);
+  addFloatText(r.x, r.y, reason === 'escaped' ? '救援目标失踪' : '救援失败', false);
+  game.shake = Math.max(game.shake, 0.18);
+  sfx('explode');
+}
+function updateRescues(dt) {
+  if (game.rescueTotal <= 0) { game.rescues.length = 0; return; }
+  // 按时间点投放（独立于波次，保证每关节奏一致）
+  game.rescueClock += dt;
+  while (game.rescueSpawned < RESCUE_CFG.times.length &&
+         game.rescueClock >= RESCUE_CFG.times[game.rescueSpawned]) {
+    spawnRescue();
+  }
+  for (let i = game.rescues.length - 1; i >= 0; i--) {
+    const r = game.rescues[i];
+    r.t += dt;
+    r.y += r.vy * dt;
+    // 靠近悬停读条；离开后进度快速衰减，鼓励玩家承担走位风险
+    if (dist(r, player) < RESCUE_CFG.hoverRadius) {
+      r.hold += dt;
+      if (r.hold >= RESCUE_CFG.holdTime) {
+        game.rescued++;
+        const gained = RESCUE_CFG.score + game.level * 100;
+        game.score += gained;
+        player.shield = Math.min(player.maxShield, player.shield + 1);
+        addExplosion(r.x, r.y, '#66ff99', 14, 0.9);
+        addShockwave(r.x, r.y, '#66ff99', 64, 0.4, 3);
+        addFloatText(r.x, r.y, '救援成功 +' + gained, true);
+        sfx('powerup');
+        game.rescues.splice(i, 1);
+        continue;
+      }
+    } else {
+      r.hold = Math.max(0, r.hold - dt * 2);
+    }
+    // 被敌方子弹或怪兽摧毁
+    let killed = false;
+    for (let bi = game.enemyBullets.length - 1; bi >= 0; bi--) {
+      const b = game.enemyBullets[bi];
+      if (b.delay > 0) continue;
+      if (dist(b, r) < RESCUE_CFG.bodyRadius + 6) {
+        game.enemyBullets.splice(bi, 1);
+        killed = true;
+        break;
+      }
+    }
+    if (!killed) {
+      for (const m of game.monsters) {
+        if (dist(m, r) < RESCUE_CFG.bodyRadius + 12 * m.size) { killed = true; break; }
+      }
+    }
+    if (killed) { failRescue(r, 'hit'); game.rescues.splice(i, 1); continue; }
+    if (r.y > H + 40) { failRescue(r, 'escaped'); game.rescues.splice(i, 1); }
+  }
+}
+function drawRescues() {
+  const tNow = performance.now() / 1000;
+  for (const r of game.rescues) {
+    const near = dist(r, player) < RESCUE_CFG.hoverRadius;
+    const prog = clamp(r.hold / RESCUE_CFG.holdTime, 0, 1);
+    ctx.save();
+    ctx.translate(r.x, r.y);
+    // 下落引导光柱，远处也能看见
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const beam = ctx.createLinearGradient(0, -72, 0, 26);
+    beam.addColorStop(0, 'rgba(90,255,150,0)');
+    beam.addColorStop(0.55, 'rgba(90,255,150,0.14)');
+    beam.addColorStop(1, 'rgba(90,255,150,0.3)');
+    ctx.fillStyle = beam;
+    ctx.fillRect(-16, -72, 32, 98);
+    ctx.restore();
+    // 外圈脉冲 / 救援进度环
+    ctx.strokeStyle = near ? 'rgba(120,255,180,0.95)' : 'rgba(120,255,180,0.5)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash(near ? [] : [5, 5]);
+    ctx.lineDashOffset = -tNow * 22;
+    ctx.beginPath();
+    ctx.arc(0, 0, 28 + Math.sin(tNow * 4) * 2, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    if (prog > 0) {
+      ctx.strokeStyle = '#b9ffd4';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(0, 0, 33, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * prog);
+      ctx.stroke();
+    }
+    // 救生舱主体
+    ctx.fillStyle = near ? '#eafff2' : '#d6f5e4';
+    ctx.strokeStyle = '#3ddc84';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-13, -16); ctx.lineTo(13, -16);
+    ctx.lineTo(18, 0); ctx.lineTo(13, 16);
+    ctx.lineTo(-13, 16); ctx.lineTo(-18, 0);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    // 绿色十字标识
+    ctx.fillStyle = '#1fae5c';
+    ctx.fillRect(-3, -10, 6, 20);
+    ctx.fillRect(-10, -3, 20, 6);
+    // 顶部信号灯
+    ctx.fillStyle = Math.sin(tNow * 8) > 0 ? '#ff5566' : '#5a1a22';
+    ctx.beginPath(); ctx.arc(0, -21, 3, 0, Math.PI * 2); ctx.fill();
+    // SOS 标签
+    ctx.fillStyle = '#8dffbc';
+    ctx.font = 'bold 11px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText('SOS', 0, -34);
+    ctx.restore();
+  }
+}
+
+/* ==================== 地面目标（仅地面关卡） ==================== */
+// 悬浮在地表上方的反重力单位：炮台 / 坦克会索敌射击，补给车被击毁后掉落宝箱。
+const GROUND_UNITS = {
+  turret: { hp: 7,  score: 420, color: '#ff8844', r: 16, label: '炮台' },
+  tank:   { hp: 12, score: 720, color: '#9adf5a', r: 22, label: '悬浮坦克' },
+  supply: { hp: 5,  score: 300, color: '#ffd23f', r: 17, label: '补给车' },
+};
+const GROUND_SPAWN_INTERVAL = 6.4;
+const GROUND_LIFE = 13;
+function spawnGroundTarget() {
+  const roll = Math.random();
+  const type = roll < 0.5 ? 'turret' : roll < 0.8 ? 'tank' : 'supply';
+  const cfg = GROUND_UNITS[type];
+  const gx = rand(70, W - 70);
+  const gy = H * (0.5 + Math.random() * 0.12);
+  game.groundTargets.push({
+    type, x: gx, y: gy,
+    vx: type === 'tank' ? rand(-24, 24) : 0,
+    hp: cfg.hp, maxHp: cfg.hp, score: cfg.score, color: cfg.color, r: cfg.r,
+    t: 0, life: GROUND_LIFE, fireCD: rand(1.2, 2.4),
+    hitFlash: 0, muzzle: 0, bob: rand(0, Math.PI * 2),
+  });
+  addShockwave(gx, gy, cfg.color, 34, 0.35, 2);
+  addFloatText(gx, gy - 24, '发现地面目标', false);
+}
+function updateGroundTargets(dt) {
+  const lv = LEVELS[game.level];
+  if (!lv || !lv.ground) { game.groundTargets.length = 0; return; }
+  // Boss 战期间停止刷新，避免干扰 Boss 读招
+  if (!game.bossActive) {
+    game.groundClock += dt;
+    if (game.groundClock >= GROUND_SPAWN_INTERVAL && game.groundTargets.length < 3) {
+      game.groundClock = 0;
+      spawnGroundTarget();
+    }
+  }
+  for (let i = game.groundTargets.length - 1; i >= 0; i--) {
+    const g = game.groundTargets[i];
+    g.t += dt;
+    if (g.hitFlash > 0) g.hitFlash -= dt;
+    if (g.muzzle > 0) g.muzzle -= dt;
+    g.y += 7 * dt; // 随地形缓慢下移
+    if (g.type === 'tank') {
+      g.x += g.vx * dt;
+      if (g.x < 60 || g.x > W - 60) g.vx *= -1;
+    }
+    if (g.t > g.life) { game.groundTargets.splice(i, 1); continue; }
+    // 索敌射击（补给车无武装）
+    if (g.type !== 'supply' && g.t > 1.2 && !game.bossActive) {
+      g.fireCD -= dt;
+      if (g.fireCD <= 0) {
+        g.fireCD = 2.2 + Math.random() * 0.8;
+        g.muzzle = 0.14;
+        const ang = Math.atan2(player.y - g.y, player.x - g.x);
+        const spd = 170 + game.level * 5;
+        game.enemyBullets.push({
+          x: g.x, y: g.y - 12,
+          vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
+          color: g.color, radius: 4,
+        });
+        addExplosion(g.x, g.y - 12, g.color, 3, 0.3);
+      }
+    }
+  }
+}
+function drawGroundTargets() {
+  const gy = H * 0.82;
+  for (const g of game.groundTargets) {
+    const fade = g.t > g.life - 1.5 ? clamp((g.life - g.t) / 1.5, 0, 1) : 1;
+    ctx.save();
+    ctx.globalAlpha = fade;
+    // 反重力光柱 + 地面投影
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const beam = ctx.createLinearGradient(0, g.y, 0, gy);
+    beam.addColorStop(0, hexToRgba(g.color, 0.22));
+    beam.addColorStop(1, hexToRgba(g.color, 0.02));
+    ctx.fillStyle = beam;
+    ctx.fillRect(g.x - 8, g.y, 16, Math.max(0, gy - g.y));
+    ctx.restore();
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath(); ctx.ellipse(g.x, gy, 20, 6, 0, 0, Math.PI * 2); ctx.fill();
+
+    ctx.save();
+    ctx.translate(g.x, g.y + Math.sin(g.t * 3 + g.bob) * 2);
+    const flash = g.hitFlash > 0;
+    if (g.type === 'turret') {
+      // 六边形底座 + 旋转炮塔
+      ctx.fillStyle = flash ? '#ffffff' : '#241a14';
+      ctx.strokeStyle = g.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let k = 0; k < 6; k++) {
+        const a = Math.PI / 6 + k * Math.PI / 3;
+        const px = Math.cos(a) * 16, py = Math.sin(a) * 12;
+        k ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+      }
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      const ang = Math.atan2(player.y - g.y, player.x - g.x);
+      ctx.rotate(ang);
+      ctx.fillStyle = '#3a2a1e';
+      ctx.fillRect(0, -3, 20, 6);
+      ctx.fillStyle = g.color;
+      ctx.beginPath(); ctx.arc(20, 0, 3, 0, Math.PI * 2); ctx.fill();
+    } else if (g.type === 'tank') {
+      // 宽履带车体 + 小炮塔
+      ctx.fillStyle = flash ? '#ffffff' : '#1f2a18';
+      ctx.strokeStyle = g.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-24, -10); ctx.lineTo(24, -10); ctx.lineTo(28, 2);
+      ctx.lineTo(20, 12); ctx.lineTo(-20, 12); ctx.lineTo(-28, 2);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#33402a';
+      ctx.fillRect(-24, -6, 48, 4);
+      ctx.fillRect(-24, 2, 48, 4);
+      const ang = Math.atan2(player.y - g.y, player.x - g.x);
+      ctx.rotate(ang);
+      ctx.fillStyle = flash ? '#ffffff' : '#4a5a38';
+      ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.fill();
+      ctx.fillRect(0, -2.5, 18, 5);
+      ctx.fillStyle = g.color;
+      ctx.beginPath(); ctx.arc(18, 0, 2.5, 0, Math.PI * 2); ctx.fill();
+    } else {
+      // 补给车：货箱 + 黄色十字
+      ctx.fillStyle = flash ? '#ffffff' : '#2a2418';
+      ctx.strokeStyle = g.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-18, -12); ctx.lineTo(18, -12); ctx.lineTo(22, 0);
+      ctx.lineTo(18, 12); ctx.lineTo(-18, 12); ctx.lineTo(-22, 0);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = g.color;
+      ctx.fillRect(-2.5, -8, 5, 16);
+      ctx.fillRect(-8, -2.5, 16, 5);
+      ctx.fillStyle = Math.sin(g.t * 6) > 0 ? '#ff5566' : '#5a1a22';
+      ctx.beginPath(); ctx.arc(0, -16, 2.5, 0, Math.PI * 2); ctx.fill();
+    }
+    // 枪口闪光
+    if (g.muzzle > 0) {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = '#ffe0a0';
+      ctx.beginPath(); ctx.arc(0, 0, 14, 0, Math.PI * 2); ctx.fill();
+    }
+    // 受损血环
+    if (g.hp < g.maxHp) {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = 'rgba(255,190,90,0.9)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, 24, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp(g.hp / g.maxHp, 0, 1));
+      ctx.stroke();
+    }
+    ctx.restore();
+    ctx.restore();
+  }
+}
+
 /* ==================== 奖励宝盒 ==================== */
 const POWERUP_DROP_CHANCE = 0.06; // 每次击杀掉落宝箱的基础概率
 const POWERUP_PITY_LIMIT = 3;     // 连续 3 个武器宝箱后，第 4 个必为特殊宝箱
@@ -6763,7 +7379,18 @@ function updatePowerups(dt) {
       p.x += dx / d * 520 * dt;
       p.y += dy / d * 520 * dt;
     } else {
-      p.y += p.vy * dt;
+      // 靠近玩家时产生吸附力，减少“眼睁睁看宝箱飘走”的挫败感
+      const d = dist(p, player);
+      if (d < 130) {
+        const k = 1 - d / 130;
+        const dx = player.x - p.x, dy = player.y - p.y;
+        const dd = Math.hypot(dx, dy) || 1;
+        const pull = 240 + 320 * k;
+        p.x += dx / dd * pull * dt;
+        p.y += dy / dd * pull * dt;
+      } else {
+        p.y += p.vy * dt;
+      }
     }
     p.t += dt;
     if (p.y > H + 30) game.powerups.splice(i, 1);
@@ -7086,6 +7713,7 @@ function drawWingmen() {
 }
 
 function playerHit() {
+  game.hitsTaken++;
   // 受伤后重置护盾恢复冷却
   player.shieldRegenTimer = GAME_CONFIG.shieldRegenDelay;
   if (player.shield > 0) {
@@ -7569,6 +8197,27 @@ function updateMonsters(dt) {
       b.y += 60 * dt;
       if (b.y > 110) { b.phase = 'fight'; b.shootCD = 1.8; b.atkTimer = 0; }
     } else {
+      // ---- 可破坏部位：存活时独立索敌射击，逼迫玩家先清炮台 ----
+      if (b.parts) {
+        const S = b.size / 5;
+        for (const p of b.parts) {
+          if (p.dead) continue;
+          if (p.flash > 0) p.flash -= dt;
+          p.cd -= dt;
+          if (p.cd <= 0 && !b.coreOpen) {
+            p.cd = 2.4 + Math.random() * 0.7;
+            const px = b.x + p.ox * S, py = b.y + p.oy * S;
+            const ang = Math.atan2(player.y - py, player.x - px);
+            const spd = 185 + game.level * 6;
+            game.enemyBullets.push({
+              x: px, y: py,
+              vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
+              color: '#ffb066', radius: 4,
+            });
+            addExplosion(px, py, '#ffaa55', 3, 0.35);
+          }
+        }
+      }
       // ---- 半血狂暴：清弹 + 冲击波 + 攻击节奏小幅提升 ----
       if (!b.enraged && b.hp <= b.maxHp * 0.5) {
         b.enraged = true;
@@ -10444,6 +11093,7 @@ function getComboMult() {
 /* ==================== HUD ==================== */
 let _lastHudScore = 0;
 let _lastHudWave = '';
+let _lastHudRescue = '';
 let _lastScoreBounceAt = 0;
 const _reduceMotion = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
 // HUD 元素缓存：updateHUD 每帧调用，避免重复查询 DOM 触发样式计算
@@ -10530,6 +11180,23 @@ function updateHUD() {
     wingRow.style.opacity = '0';
   }
 
+  // 救援目标状态
+  const rescueRow = hudEl('rescueRow');
+  if (game.rescueTotal > 0) {
+    rescueRow.style.opacity = '1';
+    const txt = game.rescued + '/' + game.rescueTotal + (game.rescueLost > 0 ? ' 失' + game.rescueLost : '');
+    if (txt !== _lastHudRescue) {
+      _lastHudRescue = txt;
+      const rEl = hudEl('hRescue');
+      rEl.textContent = txt;
+      rEl.style.color = game.rescueLost > 0 ? '#ff8899' : '#66ff99';
+    }
+    rescueRow.classList.toggle('rescue-alert', game.rescues.length > 0);
+  } else {
+    rescueRow.style.opacity = '0';
+    rescueRow.classList.remove('rescue-alert');
+  }
+
   // 连击显示：仅 combo >= 2 时显示；>=5 放大+外发光；>=10 切换警示橙光
   const comboRow = hudEl('comboRow');
   const hCombo = hudEl('hCombo');
@@ -10606,6 +11273,11 @@ function startGame(level, opts) {
   game.combo = 0; game.comboTimer = 0; game.floatTexts = []; game.warnTimer = 0; game.debris = [];
   game.rings = []; game.bossDeath = null; game.bossRageTimer = 0; game.flash = 0; game.hitStop = 0;
   game.gravityWells = [];
+  // 救援目标：每关固定 2 名，重新开局重置统计
+  game.rescues = []; game.rescueTotal = RESCUE_CFG.times.length;
+  game.rescued = 0; game.rescueLost = 0; game.rescueSpawned = 0; game.rescueClock = 0;
+  game.hitsTaken = 0;
+  game.groundTargets = []; game.groundClock = 0;
   renderTilt = 0;
   player.x = W / 2; player.y = H - 100;
   player.hp = CFG.maxHP; player.shield = GAME_CONFIG.maxShield; player.shieldRegenTimer = 0; player.invuln = 0; player.fireCD = 0;
@@ -10663,6 +11335,21 @@ function resumeGame(snap) {
   player.polarity = snap.polarity === 1 ? 1 : 0;
   // 还原宝箱保底计数
   game.powerupPity = clamp(snap.pity | 0, 0, POWERUP_PITY_LIMIT);
+  // 还原救援进度（旧快照没有该字段时按 0 处理，不会误发救援目标）
+  game.rescueTotal = clamp(snap.rescueTotal | 0, 0, RESCUE_CFG.times.length);
+  game.rescued = clamp(snap.rescued | 0, 0, game.rescueTotal);
+  game.rescueLost = clamp(snap.rescueLost | 0, 0, game.rescueTotal);
+  game.rescueSpawned = clamp(snap.rescueSpawned | 0, 0, game.rescueTotal);
+  game.rescueClock = Math.max(0, +snap.rescueClock || 0);
+  game.hitsTaken = Math.max(0, snap.hitsTaken | 0);
+  game.rescues = (Array.isArray(snap.rescues) ? snap.rescues : [])
+    .filter(r => r && Number.isFinite(+r.x) && Number.isFinite(+r.y))
+    .slice(0, RESCUE_CFG.times.length)
+    .map(r => ({
+      x: clamp(+r.x, 20, W - 20), y: clamp(+r.y, -60, H + 40),
+      vy: +r.vy || RESCUE_CFG.fallSpeed, t: +r.t || 0,
+      hold: clamp(+r.hold || 0, 0, RESCUE_CFG.holdTime), lost: 0,
+    }));
   // 还原僚机（数量 / 左右槽位 / 剩余生命）
   player.wingmen = [];
   for (const s of (snap.wingmen || [])) {
@@ -10714,6 +11401,11 @@ function retryBoss() {
   game.combo = 0; game.comboTimer = 0; game.floatTexts = []; game.warnTimer = 0; game.debris = [];
   game.rings = []; game.bossDeath = null; game.bossRageTimer = 0; game.flash = 0; game.hitStop = 0;
   game.gravityWells = [];
+  // Boss 重试只打 Boss，不再补发救援目标；救援勋章需完整通关达成
+  game.rescues = []; game.rescueTotal = 0;
+  game.rescued = 0; game.rescueLost = 0; game.rescueSpawned = 0; game.rescueClock = 0;
+  game.hitsTaken = 0;
+  game.groundTargets = []; game.groundClock = 0;
   renderTilt = 0;
   game.bossRetry = false;
   player.x = W / 2; player.y = H - 100;
@@ -10754,6 +11446,11 @@ function endLevel(win) {
   document.getElementById('ovHit').textContent = hitRate + '%';
   const rank = win ? (hitRate > 60 ? 'S' : hitRate > 40 ? 'A' : 'B') : 'D';
   document.getElementById('rank').textContent = rank;
+  // 勋章与救援统计
+  const medalMask = computeMedalMask(win, hitRate);
+  document.getElementById('ovRescue').textContent = game.rescued + '/' + game.rescueTotal;
+  document.getElementById('ovHitTaken').textContent = game.hitsTaken;
+  renderMedalRow(medalMask);
 
   // 新纪录检测
   const prevBest = save.bestScores[game.level] || 0;
@@ -10768,11 +11465,12 @@ function endLevel(win) {
   if (win) {
     unlockLevel(game.level + 1);
     recordBest(game.level, game.score);
+    mergeMedals(game.level, medalMask);
   }
 }
 
 function hideAllOverlays() {
-  ['ovTitle','ovLevel','ovPause','ovOver','ovBossIntro','ovSettings','ovResume'].forEach(id => document.getElementById(id).classList.add('hidden'));
+  ['ovTitle','ovLevel','ovBrief','ovPause','ovOver','ovBossIntro','ovSettings','ovResume'].forEach(id => document.getElementById(id).classList.add('hidden'));
 }
 
 function togglePause() {
@@ -11100,6 +11798,8 @@ function update(dt) {
   updateLaserWall(dt);
   updateInkCloud(dt);
   updatePowerups(dt);
+  updateRescues(dt);
+  updateGroundTargets(dt);
   checkCollisions();
   updateRings(dt);
   updateBossDeath(dt);
@@ -11234,6 +11934,8 @@ function render() {
     if (game.boss) drawBoss(game.boss);
     drawBossDeath();
     drawPowerups();
+    drawRescues();
+    drawGroundTargets();
     drawLaserWall();
     drawWingmen();
     drawPlayer();
@@ -11251,6 +11953,8 @@ function render() {
   if (game.boss) drawBoss(game.boss);
   drawBossDeath();
   drawPowerups();
+  drawRescues();
+  drawGroundTargets();
   drawLaserWall();
   drawWingmen();
   drawPlayer();
@@ -11300,23 +12004,85 @@ function buildLevelGrid() {
   LEVELS.forEach((lv, i) => {
     const locked = i >= save.unlocked;
     const best = save.bestScores[i] || 0;
+    const mask = getMedalMask(i);
     const d = document.createElement('div');
     d.className = 'lv' + (locked ? ' locked' : '');
-    d.innerHTML = `<div class="num">${locked ? '🔒' : i+1}</div><div class="nm">${lv.name}</div>${best > 0 ? `<div class="best">最高 ${best.toLocaleString()}</div>` : ''}`;
+    const medals = locked ? '' : `<div class="medals">${MEDAL_META.map(m => `<i class="${mask & m.bit ? 'on' : ''}" title="${m.label}"></i>`).join('')}</div>`;
+    d.innerHTML = `<div class="num">${locked ? '🔒' : i+1}</div><div class="nm">${lv.name}</div>${best > 0 ? `<div class="best">最高 ${best.toLocaleString()}</div>` : ''}${medals}`;
     if (!locked) {
-      d.addEventListener('click', () => { hideAllOverlays(); startGame(i); });
+      d.addEventListener('click', () => showBriefing(i, 'level'));
     }
     grid.appendChild(d);
   });
 }
 
+/* ==================== 任务简报 ==================== */
+let pendingBriefLevel = 0;
+let briefReturnTo = 'title';
+let briefOpts = null;
+const BRIEF_GOALS = [
+  { bit: MEDAL.CLEAR, icon: '通', name: '通关', desc: '击毁关卡 BOSS' },
+  { bit: MEDAL.ACE, icon: '准', name: '精准', desc: '命中率 ≥ 60%' },
+  { bit: MEDAL.FLAWLESS, icon: '韧', name: '无伤', desc: '全程不受击' },
+  { bit: MEDAL.RESCUE, icon: '救', name: '救援', desc: '救出全部幸存者' },
+];
+function showBriefing(level, returnTo, opts) {
+  const lv = LEVELS[level];
+  const boss = lv && BOSS_TYPES[lv.boss];
+  if (!lv || !boss) return;
+  pendingBriefLevel = level;
+  briefReturnTo = returnTo || 'title';
+  briefOpts = opts || null;
+  const best = save.bestScores[level] || 0;
+  const mask = getMedalMask(level);
+  document.getElementById('briefName').textContent = `第 ${level + 1} 关 · ${lv.name}`;
+  document.getElementById('briefSub').textContent = best > 0
+    ? `历史最高分 ${best.toLocaleString()}`
+    : '首次挑战 · 击毁 BOSS 解锁下一关';
+  document.getElementById('briefGoals').innerHTML = BRIEF_GOALS.map(g => {
+    const on = !!(mask & g.bit);
+    return `<div class="brief-goal ${on ? 'on' : ''}"><i class="g-ico">${g.icon}</i>` +
+      `<span class="g-txt"><b>${g.name}${on ? ' · 已达成' : ''}</b><span>${g.desc}</span></span></div>`;
+  }).join('');
+  document.getElementById('briefBoss').innerHTML =
+    `<b>${boss.name}</b><span>${boss.desc}</span>`;
+  const side = document.getElementById('briefSide');
+  if (lv.ground) {
+    side.style.display = '';
+    side.innerHTML = '<b>支线目标 · 地面清剿</b><br/>击毁悬浮炮台与坦克获取额外分数；击毁补给车会掉落宝箱。';
+  } else {
+    side.style.display = 'none';
+    side.innerHTML = '';
+  }
+  gamepadPrevDir = { up: false, down: false, left: false, right: false };
+  hideAllOverlays();
+  document.getElementById('ovBrief').classList.remove('hidden');
+}
+function cancelBriefing() {
+  hideAllOverlays();
+  if (briefReturnTo === 'level') {
+    buildLevelGrid();
+    document.getElementById('ovLevel').classList.remove('hidden');
+  } else if (briefReturnTo === 'over') {
+    document.getElementById('ovOver').classList.remove('hidden');
+  } else {
+    document.getElementById('ovTitle').classList.remove('hidden');
+  }
+}
+function deployFromBriefing() {
+  hideAllOverlays();
+  startGame(pendingBriefLevel, briefOpts || undefined);
+}
+
 /* ==================== 事件绑定 ==================== */
-document.getElementById('btnStart').addEventListener('click', () => { initAudio(); hideAllOverlays(); startGame(0); });
+document.getElementById('btnStart').addEventListener('click', () => { initAudio(); showBriefing(0, 'title'); });
 document.getElementById('btnLevel').addEventListener('click', () => { game.state = 'level'; hideAllOverlays(); buildLevelGrid(); document.getElementById('ovLevel').classList.remove('hidden'); });
 document.getElementById('btnBack').addEventListener('click', () => { game.state = 'title'; hideAllOverlays(); document.getElementById('ovTitle').classList.remove('hidden'); });
 document.getElementById('btnResume').addEventListener('click', togglePause);
 document.getElementById('btnQuit').addEventListener('click', () => { clearRunSave(); game.state = 'title'; hideAllOverlays(); document.getElementById('ovTitle').classList.remove('hidden'); });
-document.getElementById('btnNext').addEventListener('click', () => startGame(game.level + 1, { keepWingmen: true }));
+document.getElementById('btnNext').addEventListener('click', () => showBriefing(game.level + 1, 'over', { keepWingmen: true }));
+document.getElementById('btnDeploy').addEventListener('click', deployFromBriefing);
+document.getElementById('btnBriefBack').addEventListener('click', cancelBriefing);
 document.getElementById('btnRetry').addEventListener('click', () => {
   if (game.bossRetry) retryBoss(); else startGame(game.level);
 });
