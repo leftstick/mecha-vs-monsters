@@ -19,6 +19,13 @@
   #scan{position:fixed;inset:0;pointer-events:none;z-index:40;
     background:repeating-linear-gradient(0deg,rgba(0,0,0,0.10) 0px,rgba(0,0,0,0.10) 1px,transparent 1px,transparent 3px);
     mix-blend-mode:multiply;}
+  /* 低画质：移除高成本合成层（全屏混合、backdrop 模糊、滤镜动画） */
+  body.perf-low #scan,body.perf-wechat #scan{display:none;}
+  body.perf-low .hud-panel,body.perf-low .ov,
+  body.perf-wechat .hud-panel,body.perf-wechat .ov{
+    backdrop-filter:none;-webkit-backdrop-filter:none;}
+  body.perf-low .bar-scan,body.perf-wechat .bar-scan{display:none;}
+  body.perf-low .title,body.perf-wechat .title{animation:none;}
 
   /* ============ HUD 三段式 ============ */
   #hud{position:fixed;top:0;left:0;right:0;bottom:0;z-index:20;
@@ -468,11 +475,15 @@ let W = 0, H = 0, DPR = 1;
 // 移动端限制渲染像素比：DPR 2 会让 393×873 的视口产生 137 万像素的后备缓冲，
 // 叠加上多层全屏特效后填充率直接翻倍，是手机上掉帧的首要原因。
 const MOBILE_DPR_CAP = 1.5;
+// 运行时自适应画质会改写这个上限：微信内浏览器起步更保守，后续按帧耗能升降。
+const IS_WECHAT_BROWSER = isWeChatBrowser();
+const IS_MOBILE_DEVICE = isMobileDevice();
+let renderDPRCap = IS_MOBILE_DEVICE ? (IS_WECHAT_BROWSER ? 1.25 : MOBILE_DPR_CAP) : 2;
 const vv = () => window.visualViewport;
 function resize() {
   W = vv() ? vv().width : innerWidth;
   H = vv() ? vv().height : innerHeight;
-  DPR = Math.min(devicePixelRatio || 1, isMobileDevice() ? MOBILE_DPR_CAP : 2);
+  DPR = Math.min(devicePixelRatio || 1, renderDPRCap);
   canvas.width = W * DPR;
   canvas.height = H * DPR;
   canvas.style.width = W + 'px';
@@ -711,8 +722,8 @@ const GAME_CONFIG = {
  * qv(obj)：若 obj 是 {high,medium,low} 则返回当前档位值，否则原样返回。
  */
 const GAME_ART_CONFIG = {
-  // 移动端默认 medium：降低发光模糊、粒子上限与后处理强度，保留主要视觉特征
-  quality: isMobileDevice() ? 'medium' : 'high',
+  // 微信内置浏览器直接以 low 起步（运行时可按帧耗回调），普通移动端 medium
+  quality: IS_WECHAT_BROWSER ? 'low' : (IS_MOBILE_DEVICE ? 'medium' : 'high'),
 
   // 实体轮廓描边（锐利无羽化）
   outline: {
@@ -774,6 +785,7 @@ const GAME_ART_CONFIG = {
     grain: true,
     scanlines: false,
     colorGrade: true,
+    colorGradeStrength: { high: 1, medium: 0.7, low: 0 },
     vignetteStrength: { high: 0.5, medium: 0.35, low: 0 },
     grainDensity: { high: 0.04, medium: 0.03, low: 0 },
     scanlineAlpha: { high: 0.04, medium: 0.03, low: 0 },
@@ -1463,6 +1475,208 @@ function isMobileDevice() {
   return /Android|iPhone|iPad|iPod|Mobile|HarmonyOS/i.test(navigator.userAgent) ||
     (navigator.maxTouchPoints > 1 && window.matchMedia('(pointer: coarse)').matches);
 }
+
+function isWeChatBrowser() {
+  return /MicroMessenger/i.test(navigator.userAgent);
+}
+
+/* ==================== 运行时自适应画质 ====================
+ * 微信内置浏览器（XWeb 嵌在 Android View 中）无法像独立 Chromium 那样
+ * 独占合成器，GPU 策略更保守。按真实渲染帧间隔动态调档：
+ *  - 微信：low 画质起步，DPR 只在 1.25 / 1.0 之间调整
+ *  - 移动端：medium/1.5 起步，掉帧降 low/1.0，恢复后回到 medium
+ *  - 桌面：high/2 起步，掉帧逐级下降
+ * 连续多个统计窗口异常才切档，避免 Boss 战瞬时波动导致画质横跳。
+ */
+// tiers 按「最好 → 最差」排列；index 越大画质越低
+const PERF_PROFILES = {
+  wechat: {
+    start: 0, maxIndex: 0,
+    tiers: [
+      { quality: 'low', dpr: 1.25 },
+      { quality: 'low', dpr: 1.0 },
+    ],
+  },
+  mobile: {
+    start: 0, maxIndex: 0,
+    tiers: [
+      { quality: 'medium', dpr: MOBILE_DPR_CAP },
+      { quality: 'low', dpr: 1.0 },
+    ],
+  },
+  desktop: {
+    start: 0, maxIndex: 0,
+    tiers: [
+      { quality: 'high', dpr: 2 },
+      { quality: 'medium', dpr: 1.5 },
+      { quality: 'low', dpr: 1.0 },
+    ],
+  },
+};
+
+const PERF_WINDOW = 45;        // 45 个渲染帧 ≈ 0.75s 一个统计窗口
+const PERF_BAD_MS = 19.5;      // 平均帧间隔 > 19.5ms（低于约 51fps）
+const PERF_GOOD_MS = 17.6;     // 平均帧间隔 < 17.6ms（基本满 60fps）
+const PERF_DOWN_WINDOWS = 2;   // 连续 2 个差窗口才降档
+const PERF_UP_WINDOWS = 6;     // 连续 6 个好窗口才升档
+const PERF_COOLDOWN_MS = 4000; // 切档后 4s 内不再调整
+
+const perfMeter = {
+  profile: null,
+  index: 0,
+  last: 0,
+  sum: 0,
+  count: 0,
+  bad: 0,
+  good: 0,
+  cooldownUntil: 0,
+  upBlockedUntil: 0,
+  lastUpgradeAt: -Infinity,
+};
+
+let _lowFxActive = false;
+let _fxOrig = null;
+
+// 低画质下直接屏蔽阴影与 lighter 混合：这两个是 Canvas2D 填充率的最大来源
+function installLowFxOverrides() {
+  if (_lowFxActive) return;
+  const proto = Object.getPrototypeOf(ctx);
+  const descs = {
+    shadowBlur: Object.getOwnPropertyDescriptor(proto, 'shadowBlur'),
+    shadowColor: Object.getOwnPropertyDescriptor(proto, 'shadowColor'),
+    globalCompositeOperation: Object.getOwnPropertyDescriptor(proto, 'globalCompositeOperation'),
+  };
+  if (!descs.shadowBlur || !descs.shadowColor || !descs.globalCompositeOperation) return;
+  try {
+    // 先把原生上下文状态清零，覆盖 setter 只影响之后的赋值
+    descs.shadowBlur.set.call(ctx, 0);
+    descs.shadowColor.set.call(ctx, 'rgba(0,0,0,0)');
+    descs.globalCompositeOperation.set.call(ctx, 'source-over');
+    Object.defineProperty(ctx, 'shadowBlur', {
+      configurable: true,
+      get: () => 0,
+      set: () => {},
+    });
+    Object.defineProperty(ctx, 'shadowColor', {
+      configurable: true,
+      get: () => 'rgba(0,0,0,0)',
+      set: () => {},
+    });
+    Object.defineProperty(ctx, 'globalCompositeOperation', {
+      configurable: true,
+      get: () => descs.globalCompositeOperation.get.call(ctx),
+      set: v => descs.globalCompositeOperation.set.call(ctx, v === 'lighter' ? 'source-over' : v),
+    });
+    _fxOrig = descs;
+    _lowFxActive = true;
+  } catch (e) {
+    _fxOrig = null;
+    _lowFxActive = false;
+  }
+}
+
+function removeLowFxOverrides() {
+  if (!_lowFxActive) return;
+  _lowFxActive = false;
+  try {
+    delete ctx.shadowBlur;
+    delete ctx.shadowColor;
+    delete ctx.globalCompositeOperation;
+    // 清掉覆盖期间可能残留的阴影/混合状态
+    _fxOrig.shadowBlur.set.call(ctx, 0);
+    _fxOrig.globalCompositeOperation.set.call(ctx, 'source-over');
+  } catch (e) {}
+  _fxOrig = null;
+}
+
+function pickPerfProfile() {
+  if (IS_WECHAT_BROWSER) return PERF_PROFILES.wechat;
+  if (IS_MOBILE_DEVICE) return PERF_PROFILES.mobile;
+  return PERF_PROFILES.desktop;
+}
+
+function applyPerfTier(index) {
+  const profile = perfMeter.profile;
+  if (!profile) return;
+  const tier = profile.tiers[index];
+  if (!tier) return;
+  perfMeter.index = index;
+  GAME_ART_CONFIG.quality = tier.quality;
+  if (tier.quality === 'low') installLowFxOverrides();
+  else removeLowFxOverrides();
+  document.body.classList.toggle('perf-low', tier.quality === 'low');
+  if (renderDPRCap !== tier.dpr) {
+    renderDPRCap = tier.dpr;
+    resize();
+  }
+}
+
+function resetPerfMeter(now) {
+  perfMeter.last = now || 0;
+  perfMeter.sum = 0;
+  perfMeter.count = 0;
+  perfMeter.bad = 0;
+  perfMeter.good = 0;
+}
+
+function initPerfAdaptive() {
+  perfMeter.profile = pickPerfProfile();
+  if (IS_WECHAT_BROWSER) document.body.classList.add('perf-wechat');
+  applyPerfTier(perfMeter.profile.start);
+  resetPerfMeter(0);
+}
+
+// 每完成一帧渲染调用一次；菜单/暂停/切后台不采样
+function updatePerfMeter(now) {
+  if (!perfMeter.profile) return;
+  if (document.hidden ||
+      (game.state !== 'playing' && game.state !== 'bossIntro')) {
+    resetPerfMeter(0);
+    return;
+  }
+  if (perfMeter.last) {
+    const d = now - perfMeter.last;
+    // 断点/切后台造成的超长间隔不计入，避免误降档
+    if (d > 0 && d < 200) { perfMeter.sum += d; perfMeter.count++; }
+  }
+  perfMeter.last = now;
+  if (perfMeter.count < PERF_WINDOW) return;
+
+  const avg = perfMeter.sum / perfMeter.count;
+  perfMeter.sum = 0;
+  perfMeter.count = 0;
+
+  if (avg > PERF_BAD_MS) { perfMeter.bad++; perfMeter.good = 0; }
+  else if (avg < PERF_GOOD_MS) { perfMeter.good++; perfMeter.bad = 0; }
+  else { perfMeter.bad = 0; perfMeter.good = 0; }
+
+  if (now < perfMeter.cooldownUntil) return;
+
+  if (perfMeter.bad >= PERF_DOWN_WINDOWS &&
+      perfMeter.index < perfMeter.profile.tiers.length - 1) {
+    // 刚升档就掉帧，说明这一档撑不住：拉长再次尝试升档的间隔，避免周期性横跳
+    if (now - perfMeter.lastUpgradeAt < 10000) {
+      perfMeter.upBlockedUntil = now + 60000;
+    } else {
+      perfMeter.upBlockedUntil = now + 10000;
+    }
+    applyPerfTier(perfMeter.index + 1);
+    perfMeter.cooldownUntil = now + PERF_COOLDOWN_MS;
+    resetPerfMeter(now);
+  } else if (perfMeter.good >= PERF_UP_WINDOWS &&
+             perfMeter.index > perfMeter.profile.maxIndex &&
+             now >= perfMeter.upBlockedUntil) {
+    perfMeter.lastUpgradeAt = now;
+    applyPerfTier(perfMeter.index - 1);
+    perfMeter.cooldownUntil = now + PERF_COOLDOWN_MS;
+    resetPerfMeter(now);
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  resetPerfMeter(0);
+});
+addEventListener('resize', () => resetPerfMeter(0));
 
 // 游戏中插入一条历史记录：从屏幕边缘右滑返回时先触发 popstate 并暂停，而不是直接退出页面
 function armBackGuard(force) {
@@ -6624,7 +6838,9 @@ function drawWarning() {
 }
 
 function updateParticles(dt) {
-  const pmax = GAME_CONFIG.particles.max;
+  // 粒子上限跟随当前画质档位（low 时降到 40%），避免低端 GPU 被填充率拖垮
+  const pmax = Math.round(GAME_CONFIG.particles.max *
+    GAME_ART_CONFIG.qv(GAME_ART_CONFIG.fx.particleCapMult));
   const dLife = GAME_CONFIG.particles.defaultLife;
   for (let i = game.particles.length - 1; i >= 0; i--) {
     const p = game.particles[i];
@@ -11713,6 +11929,8 @@ function loop(t) {
   mergeInput();
   render();
   ctx.restore();
+  // 只统计真正完成渲染的帧（高刷屏被限到 60fps 的跳过帧不参与）
+  updatePerfMeter(t);
 }
 
 function update(dt) {
@@ -11857,12 +12075,14 @@ function drawPostProcess() {
   ctx.save();
 
   // 1) 调色：高对比度 + 暗部冷蓝 + 霓虹高亮提亮（overlay 混合）
-  if (PP.colorGrade) {
+  // 低画质强度为 0，连渐变都不创建
+  const cgStrength = AC.qv(PP.colorGradeStrength);
+  if (PP.colorGrade && cgStrength > 0) {
     ctx.globalCompositeOperation = 'overlay';
     const cg = ctx.createLinearGradient(0, 0, 0, H);
-    cg.addColorStop(0, 'rgba(40,80,140,0.18)');
-    cg.addColorStop(0.5, 'rgba(20,30,60,0.05)');
-    cg.addColorStop(1, 'rgba(10,20,40,0.28)');
+    cg.addColorStop(0, `rgba(40,80,140,${(0.18 * cgStrength).toFixed(3)})`);
+    cg.addColorStop(0.5, `rgba(20,30,60,${(0.05 * cgStrength).toFixed(3)})`);
+    cg.addColorStop(1, `rgba(10,20,40,${(0.28 * cgStrength).toFixed(3)})`);
     ctx.fillStyle = cg;
     ctx.fillRect(0, 0, W, H);
     ctx.globalCompositeOperation = 'source-over';
@@ -12179,6 +12399,7 @@ if (pendingRun) {
   document.getElementById('resumeInfo').textContent = resumeSummary(pendingRun);
   document.getElementById('ovResume').classList.remove('hidden');
 }
+initPerfAdaptive();
 requestAnimationFrame(loop);
 </script>
 </body>
