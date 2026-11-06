@@ -465,11 +465,14 @@
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 let W = 0, H = 0, DPR = 1;
+// 移动端限制渲染像素比：DPR 2 会让 393×873 的视口产生 137 万像素的后备缓冲，
+// 叠加上多层全屏特效后填充率直接翻倍，是手机上掉帧的首要原因。
+const MOBILE_DPR_CAP = 1.5;
 const vv = () => window.visualViewport;
 function resize() {
   W = vv() ? vv().width : innerWidth;
   H = vv() ? vv().height : innerHeight;
-  DPR = Math.min(devicePixelRatio || 1, 2);
+  DPR = Math.min(devicePixelRatio || 1, isMobileDevice() ? MOBILE_DPR_CAP : 2);
   canvas.width = W * DPR;
   canvas.height = H * DPR;
   canvas.style.width = W + 'px';
@@ -708,7 +711,8 @@ const GAME_CONFIG = {
  * qv(obj)：若 obj 是 {high,medium,low} 则返回当前档位值，否则原样返回。
  */
 const GAME_ART_CONFIG = {
-  quality: 'high',
+  // 移动端默认 medium：降低发光模糊、粒子上限与后处理强度，保留主要视觉特征
+  quality: isMobileDevice() ? 'medium' : 'high',
 
   // 实体轮廓描边（锐利无羽化）
   outline: {
@@ -11671,9 +11675,21 @@ function toggleBGM() {
 
 /* ==================== 主循环 ==================== */
 let lastT = 0;
+// 高刷屏（90/120/144Hz）下把渲染限制在 60fps：
+// rAF 默认跟随屏幕刷新率，120Hz 会让每帧的填充/混合工作量直接翻倍。
+// 用目标时间轴调度而非"跳一帧"，保证 90/144Hz 屏上平均仍是 60fps。
+const TARGET_FPS = 60;
+const FRAME_MS = 1000 / TARGET_FPS;
+const FRAME_TOLERANCE_MS = 1.5;
+let nextFrameT = 0;
 function loop(t) {
+  requestAnimationFrame(loop);
+  if (t + FRAME_TOLERANCE_MS < nextFrameT) return;
   const dt = Math.min((t - lastT) / 1000, 0.05);
   lastT = t;
+  nextFrameT += FRAME_MS;
+  // 严重掉帧后不追帧，避免连续渲染造成二次卡顿
+  if (nextFrameT < t) nextFrameT = t + FRAME_MS;
 
   ctx.save();
   // 屏幕震动
@@ -11697,7 +11713,6 @@ function loop(t) {
   mergeInput();
   render();
   ctx.restore();
-  requestAnimationFrame(loop);
 }
 
 function update(dt) {
@@ -11812,6 +11827,30 @@ function update(dt) {
 }
 
 /* ==================== 后处理（暗角 / 颗粒 / 扫描线 / 调色） ==================== */
+// 胶片颗粒预生成为 128×128 噪声贴图，运行时用 pattern 一次填充。
+// 原实现每帧要画约 W*H*0.04 ≈ 1.37 万个 1px 矩形（60fps 下 82 万次/秒），
+// 在移动端会直接压垮主线程。
+const GRAIN_TILE = 128;
+let _grainPattern = null;
+let _grainPatternDensity = -1;
+function getGrainPattern(density) {
+  if (_grainPattern && _grainPatternDensity === density) return _grainPattern;
+  const cv = document.createElement('canvas');
+  cv.width = GRAIN_TILE;
+  cv.height = GRAIN_TILE;
+  const g = cv.getContext('2d');
+  const n = Math.max(1, Math.round(GRAIN_TILE * GRAIN_TILE * density));
+  for (let i = 0; i < n; i++) {
+    const gx = (Math.random() * GRAIN_TILE) | 0;
+    const gy = (Math.random() * GRAIN_TILE) | 0;
+    g.fillStyle = Math.random() > 0.5 ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+    g.fillRect(gx, gy, 1, 1);
+  }
+  _grainPattern = ctx.createPattern(cv, 'repeat');
+  _grainPatternDensity = density;
+  return _grainPattern;
+}
+
 function drawPostProcess() {
   const AC = GAME_ART_CONFIG;
   const PP = AC.postprocess;
@@ -11841,19 +11880,22 @@ function drawPostProcess() {
     }
   }
 
-  // 3) 胶片颗粒（随机像素点，按档位密度）
+  // 3) 胶片颗粒（预生成噪声贴图 + pattern，一次全屏填充）
   if (PP.grain) {
     const gd = AC.qv(PP.grainDensity);
     if (gd > 0) {
-      const n = Math.floor(W * H * gd);
-      ctx.globalAlpha = 0.5;
-      for (let i = 0; i < n; i++) {
-        const gx = (Math.random() * W) | 0;
-        const gy = (Math.random() * H) | 0;
-        ctx.fillStyle = Math.random() > 0.5 ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
-        ctx.fillRect(gx, gy, 1, 1);
+      const pat = getGrainPattern(gd);
+      if (pat) {
+        // 每帧随机偏移图案，保留颗粒闪烁感，成本只有两次 random
+        const ox = (Math.random() * GRAIN_TILE) | 0;
+        const oy = (Math.random() * GRAIN_TILE) | 0;
+        ctx.save();
+        ctx.globalAlpha = 0.5;
+        ctx.translate(ox, oy);
+        ctx.fillStyle = pat;
+        ctx.fillRect(-ox, -oy, W, H);
+        ctx.restore();
       }
-      ctx.globalAlpha = 1;
     }
   }
 
