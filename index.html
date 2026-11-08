@@ -8873,24 +8873,31 @@ function playerHit() {
 
 /* ==================== 攻击语法库 / 预警 / 编队齐射 ==================== */
 // 所有伤害弹道都从固定几何发射：环形留缺口、轨道留安全道、落点提前标记。
+function attackPolarity(o) {
+  if (o.polFromBoss && game.boss) return game.boss.polarity;
+  return o.pol == null ? null : o.pol;
+}
 const ATTACK_LIB = {
   ring(o) {
     const count = o.count || 16;
     const gapStart = o.gapStart || 0;
     const gapCount = o.gapCount || 0;
     const speed = o.speed || 140;
+    const pol = attackPolarity(o);
     // x/y 省略时以 Boss 当前位置为圆心，剧本招式无需重复写坐标
     const ox = o.x == null ? (game.boss ? game.boss.x : W / 2) : o.x;
     const oy = o.y == null ? (game.boss ? game.boss.y : H * 0.2) : o.y;
     for (let i = 0; i < count; i++) {
       if (gapCount > 0 && ((i - gapStart + count) % count) < gapCount) continue;
       const ang = (i / count) * Math.PI * 2 + (o.rotate || 0);
-      game.enemyBullets.push({
+      const b = {
         x: ox, y: oy,
         vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed,
         color: o.color || '#9fe8ff', radius: o.radius || 5,
         delay: o.delay || 0,
-      });
+      };
+      if (pol != null) { b.pol = pol; b.color = POLAR_COLOR[pol]; }
+      game.enemyBullets.push(b);
     }
   },
   lanes(o) {
@@ -8913,16 +8920,23 @@ const ATTACK_LIB = {
     const count = o.count || 5;
     const spread = o.spread || 0.16;
     const center = (count - 1) / 2;
+    const speed = o.speed || 170;
+    const pol = attackPolarity(o);
+    const ox = o.x == null ? (game.boss ? game.boss.x : W / 2) : o.x;
+    const oy = o.y == null ? (game.boss ? game.boss.y : H * 0.2) : o.y;
     for (let i = 0; i < count; i++) {
       if (i === o.skipIndex) continue;
       const ang = o.angle + (i - center) * spread;
-      game.enemyBullets.push({
-        x: o.x, y: o.y,
-        vx: Math.cos(ang) * (o.speed || 170),
-        vy: Math.sin(ang) * (o.speed || 170),
+      const b = {
+        x: ox, y: oy,
+        vx: Math.cos(ang) * speed,
+        vy: Math.sin(ang) * speed,
         color: o.color || '#ff8844', radius: o.radius || 5,
         delay: o.delay || 0,
-      });
+      };
+      if (o.homing) b.homing = o.homing;
+      if (pol != null) { b.pol = pol; b.color = POLAR_COLOR[pol]; }
+      game.enemyBullets.push(b);
     }
   },
   markers(o) {
@@ -8937,13 +8951,15 @@ const ATTACK_LIB = {
         return arr;
       })();
       for (const ang of list) {
-        game.enemyBullets.push({
+        const b = {
           x, y,
           vx: Math.cos(ang) * (o.speed || 150),
           vy: Math.sin(ang) * (o.speed || 150),
           color: o.color || '#ffaa44', radius: o.radius || 6,
           delay: (o.delay || 0) + (p.delay || 0),
-        });
+        };
+        if (o.homing) b.homing = o.homing;
+        game.enemyBullets.push(b);
       }
     }
   },
@@ -9019,6 +9035,76 @@ function drawTelegraphs() {
       ctx.beginPath();
       ctx.moveTo(t.x, 0); ctx.lineTo(t.x, H);
       ctx.stroke();
+      ctx.setLineDash([]);
+    } else if (t.kind === 'fan') {
+      // 扇形：每条危险方向画粗线，中间缺口用蓝色标出
+      const count = t.count || 5;
+      const spread = t.spread || 0.2;
+      const center = (count - 1) / 2;
+      const base = t.angle == null ? Math.PI / 2 : t.angle;
+      const range = t.range || H * 0.92;
+      ctx.lineCap = 'round';
+      for (let i = 0; i < count; i++) {
+        if (i === t.skipIndex) continue;
+        const ang = base + (i - center) * spread;
+        ctx.globalAlpha = 0.16 + 0.16 * k;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 13;
+        ctx.beginPath();
+        ctx.moveTo(t.x, t.y);
+        ctx.lineTo(t.x + Math.cos(ang) * range, t.y + Math.sin(ang) * range);
+        ctx.stroke();
+      }
+      if (t.skipIndex != null) {
+        const gapAng = base + (t.skipIndex - center) * spread;
+        ctx.globalAlpha = 0.16 + 0.16 * pulse;
+        ctx.strokeStyle = '#7ef0ff';
+        ctx.lineWidth = 15;
+        ctx.setLineDash([18, 14]);
+        ctx.lineDashOffset = -now * 60;
+        ctx.beginPath();
+        ctx.moveTo(t.x, t.y);
+        ctx.lineTo(t.x + Math.cos(gapAng) * range, t.y + Math.sin(gapAng) * range);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      ctx.lineCap = 'butt';
+    } else if (t.kind === 'path') {
+      // 冲撞路径：起点到锁定终点，终点画十字
+      const x0 = t.x0 == null ? t.x : t.x0;
+      const y0 = t.y0 == null ? t.y : t.y0;
+      const x1 = t.x1 == null ? x0 : t.x1;
+      const y1 = t.y1 == null ? y0 : t.y1;
+      ctx.globalAlpha = 0.28 + 0.3 * k;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = t.w || 42;
+      ctx.lineCap = 'round';
+      ctx.setLineDash([18, 14]);
+      ctx.lineDashOffset = -now * 90;
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 0.55 + 0.3 * pulse;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x1, y1, 26, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x1 - 16, y1); ctx.lineTo(x1 + 16, y1);
+      ctx.moveTo(x1, y1 - 16); ctx.lineTo(x1, y1 + 16);
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+    } else if (t.kind === 'cloud') {
+      // 墨雾/遮蔽区域：紫黑色软圆
+      const r = t.r || 110;
+      const g = ctx.createRadialGradient(t.x, t.y, r * 0.15, t.x, t.y, r);
+      g.addColorStop(0, 'rgba(10,24,34,0.42)');
+      g.addColorStop(0.7, 'rgba(12,32,44,0.24)');
+      g.addColorStop(1, 'rgba(12,32,44,0)');
+      ctx.globalAlpha = 0.5 + 0.35 * k;
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(t.x, t.y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.6;
+      ctx.setLineDash([10, 10]);
+      ctx.beginPath(); ctx.arc(t.x, t.y, r * (0.72 + 0.2 * k), 0, Math.PI * 2); ctx.stroke();
       ctx.setLineDash([]);
     } else if (t.kind === 'ring') {
       const r = t.r || 170;
@@ -9201,6 +9287,185 @@ function bossBulletScale() {
 
 /* ==================== Boss 攻击剧本 ==================== */
 // 每个 Boss 的招式是固定顺序的 deck；阶段只换 deck，不靠随机角度堆难度。
+/* ---- 动态预警：锁定轨道 / 冲撞路径 / 召唤点 / 引力井 ---- */
+function teleGuardianLock(b, pat) {
+  const n = pat.lockCount || 2;
+  const xs = n === 3
+    ? [player.x - W * 0.26, player.x, player.x + W * 0.26]
+    : [player.x - W * 0.18, player.x + W * 0.18];
+  b.lockXs = xs.map(x => clamp(x, W * 0.08, W * 0.92));
+  for (const x of b.lockXs) {
+    pushTelegraph({ kind: 'lane', x, w: 38, life: pat.tele, color: '#00ffff' });
+  }
+  if (n === 2) {
+    pushTelegraph({
+      kind: 'safe', x: clamp(player.x, W * 0.08, W * 0.92), w: W * 0.10,
+      life: pat.tele, color: '#7ef0ff', label: '安全',
+    });
+  }
+}
+function teleBeastCharge(b, pat) {
+  b.chargeX = clamp(player.x, W * 0.12, W * 0.88);
+  b.chargeY = clamp(player.y, H * 0.30, H * 0.62);
+  pushTelegraph({
+    kind: 'path', x0: b.x, y0: b.y, x1: b.chargeX, y1: b.chargeY,
+    w: 50, life: pat.tele, color: '#ff8844',
+  });
+}
+function teleVinetitanSeeds(b, pat) {
+  const S = b.size / 5;
+  b.seedXs = [b.x - 64 * S, b.x, b.x + 64 * S].map(x => clamp(x, W * 0.1, W * 0.9));
+  for (const x of b.seedXs) {
+    pushTelegraph({ kind: 'marker', x, y: b.y, r: 30, life: pat.tele, color: '#88dd22' });
+  }
+}
+function teleSingularityWells(b, pat) {
+  const tx = clamp(player.x, W * 0.22, W * 0.78);
+  const ty = clamp(player.y - 24, H * 0.42, H * 0.72);
+  let ox = W - tx;
+  if (Math.abs(ox - tx) < W * 0.22) ox = tx < W / 2 ? W * 0.78 : W * 0.22;
+  b.wellPoints = [
+    { x: tx, y: ty },
+    { x: clamp(ox, W * 0.22, W * 0.78), y: clamp(ty + H * 0.10, H * 0.42, H * 0.78) },
+  ];
+  for (const p of b.wellPoints) {
+    pushTelegraph({
+      kind: 'marker', x: p.x, y: p.y, r: 70 * (b.size / 6.5),
+      life: pat.tele, color: '#cf9bff',
+    });
+  }
+}
+function teleSwarmSummon(b, pat) {
+  const S = b.size / 5;
+  b.summonPoints = [];
+  for (let i = 0; i < 4; i++) {
+    const ang = i * Math.PI / 2 + b.t * 0.8;
+    b.summonPoints.push({
+      x: clamp(b.x + Math.cos(ang) * 70 * S, 30, W - 30),
+      y: b.y + 46 + Math.sin(ang) * 18,
+    });
+  }
+  for (const p of b.summonPoints) {
+    pushTelegraph({ kind: 'marker', x: p.x, y: p.y, r: 26, life: pat.tele, color: '#ff9944' });
+  }
+}
+function teleLeviathanInk(b, pat) {
+  pushTelegraph({
+    kind: 'cloud', x: b.x, y: b.y + 18, r: 110 * (b.size / 5),
+    life: pat.tele, color: '#5cf2d8',
+  });
+}
+function teleMagnetarEmp(b, pat) {
+  pushTelegraph({
+    kind: 'charge', x: b.x, y: b.y, r: 44 * (b.size / 5),
+    life: pat.tele, color: '#ffffff',
+  });
+}
+function teleSwarmPulse(b, pat) {
+  pushTelegraph({
+    kind: 'charge', x: b.x, y: b.y, r: 52 * (b.size / 5),
+    life: pat.tele, color: '#ffcc44',
+  });
+}
+
+/* ---- 剧本专属招式（无法用纯几何描述的 Boss 机制） ---- */
+const BOSS_SPECIALS = {
+  leviathanInk(b) {
+    startInkCloud(b);
+    for (let i = -1; i <= 1; i++) {
+      const ang = Math.PI / 2 + i * 0.3;
+      game.enemyBullets.push({
+        x: b.x + i * 20, y: b.y + 18,
+        vx: Math.cos(ang) * 80, vy: Math.sin(ang) * 80,
+        color: '#8affe0', radius: 7, homing: 70,
+      });
+    }
+    game.shake = Math.max(game.shake, 0.15);
+  },
+  colossusVortex(b) {
+    game.enemyBullets.push({
+      x: b.x, y: b.y + 20, vx: 0, vy: 95 * bossBulletScale(),
+      color: '#ddaa55', radius: 10, homing: 60,
+    });
+  },
+  guardianLaser(b) {
+    const sp = 235 * bossBulletScale();
+    for (const x of (b.lockXs || [])) {
+      for (let k = 0; k < 3; k++) {
+        game.enemyBullets.push({
+          x, y: -24, vx: 0, vy: sp,
+          color: '#00ffff', radius: 4, delay: k * 0.14,
+        });
+      }
+    }
+  },
+  beastkingCharge(b) {
+    b.charging = true;
+    const dx = (b.chargeX == null ? player.x : b.chargeX) - b.x;
+    const dy = (b.chargeY == null ? player.y : b.chargeY) - b.y;
+    const d = Math.max(Math.hypot(dx, dy), 0.001);
+    b.vx = dx / d * 520;
+    b.vy = dy / d * 520;
+    game.shake = Math.max(game.shake, 0.25);
+  },
+  vinetitanSeeds(b) {
+    const S = b.size / 5;
+    const xs = b.seedXs || [b.x - 64 * S, b.x, b.x + 64 * S];
+    for (let i = 0; i < xs.length; i++) {
+      game.enemyBullets.push({
+        x: xs[i], y: b.y, vx: (i - 1) * 18, vy: 145,
+        color: '#88dd22', radius: 9, split: true, splitCount: 4, splitSpeed: 150,
+      });
+    }
+  },
+  singularityWells(b) {
+    game.gravityWells = (b.wellPoints || []).map((p, i) => ({
+      x: p.x, y: p.y, r: 82 * (b.size / 6.5),
+      life: 4.4, maxLife: 4.4, seed: i * 1.7,
+    }));
+  },
+  magnetarStorm(b) {
+    b.stormTimer = 3.0;
+    for (const eb of game.enemyBullets) {
+      eb.pol = b.polarity;
+      eb.color = POLAR_COLOR[b.polarity];
+    }
+    addShockwave(b.x, b.y, POLAR_COLOR[b.polarity], 190 * (b.size / 5), 0.6, 8);
+    game.flash = 0.25; game.flashColor = POLAR_COLOR[b.polarity];
+  },
+  magnetarEmp(b) {
+    game.bullets.length = 0;
+    togglePolarity(true);
+    player.polarityLock = Math.max(player.polarityLock, 0.8);
+    addShockwave(player.x, player.y, POLAR_COLOR[player.polarity], 150, 0.55, 5);
+    game.flash = 0.4; game.flashColor = POLAR_COLOR[player.polarity];
+    game.shake = Math.max(game.shake, 0.4);
+    sfx('bossWarn');
+  },
+  swarmKamikaze(b) {
+    const cfg = MONSTER_TYPES.kamikaze;
+    const bal = getBalance();
+    const pts = b.summonPoints || [];
+    for (const p of pts) {
+      game.monsters.push({
+        type: 'kamikaze',
+        x: p.x, y: p.y,
+        vx: 0, vy: cfg.speed * CFG.baseMonsterSpeed * bal.enemySpeed,
+        hp: cfg.hp, maxHp: cfg.hp, size: cfg.size, score: cfg.score,
+        shootCD: 0, shootInterval: 0, fireRole: 'none', groupId: null,
+        t: 0, t0: Math.random() * Math.PI * 2,
+        pattern: 'line', phase: 'fight', hitFlash: 0, kbVX: 0, kbVY: 0, shootAlt: 0,
+      });
+    }
+    addShockwave(b.x, b.y, '#ff9944', 130, 0.5, 4);
+    sfx('explode');
+  },
+  swarmGuardPulse(b) {
+    b.guardPulse = 2.4;
+    addShockwave(b.x, b.y, '#ffcc44', 120, 0.5, 5);
+  },
+};
+
 const BOSS_SCRIPTS = {
   voidlord: {
     stations: {
@@ -9304,9 +9569,366 @@ const BOSS_SCRIPTS = {
       },
     },
   },
+  leviathan: {
+    stations: {
+      left:   { fx: 0.30, y: 108 },
+      center: { fx: 0.50, y: 98 },
+      right:  { fx: 0.70, y: 108 },
+    },
+    phases: [
+      { hp: 1.00, deck: ['sonarRing', 'torpedoTrio'] },
+      { hp: 0.50, deck: ['inkVeil', 'sonarRingB', 'torpedoTrio'] },
+    ],
+    patterns: {
+      // 声呐环：16 向，3 连缺口；半血换缺口方位
+      sonarRing: {
+        station: 'center', tele: 0.9, recover: 1.0,
+        steps: [{ t: 0, emit: 'ring', args: { count: 16, gapStart: 3, gapCount: 3, speed: 100, color: '#5cf2d8' } }],
+      },
+      sonarRingB: {
+        station: 'right', tele: 0.9, recover: 1.0,
+        steps: [{ t: 0, emit: 'ring', args: { count: 16, gapStart: 7, gapCount: 3, speed: 110, color: '#5cf2d8' } }],
+      },
+      // 三枚慢速鱼雷：顶部固定入水点，可拖掉
+      torpedoTrio: {
+        station: 'left', tele: 0.95, recover: 1.1,
+        steps: [{
+          t: 0, emit: 'markers',
+          args: {
+            points: [{ fx: 0.28 }, { fx: 0.50 }, { fx: 0.72 }],
+            angles: [Math.PI / 2], speed: 82, color: '#8affe0', radius: 7, homing: 60,
+          },
+        }],
+      },
+      // 墨雾遮蔽 + 本体两侧三枚追踪鱼雷
+      inkVeil: {
+        station: 'center', tele: 1.0, recover: 1.15,
+        onTele: teleLeviathanInk,
+        steps: [{ t: 0, emit: 'special', special: 'leviathanInk' }],
+      },
+    },
+  },
+  colossus: {
+    stations: {
+      left:   { fx: 0.32, y: 104 },
+      center: { fx: 0.50, y: 98 },
+      right:  { fx: 0.68, y: 104 },
+    },
+    phases: [
+      { hp: 1.00, deck: ['rockFall', 'sandFan'] },
+      { hp: 0.50, deck: ['sandFan', 'rockFallHeavy', 'vortexOrb'] },
+    ],
+    patterns: {
+      // 落石：五个固定纵向落点，按顺序入场
+      rockFall: {
+        station: 'center', tele: 0.95, recover: 1.0,
+        steps: [{
+          t: 0, emit: 'markers',
+          args: {
+            points: [
+              { fx: 0.14, delay: 0 }, { fx: 0.32, delay: 0.08 }, { fx: 0.50, delay: 0.16 },
+              { fx: 0.68, delay: 0.24 }, { fx: 0.86, delay: 0.32 },
+            ],
+            angles: [Math.PI / 2], speed: 150, color: '#aa7744', radius: 8,
+          },
+        }],
+      },
+      rockFallHeavy: {
+        station: 'left', tele: 1.0, recover: 1.15,
+        steps: [{
+          t: 0, emit: 'markers',
+          args: {
+            points: [
+              { fx: 0.18, delay: 0.10 }, { fx: 0.38, delay: 0.20 },
+              { fx: 0.62, delay: 0 }, { fx: 0.82, delay: 0.30 },
+            ],
+            angles: [Math.PI / 2], speed: 168, color: '#c08a55', radius: 10,
+          },
+        }],
+      },
+      // 沙暴扇：中心留固定缺口
+      sandFan: {
+        station: 'center', tele: 0.9, recover: 1.0,
+        steps: [{ t: 0, emit: 'fan', args: { count: 5, skipIndex: 2, spread: 0.20, angle: Math.PI / 2, speed: 150, color: '#ddaa55', radius: 6 } }],
+      },
+      // 追踪沙旋 + 扇形掩护
+      vortexOrb: {
+        station: 'right', tele: 1.0, recover: 1.2,
+        steps: [
+          { t: 0, emit: 'special', special: 'colossusVortex' },
+          { t: 0.08, emit: 'fan', args: { count: 5, skipIndex: 2, spread: 0.22, angle: Math.PI / 2, speed: 140, color: '#c99a55', radius: 5 } },
+        ],
+        onTele(b, pat) {
+          pushTelegraph({
+            kind: 'fan', x: b.x, y: b.y, angle: Math.PI / 2,
+            spread: 0.22, count: 5, skipIndex: 2, life: pat.tele, color: '#ddaa55',
+          });
+        },
+      },
+    },
+  },
+  guardian: {
+    stations: {
+      left:   { fx: 0.30, y: 100 },
+      center: { fx: 0.50, y: 94 },
+      right:  { fx: 0.70, y: 100 },
+    },
+    phases: [
+      { hp: 1.00, deck: ['lockLanes', 'missileFan'] },
+      { hp: 0.50, deck: ['missileFan', 'lockCross', 'lockLanes'] },
+    ],
+    patterns: {
+      // 预判激光：预警时锁定玩家当前左右两侧的纵向轨道
+      lockLanes: {
+        station: 'center', tele: 0.95, recover: 1.0, lockCount: 2,
+        onTele: teleGuardianLock,
+        steps: [{ t: 0, emit: 'special', special: 'guardianLaser' }],
+      },
+      lockCross: {
+        station: 'center', tele: 1.0, recover: 1.1, lockCount: 3,
+        onTele: teleGuardianLock,
+        steps: [{ t: 0, emit: 'special', special: 'guardianLaser' }],
+      },
+      // 追踪导弹：三枚慢速，可拖掉
+      missileFan: {
+        station: 'right', tele: 0.95, recover: 1.1,
+        steps: [{ t: 0, emit: 'fan', args: { count: 3, spread: 0.24, angle: Math.PI / 2, speed: 135, color: '#ffaa00', radius: 5, homing: 62 } }],
+      },
+    },
+  },
+  beastking: {
+    stations: {
+      left:   { fx: 0.30, y: 100 },
+      center: { fx: 0.50, y: 94 },
+      right:  { fx: 0.70, y: 100 },
+    },
+    phases: [
+      { hp: 1.00, deck: ['rockFan', 'charge'] },
+      { hp: 0.50, deck: ['charge', 'rockFanHeavy', 'rockFan'] },
+    ],
+    patterns: {
+      rockFan: {
+        station: 'center', tele: 0.85, recover: 1.0,
+        steps: [{ t: 0, emit: 'fan', args: { count: 5, skipIndex: 2, spread: 0.24, angle: Math.PI / 2, speed: 175, color: '#a07040', radius: 6 } }],
+      },
+      rockFanHeavy: {
+        station: 'left', tele: 0.9, recover: 1.1,
+        steps: [{ t: 0, emit: 'fan', args: { count: 7, skipIndex: 3, spread: 0.22, angle: Math.PI / 2, speed: 182, color: '#b07a45', radius: 6 } }],
+      },
+      // 冲撞：预警时锁定终点并画出路径，玩家可侧移
+      charge: {
+        station: 'center', tele: 0.95, recover: 1.35,
+        onTele: teleBeastCharge,
+        steps: [{ t: 0, emit: 'special', special: 'beastkingCharge' }],
+      },
+    },
+  },
+  vinetitan: {
+    stations: {
+      left:   { fx: 0.30, y: 102 },
+      center: { fx: 0.50, y: 96 },
+      right:  { fx: 0.70, y: 102 },
+    },
+    phases: [
+      { hp: 1.00, deck: ['poisonFan', 'seedBombs'] },
+      { hp: 0.50, deck: ['seedBombs', 'poisonFanWide', 'poisonFan'] },
+    ],
+    patterns: {
+      poisonFan: {
+        station: 'center', tele: 0.9, recover: 1.0,
+        steps: [{ t: 0, emit: 'fan', args: { count: 7, skipIndex: 3, spread: 0.20, angle: Math.PI / 2, speed: 165, color: '#66ff44', radius: 5 } }],
+      },
+      poisonFanWide: {
+        station: 'left', tele: 0.95, recover: 1.1,
+        steps: [{ t: 0, emit: 'fan', args: { count: 9, skipIndex: 4, spread: 0.19, angle: Math.PI / 2, speed: 175, color: '#66ff44', radius: 5 } }],
+      },
+      // 种子炸弹：三个固定落点，到达玩家高度后向四方分裂
+      seedBombs: {
+        station: 'right', tele: 1.0, recover: 1.2,
+        onTele: teleVinetitanSeeds,
+        steps: [{ t: 0, emit: 'special', special: 'vinetitanSeeds' }],
+      },
+    },
+  },
+  kraken: {
+    stations: {
+      left:   { fx: 0.28, y: 106 },
+      center: { fx: 0.50, y: 100 },
+      right:  { fx: 0.72, y: 106 },
+    },
+    phases: [
+      { hp: 1.00, deck: ['arcRing', 'tentacleLanes'] },
+      { hp: 0.50, deck: ['tentacleLanes', 'arcRingB', 'arcRing'] },
+    ],
+    patterns: {
+      // 电弧环：12 向，2 连缺口
+      arcRing: {
+        station: 'center', tele: 0.9, recover: 1.0,
+        steps: [{ t: 0, emit: 'ring', args: { count: 12, gapStart: 3, gapCount: 2, speed: 145, color: '#ff66cc' } }],
+      },
+      arcRingB: {
+        station: 'left', tele: 0.9, recover: 1.0,
+        steps: [{ t: 0, emit: 'ring', args: { count: 12, gapStart: 8, gapCount: 2, speed: 155, color: '#ff66cc' } }],
+      },
+      // 触手打击：三条固定纵向轨道，轨道之间为安全区
+      tentacleLanes: {
+        station: 'right', tele: 1.0, recover: 1.2,
+        steps: [{ t: 0, emit: 'lanes', args: { xs: [0.20, 0.50, 0.80], gapIndex: -1, shots: 4, speed: 200, delay: 0.16, color: '#ff44aa', radius: 5 } }],
+      },
+    },
+  },
+  frostqueen: {
+    stations: {
+      left:   { fx: 0.28, y: 106 },
+      center: { fx: 0.50, y: 100 },
+      right:  { fx: 0.72, y: 106 },
+    },
+    phases: [
+      { hp: 1.00, deck: ['iceSpiral', 'iceSpears'] },
+      { hp: 0.50, deck: ['iceSpears', 'iceSpiralB', 'iceSpiral'] },
+      { hp: 0.25, deck: ['iceSpiralFast', 'iceSpearsFast', 'iceSpiralB'] },
+    ],
+    patterns: {
+      iceSpiral: {
+        station: 'center', tele: 0.9, recover: 1.0,
+        steps: [{ t: 0, emit: 'ring', args: { count: 12, gapStart: 3, gapCount: 3, speed: 138, color: '#bffaff' } }],
+      },
+      iceSpiralB: {
+        station: 'right', tele: 0.9, recover: 1.0,
+        steps: [{ t: 0, emit: 'ring', args: { count: 12, gapStart: 8, gapCount: 3, speed: 145, color: '#bffaff' } }],
+      },
+      iceSpiralFast: {
+        station: 'center', tele: 0.8, recover: 0.9,
+        steps: [{ t: 0, emit: 'ring', args: { count: 16, gapStart: 5, gapCount: 4, speed: 150, color: '#c8fbff' } }],
+      },
+      // 冰棱坠击：四条固定通道，通道之间可走位
+      iceSpears: {
+        station: 'center', tele: 1.0, recover: 1.15,
+        steps: [{ t: 0, emit: 'lanes', args: { xs: [0.15, 0.38, 0.62, 0.85], gapIndex: -1, shots: 3, speed: 172, delay: 0.26, color: '#9ff8ff', radius: 5 } }],
+      },
+      iceSpearsFast: {
+        station: 'right', tele: 0.9, recover: 1.05,
+        steps: [{ t: 0, emit: 'lanes', args: { xs: [0.15, 0.38, 0.62, 0.85], gapIndex: -1, shots: 4, speed: 185, delay: 0.20, color: '#bffaff', radius: 5 } }],
+      },
+    },
+  },
+  singularity: {
+    stations: {
+      left:   { fx: 0.30, y: 104 },
+      center: { fx: 0.50, y: 98 },
+      right:  { fx: 0.70, y: 104 },
+    },
+    phases: [
+      { hp: 1.00, deck: ['collapseRing', 'gravityWell'] },
+      { hp: 0.50, deck: ['gravityWell', 'twinLance', 'collapseRingB'] },
+      { hp: 0.25, deck: ['collapseRingFast', 'twinLance', 'gravityWell'] },
+    ],
+    patterns: {
+      collapseRing: {
+        station: 'center', tele: 0.95, recover: 1.05,
+        steps: [{ t: 0, emit: 'ring', args: { count: 12, gapStart: 0, gapCount: 4, speed: 118, color: '#cf9bff' } }],
+      },
+      collapseRingB: {
+        station: 'right', tele: 0.95, recover: 1.05,
+        steps: [{ t: 0, emit: 'ring', args: { count: 12, gapStart: 6, gapCount: 4, speed: 125, color: '#d3a6ff' } }],
+      },
+      collapseRingFast: {
+        station: 'center', tele: 0.85, recover: 0.95,
+        steps: [{ t: 0, emit: 'ring', args: { count: 16, gapStart: 4, gapCount: 4, speed: 135, color: '#e0b8ff' } }],
+      },
+      twinLance: {
+        station: 'left', tele: 0.95, recover: 1.1,
+        steps: [{ t: 0, emit: 'fan', args: { count: 3, spread: 0.17, angle: Math.PI / 2, speed: 178, color: '#e0b8ff', radius: 4 } }],
+      },
+      // 引力井：两个固定牵引点 + 带 4 缺口的坍缩环
+      gravityWell: {
+        station: 'center', tele: 1.0, recover: 1.2,
+        onTele: teleSingularityWells,
+        steps: [
+          { t: 0, emit: 'special', special: 'singularityWells' },
+          { t: 0.06, emit: 'ring', args: { count: 12, gapStart: 3, gapCount: 4, speed: 105, color: '#d3a6ff' } },
+        ],
+      },
+    },
+  },
+  magnetar: {
+    stations: {
+      left:   { fx: 0.30, y: 140 },
+      center: { fx: 0.50, y: 136 },
+      right:  { fx: 0.70, y: 140 },
+    },
+    phases: [
+      { hp: 1.00, deck: ['polarVolley', 'polarStorm'] },
+      { hp: 0.50, deck: ['polarStorm', 'polarVolley', 'emp'] },
+      { hp: 0.25, deck: ['emp', 'polarStormFast', 'polarVolley'] },
+    ],
+    patterns: {
+      // 极性齐射：颜色与判定跟随 Boss 当前磁极
+      polarVolley: {
+        station: 'center', tele: 0.9, recover: 0.95,
+        steps: [{ t: 0, emit: 'fan', args: { count: 3, spread: 0.18, angle: Math.PI / 2, speed: 175, color: '#ff5566', radius: 5, polFromBoss: true } }],
+      },
+      polarStorm: {
+        station: 'center', tele: 1.0, recover: 1.25,
+        steps: [
+          { t: 0, emit: 'ring', args: { count: 12, gapStart: 3, gapCount: 3, speed: 120, color: '#ff5566', radius: 5, polFromBoss: true } },
+          { t: 0.05, emit: 'special', special: 'magnetarStorm' },
+        ],
+      },
+      polarStormFast: {
+        station: 'right', tele: 0.85, recover: 1.1,
+        steps: [
+          { t: 0, emit: 'ring', args: { count: 16, gapStart: 5, gapCount: 4, speed: 135, color: '#5aa0ff', radius: 5, polFromBoss: true } },
+          { t: 0.05, emit: 'special', special: 'magnetarStorm' },
+        ],
+      },
+      // EMP：不造成伤害，清空玩家弹幕并强制反转磁极
+      emp: {
+        station: 'center', tele: 1.0, recover: 1.3,
+        onTele: teleMagnetarEmp,
+        steps: [{ t: 0, emit: 'special', special: 'magnetarEmp' }],
+      },
+    },
+  },
+  swarmmother: {
+    stations: {
+      left:   { fx: 0.32, y: 140 },
+      center: { fx: 0.50, y: 136 },
+      right:  { fx: 0.68, y: 140 },
+    },
+    phases: [
+      { hp: 1.00, deck: ['larvaFan', 'summonKamikaze'] },
+      { hp: 0.50, deck: ['guardPulse', 'larvaFan', 'summonKamikaze'] },
+      { hp: 0.25, deck: ['summonKamikaze', 'larvaFanWide', 'guardPulse'] },
+    ],
+    patterns: {
+      larvaFan: {
+        station: 'center', tele: 0.9, recover: 1.0,
+        steps: [{ t: 0, emit: 'fan', args: { count: 7, skipIndex: 3, spread: 0.18, angle: Math.PI / 2, speed: 150, color: '#ffcc44', radius: 4 } }],
+      },
+      larvaFanWide: {
+        station: 'left', tele: 0.95, recover: 1.1,
+        steps: [{ t: 0, emit: 'fan', args: { count: 9, skipIndex: 4, spread: 0.17, angle: Math.PI / 2, speed: 160, color: '#ffcc44', radius: 4 } }],
+      },
+      // 召唤四只自爆蜂：四个固定出生点，纯撞击
+      summonKamikaze: {
+        station: 'right', tele: 1.0, recover: 1.25,
+        onTele: teleSwarmSummon,
+        steps: [{ t: 0, emit: 'special', special: 'swarmKamikaze' }],
+      },
+      // 护卫环收缩：短时间收拢护卫，缩小本体可攻击缝隙
+      guardPulse: {
+        station: 'center', tele: 0.9, recover: 1.1,
+        onTele: teleSwarmPulse,
+        steps: [{ t: 0, emit: 'special', special: 'swarmGuardPulse' }],
+      },
+    },
+  },
 };
 
 function showBossPatternTelegraph(b, pat) {
+  // 动态锁定类招式（预判轨道、引力井、召唤点）由招式自己铺预警
+  if (pat.onTele) { pat.onTele(b, pat); return; }
   const step = pat.steps[0];
   if (!step) return;
   const a = step.args || {};
@@ -9314,7 +9936,8 @@ function showBossPatternTelegraph(b, pat) {
     pushTelegraph({
       kind: 'ring', x: b.x, y: b.y, r: Math.min(W * 0.46, 210),
       count: a.count || 16, gapStart: a.gapStart || 0, gapCount: a.gapCount || 0,
-      rotate: a.rotate || 0, life: pat.tele, color: a.color || '#ffb066',
+      rotate: a.rotate || 0, life: pat.tele,
+      color: (a.polFromBoss && b) ? POLAR_COLOR[b.polarity] : (a.color || '#ffb066'),
     });
   } else if (step.emit === 'lanes') {
     const xs = a.xs || [];
@@ -9330,8 +9953,19 @@ function showBossPatternTelegraph(b, pat) {
     }
   } else if (step.emit === 'markers') {
     for (const p of (a.points || [])) {
-      pushTelegraph({ kind: 'marker', x: W * p.fx, y: 36, r: 32, life: pat.tele, color: a.color || '#ff8844' });
+      pushTelegraph({
+        kind: 'marker', x: W * p.fx, y: p.y == null ? 36 : p.y,
+        r: a.radius ? a.radius * 4 : 32, life: pat.tele, color: a.color || '#ff8844',
+      });
     }
+  } else if (step.emit === 'fan') {
+    pushTelegraph({
+      kind: 'fan', x: b.x, y: b.y,
+      angle: a.angle == null ? Math.PI / 2 : a.angle,
+      spread: a.spread || 0.18, count: a.count || 5, skipIndex: a.skipIndex,
+      life: pat.tele,
+      color: (a.polFromBoss && b) ? POLAR_COLOR[b.polarity] : (a.color || '#ff8844'),
+    });
   }
 }
 
@@ -9365,11 +9999,64 @@ function updateHeliosCore(b, dt) {
   }
 }
 
+// 第 11 关磁极核心：周期翻转磁极 / 极性风暴染色
+function updateMagnetarCore(b, dt) {
+  if (b.polFlash > 0) b.polFlash -= dt;
+  if (b.polarityTimer == null) b.polarityTimer = 3.4;
+  b.polarityTimer -= dt;
+  if (b.polarityTimer <= 0) {
+    b.polarity = 1 - b.polarity;
+    b.polarityTimer = b.enraged ? 2.2 : 3.4;
+    b.polFlash = 0.5;
+    addShockwave(b.x, b.y, POLAR_COLOR[b.polarity], 150 * (b.size / 5), 0.5, 6);
+    sfx('charge');
+  }
+  if (b.stormTimer > 0) {
+    b.stormTimer -= dt;
+    for (const eb of game.enemyBullets) {
+      eb.pol = b.polarity;
+      eb.color = POLAR_COLOR[b.polarity];
+    }
+    if (b.stormTimer < 0) b.stormTimer = 0;
+  }
+}
+
+// 第 12 关虫群之母：护卫环收缩 / 回填
+function updateSwarmCore(b, dt) {
+  if (b.guardR === undefined) b.guardR = 92;
+  if (b.guardRBase === undefined) b.guardRBase = 92;
+  if (b.guardPulse > 0) b.guardPulse -= dt;
+  b.guardRTarget = b.guardPulse > 0 ? 70 : b.guardRBase;
+  b.guardR += (b.guardRTarget - b.guardR) * Math.min(1, 6 * dt);
+  for (const g of game.monsters) {
+    if (g.orbit && g.orbit.owner === 'boss') g.orbit.r = b.guardR;
+  }
+  b.guardCD = (b.guardCD === undefined ? 5.0 : b.guardCD) - dt;
+  if (b.guardCD <= 0) {
+    b.guardCD = 5.5;
+    if (guardCount('boss') < 8) spawnGuard(guardCount('boss') * Math.PI / 4, 'boss', b);
+  }
+}
+
 // 剧本运行时：移动 → 预警 → 发射 → 恢复。同一时刻只跑一个招式。
 function updateBossScript(b, dt) {
   const script = BOSS_SCRIPTS[b.type];
   if (!script) return;
   if (b.type === 'helios') updateHeliosCore(b, dt);
+  else if (b.type === 'magnetar') updateMagnetarCore(b, dt);
+  else if (b.type === 'swarmmother') updateSwarmCore(b, dt);
+
+  // 冲撞招式：预警后沿锁定方向推进，接近终点或越界时停止
+  if (b.charging) {
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+    const remain = Math.hypot((b.chargeX || b.x) - b.x, (b.chargeY || b.y) - b.y);
+    if (remain < 28 || b.y >= (b.chargeY || H * 0.6)) {
+      b.charging = false;
+      b.y = clamp(b.y, 70, H * 0.72);
+    }
+    b.x = clamp(b.x, 30, W - 30);
+  }
 
   if (b.scriptPause > 0) {
     b.scriptPause -= dt;
@@ -9435,7 +10122,12 @@ function updateBossScript(b, dt) {
     s.stepT += dt;
     while (s.step < s.pattern.steps.length && s.stepT >= s.pattern.steps[s.step].t) {
       const step = s.pattern.steps[s.step];
-      ATTACK_LIB[step.emit](step.args);
+      if (step.emit === 'special') {
+        const fn = BOSS_SPECIALS[step.special];
+        if (fn) fn(b, step.args || {}, s);
+      } else {
+        ATTACK_LIB[step.emit](step.args);
+      }
       s.step++;
     }
     if (s.step >= s.pattern.steps.length) {

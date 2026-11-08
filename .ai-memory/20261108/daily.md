@@ -151,3 +151,24 @@
   - 既有桌面回归 49/49 通过；移动端触控回归全部通过。
   - 截图确认：voidlord 环形缺口弧、dragon 危险轨道 + 安全道、ufo 编队安全柱 + 蓄力圈。
   - 未迁移的 10 个 Boss 仍使用旧随机瞄准弹幕；下一步按同一语法逐个改写。
+
+## [10:25] - 功能实现: Sprint 5B 完成（剩余 10 个 Boss 全部迁移到确定性剧本）
+
+- **文件**: `index.html`
+- **Boss 剧本迁移**:
+  - 新增 `leviathan`（声呐环 / 三鱼雷 / 墨云）、`colossus`（落石 / 沙暴扇形 / 漩涡球）、`guardian`（锁定双轨 / 交叉轨 / 导弹扇形）、`beastking`（岩石扇形 / 锁定冲锋）、`vinetitan`（毒扇 / 种子落点）、`kraken`（弧形环 / 触手轨道）、`frostqueen`（冰螺旋 / 冰矛轨道）、`singularity`（坍缩环 / 双枪 / 重力井）、`magnetar`（极性齐射 / 极性风暴 / EMP）、`swarmmother`（幼体扇形 / 召唤自爆虫 / 护卫脉冲）。
+  - 13 个 Boss 全部具备 `BOSS_SCRIPTS`，旧 `else if` 分支与随机瞄准特殊攻击不再可达，保留代码未删除以降低本次改动风险。
+- **攻击语法扩展**:
+  - `ATTACK_LIB` 新增 `homing`、`pol`、`polFromBoss` 参数；`fan` 默认以 Boss 位置为原点；新增 `attackPolarity` 统一解析弹幕极性。
+  - 新增预警种类：`fan`（危险射线 + 中央缺口蓝虚线）、`path`（冲锋路径 + 落点十字）、`cloud`（墨云范围预演）。
+  - `showBossPatternTelegraph` 支持 `pat.onTele` 自定义预警；极性弹幕的环形/扇形预警颜色跟随 Boss 当前极性。
+- **机制保留（BOSS_SPECIALS + 核心更新）**:
+  - `leviathanInk`、`colossusVortex`、`guardianLaser`、`beastkingCharge`、`vinetitanSeeds`、`singularityWells`、`magnetarStorm`、`magnetarEmp`、`swarmKamikaze`、`swarmGuardPulse`。
+  - `updateBossScript` 统一驱动赫利俄斯核心、磁极核心（极性翻转/风暴重绘）、蜂巢核心（护卫脉冲/补员）。
+  - 新增通用冲锋位移：锁定终点、到达或越界后结束冲锋并回到安全高度，带边界夹取。
+- **验证**:
+  - `npx vite build` 通过（607.18 kB，gzip 164.10 kB）。
+  - 新增 Sprint 5B CDP 用例 25/25 通过：13 个 Boss 剧本完整性、每个剧本状态循环与 deck 轮换、无非法子弹坐标、墨云/锁轨/冲锋/种子/触手/冰矛/重力井/极性风暴/召唤/护卫脉冲逐项断言、无运行时异常与控制台错误。
+  - Sprint 5A 16/16、桌面回归 49/49、移动端触控回归全部通过。
+  - 截图确认：guardian 双锁定轨道 + 中央安全带、beastking 冲锋路径 + 落点十字、magnetar 极性环预警、singularity 双重力井落点。
+  - 未提交；等待用户确认后再提交推送。
