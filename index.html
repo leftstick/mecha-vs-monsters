@@ -1658,6 +1658,29 @@ let bombBtn = { cx:0, cy:0, r:25, flash:0 };
 let polarBtn = { cx:0, cy:0, r:26, flash:0 };
 let touchActive = false, touchId = null;
 
+function layoutActionButtons() {
+  const tc = GAME_CONFIG.touch;
+  const r = 30; // 直径 60，兼顾拇指命中率与遮挡面积
+  dashBtn.r = r; bombBtn.r = r; polarBtn.r = r;
+  if (tc.mode === 'joystick') {
+    // 摇杆模式：射击键上方纵向排布，避开底部血条
+    bombBtn.cx = shootBtn.cx;
+    bombBtn.cy = shootBtn.cy - 102;
+    dashBtn.cx = shootBtn.cx - 76;
+    dashBtn.cy = shootBtn.cy - 162;
+    polarBtn.cx = shootBtn.cx;
+    polarBtn.cy = shootBtn.cy - 214;
+  } else {
+    // 拖动模式：沿右边缘纵向排布，炸弹贴拇指落点，避开居中血条与机体活动区
+    bombBtn.cx = W - 54;
+    bombBtn.cy = H - 104;
+    dashBtn.cx = W - 54;
+    dashBtn.cy = H - 196;
+    polarBtn.cx = W - 54;
+    polarBtn.cy = H - 288;
+  }
+}
+
 function resizeUI() {
   uiCv.width = W; uiCv.height = H;
   const tc = GAME_CONFIG.touch;
@@ -1667,17 +1690,7 @@ function resizeUI() {
   // 射击按钮中心：右下角
   shootBtn.cx = W - tc.shootBtnMargin - tc.shootBtnSize/2;
   shootBtn.cy = H - tc.shootBtnMargin - tc.shootBtnSize/2;
-  // 冲刺 / 炸弹按钮：射击键左侧的 2×2 拇指区
-  dashBtn.r = 25;
-  dashBtn.cx = shootBtn.cx - 64;
-  dashBtn.cy = shootBtn.cy - 54;
-  bombBtn.r = 25;
-  bombBtn.cx = shootBtn.cx - 64;
-  bombBtn.cy = shootBtn.cy + 26;
-  // 磁极按钮：射击按钮正上方，拇指可自然上移触发
-  polarBtn.cx = W - tc.shootBtnMargin - tc.shootBtnSize/2;
-  polarBtn.cy = H - tc.shootBtnMargin - tc.shootBtnSize - 46;
-  polarBtn.r = 26;
+  layoutActionButtons();
 }
 
 ta.addEventListener('pointerdown', e => {
@@ -15100,6 +15113,8 @@ function setTouchMode(mode) {
                     : '左下摇杆控制移动，右下按钮控制射击';
   // 显示/隐藏 UI Canvas
   document.getElementById('uiCanvas').style.display = mode === 'joystick' ? 'block' : 'none';
+  // 两种模式的拇指区不同，切换后立即重排冲刺/炸弹/磁极按钮
+  layoutActionButtons();
 }
 document.querySelectorAll('#ovSettings .opt-btn').forEach(b => {
   b.addEventListener('click', () => setTouchMode(b.dataset.mode));
