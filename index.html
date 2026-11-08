@@ -236,8 +236,8 @@
   .hangar-row{display:flex;align-items:center;gap:10px;padding:8px 10px;
     border:1px solid rgba(0,229,255,0.18);border-radius:10px;background:rgba(8,16,26,0.72);}
   .hangar-info{flex:1;min-width:0;}
-  .hangar-info b{display:block;font-size:13px;color:#c8e6ff;}
-  .hangar-info span{display:block;font-size:10px;color:#5a7a9a;margin-top:2px;}
+  .hangar-info > b{display:block;font-size:13px;color:#c8e6ff;}
+  .hangar-info > span{display:block;font-size:10px;color:#5a7a9a;margin-top:2px;}
   .hangar-pips{display:flex;gap:2px;margin-top:5px;flex-wrap:wrap;}
   .hangar-pips i{width:7px;height:5px;border-radius:2px;background:#1d3145;border:1px solid #2a4560;}
   .hangar-pips i.on{background:#00e5ff;border-color:#8ff;box-shadow:0 0 6px rgba(0,229,255,0.8);}
@@ -1156,15 +1156,29 @@ function hexToRgba(hex, alpha) {
 
 /* ==================== 存档 (localStorage) ==================== */
 const SAVE_KEY = 'mecha_vs_monsters_save_v1';
-// 永久改装：6 条线 × 10 级。单次通关的合金不足以点满任何一条线，
-// 但每级收益都足够直观，满级时 6 条线合计是质变而不是数值装饰。
+// 永久改装：8 条线。单次普通全通约 875 合金，主力线满级需 4~6 次全通。
+// 成本按 1.14~1.16 递增，越到后期越贵，避免两次通关就点满一条线。
+function upgradeCostCurve(base, growth, n) {
+  const out = [];
+  let c = base;
+  for (let i = 0; i < n; i++) {
+    out.push(Math.max(5, Math.round(c / 5) * 5));
+    c *= growth;
+  }
+  return out;
+}
+// 射速 / 冲刺用递减曲线：旧版 10 级收益保持不变，10 级之后继续提升但收益放缓
+function fireRateMultOf(lv) { return 1 / (1 + Math.max(0, lv) * 0.054); }
+function dashCooldownMultOf(lv) { return 1 / (1 + Math.max(0, lv) * 0.0667); }
 const UPGRADE_DEFS = [
-  { key: 'damage',  name: '主炮伤害', desc: '每级 +7% 子弹伤害',   kind: 'pctUp',   max: 10, costs: [30, 40, 50, 65, 80, 100, 125, 155, 190, 230], value: 0.07 },
-  { key: 'fireRate',name: '射速',     desc: '每级 -3.5% 射击间隔', kind: 'pctDown', max: 10, costs: [35, 45, 55, 70, 90, 110, 135, 165, 205, 250], value: 0.035 },
-  { key: 'wingman', name: '僚机火力', desc: '每级 +8% 僚机伤害',   kind: 'pctUp',   max: 10, costs: [25, 35, 45, 55, 70, 90, 110, 140, 175, 215], value: 0.08 },
-  { key: 'shield',  name: '护盾上限', desc: '每级 +0.3 护盾上限',  kind: 'shield',  max: 10, costs: [40, 50, 65, 80, 100, 125, 155, 190, 230, 280], value: 0.30 },
-  { key: 'bomb',    name: '炸弹容量', desc: '每级 +0.5 炸弹上限',  kind: 'bomb',    max: 10, costs: [45, 60, 75, 95, 115, 140, 175, 210, 255, 310], value: 0.50 },
-  { key: 'dash',    name: '冲刺冷却', desc: '每级 -4% 冲刺冷却',   kind: 'pctDown', max: 10, costs: [30, 40, 55, 70, 85, 105, 130, 160, 195, 240], value: 0.04 },
+  { key: 'damage',  name: '主炮伤害', desc: '每级 +7% 子弹伤害',        kind: 'pctUp',   max: 20, costs: upgradeCostCurve(40, 1.15, 20),  value: 0.07 },
+  { key: 'fireRate',name: '射速',     desc: '每级提升射速（递减），满级约 2 倍', kind: 'rate', max: 20, costs: upgradeCostCurve(40, 1.145, 20), value: 0.054 },
+  { key: 'wingman', name: '僚机火力', desc: '每级 +8% 僚机伤害',        kind: 'pctUp',   max: 20, costs: upgradeCostCurve(35, 1.14, 20),  value: 0.08 },
+  { key: 'shield',  name: '护盾上限', desc: '每级 +0.3 护盾上限',       kind: 'shield',  max: 20, costs: upgradeCostCurve(50, 1.15, 20),  value: 0.30 },
+  { key: 'bomb',    name: '炸弹容量', desc: '每 4 级 +1 炸弹上限',      kind: 'bomb',    max: 20, costs: upgradeCostCurve(55, 1.145, 20), value: 0.25 },
+  { key: 'dash',    name: '冲刺冷却', desc: '每级缩短冲刺冷却（递减）', kind: 'dash',    max: 20, costs: upgradeCostCurve(40, 1.14, 20),  value: 0.0667 },
+  { key: 'crit',    name: '暴击率',   desc: '每级 +0.6% 暴击概率',      kind: 'crit',    max: 15, costs: upgradeCostCurve(60, 1.16, 15),  value: 0.006 },
+  { key: 'speed',   name: '机动速度', desc: '每级 +2% 移动速度',        kind: 'pctUp',   max: 15, costs: upgradeCostCurve(50, 1.15, 15),  value: 0.02 },
 ];
 // 三选一模块：开局 Build 差异
 const MODULES = [
@@ -1178,16 +1192,32 @@ function upgradeLv(key) {
   return clamp(((save.upgrades || {})[key] | 0), 0, def.max);
 }
 function bombCap() {
-  return BOMB_MAX + Math.floor(upgradeLv('bomb') * 0.5);
+  return BOMB_MAX + Math.floor(upgradeLv('bomb') / 4);
 }
 // 机库展示用：把当前等级换算成玩家一眼能看懂的收益文本
 function upgradeBonusText(def, lv) {
-  const v = Math.max(0, lv) * def.value;
+  const n = Math.max(0, lv);
+  const v = n * def.value;
+  if (def.key === 'fireRate') return (1 / (CFG.fireInterval * fireRateMultOf(n))).toFixed(1) + ' 发/秒';
+  if (def.key === 'dash') return (2.0 * dashCooldownMultOf(n)).toFixed(2) + 's';
+  if (def.key === 'crit') return Math.round((GAME_CONFIG.crit.chance + v) * 100) + '%';
+  if (def.key === 'bomb') return '+' + Math.floor(n / 4);
   if (def.kind === 'pctUp') return '+' + Math.round(v * 100) + '%';
   if (def.kind === 'pctDown') return '-' + Math.round(v * 100) + '%';
   if (def.kind === 'shield') return '+' + v.toFixed(1);
-  if (def.kind === 'bomb') return '+' + Math.floor(v);
   return '';
+}
+// 下一级提示：炸弹容量每 4 级才 +1，需标出真正生效的等级，避免显示“下一级 +1”却毫无变化
+function upgradeNextText(def, lv) {
+  if (lv >= def.max) return '';
+  if (def.key === 'bomb') {
+    const cur = Math.floor(lv / 4);
+    let nlv = lv + 1;
+    while (nlv <= def.max && Math.floor(nlv / 4) === cur) nlv++;
+    if (nlv > def.max) return ' → 满级 +' + cur;
+    return nlv === lv + 1 ? ' → 下一级 +1' : ` → Lv.${nlv} 再 +1`;
+  }
+  return ' → 下一级 ' + upgradeBonusText(def, lv + 1);
 }
 function upgradeTotalCost() {
   return UPGRADE_DEFS.reduce((sum, def) => sum + def.costs.reduce((a, b) => a + b, 0), 0);
@@ -1232,12 +1262,18 @@ function loadSave() {
             upgrades[def.key] = clamp(Math.floor(Number(data.upgrades[def.key])) || 0, 0, def.max);
           }
         }
+        // v1 -> v2：炸弹线从 10 档扩到 20 档但每档收益减半，旧等级翻倍以保留原有容量
+        const saveVer = Math.max(1, Math.floor(Number(data.v)) || 1);
+        const migrated = saveVer < 2;
+        if (migrated && upgrades.bomb) upgrades.bomb = clamp(upgrades.bomb * 2, 0, 20);
         const module = clamp(Math.floor(Number(data.module)) || 0, 0, MODULES.length - 1);
-        return { v: 1, unlocked, bestScores, medals, stars, difficulty, alloy, upgrades, module };
+        const out = { v: 2, unlocked, bestScores, medals, stars, difficulty, alloy, upgrades, module };
+        if (migrated) saveSave(out);
+        return out;
       }
     }
   } catch(e) {}
-  return { v: 1, unlocked: 1, bestScores: {}, medals: {}, stars: {}, difficulty: 0, alloy: 0, upgrades: {}, module: 0 }; // 默认解锁第 1 关
+  return { v: 2, unlocked: 1, bestScores: {}, medals: {}, stars: {}, difficulty: 0, alloy: 0, upgrades: {}, module: 0 }; // 默认解锁第 1 关
 }
 function saveSave(data) {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch(e) {}
@@ -1520,6 +1556,9 @@ let player = {
   wingDmgMult: 1,
   fireRateMult: 1,
   dashCDMult: 1,
+  critBonus: 0,
+  speedMult: 1,
+  rateLv: 0,
 };
 
 let input = { left:false, right:false, up:false, down:false, shoot:false, kbShoot:false };
@@ -8089,24 +8128,29 @@ function drawBoss(b) {
 }
 
 /* ==================== 子弹 ==================== */
+// 保留上一次冷却的帧内余量：否则 60fps 下 0.14s 会被量化成 9 帧、0.067s 被量化成 5 帧，
+// 高射速升级的实际收益会被吃掉一截。
+function setFireCooldown(base) {
+  player.fireCD = Math.max(base * 0.5, player.fireCD + base);
+}
 function fireBullet() {
   if (player.fireCD > 0) return;
   const w = player.weapon;
   const cdScale = fireIntervalScale();
   if (w === 'normal') {
-    player.fireCD = CFG.fireInterval * cdScale;
+    setFireCooldown(CFG.fireInterval * cdScale);
     game.bullets.push({ x: player.x, y: player.y - 24, vx: 0, vy: -CFG.bulletSpeed, dmg: 1 * player.dmgMult, type: 'normal' });
     game.shots++;
     sfx('shoot');
   } else if (w === 'laser') {
     // 激光: 穿透, 高伤害, 宽弹
-    player.fireCD = 0.08 * cdScale;
+    setFireCooldown(0.08 * cdScale);
     game.bullets.push({ x: player.x, y: player.y - 24, vx: 0, vy: -CFG.bulletSpeed * 1.4, dmg: 2 * player.dmgMult, type: 'laser', pierce: true });
     game.shots++;
     sfx('laser');
   } else if (w === 'shotgun') {
     // 霰弹: 5 发扇形散射
-    player.fireCD = 0.28 * cdScale;
+    setFireCooldown(0.28 * cdScale);
     for (let i = -2; i <= 2; i++) {
       const ang = -Math.PI / 2 + i * 0.18;
       game.bullets.push({ x: player.x, y: player.y - 20, vx: Math.cos(ang) * CFG.bulletSpeed, vy: Math.sin(ang) * CFG.bulletSpeed, dmg: 1 * player.dmgMult, type: 'shotgun' });
@@ -8115,22 +8159,24 @@ function fireBullet() {
     sfx('shotgun');
   } else if (w === 'rocket') {
     // 三连发火箭: 追踪, 爆炸伤害
-    player.fireCD = 0.35 * cdScale;
+    setFireCooldown(0.35 * cdScale);
     for (let i = -1; i <= 1; i++) {
       game.bullets.push({ x: player.x + i * 12, y: player.y - 20, vx: i * 60, vy: -CFG.bulletSpeed * 0.9, dmg: 3 * player.dmgMult, type: 'rocket', track: true });
     }
     game.shots += 3;
     sfx('rocket');
   }
-  // 炮口闪光（按武器着色，与子弹外观匹配 + 亮白核）
+  // 炮口闪光（按武器着色，与子弹外观匹配 + 亮白核）；射速等级越高，炮口越亮越密
+  const rl = player.rateLv || 0;
   const mx = player.x, my = player.y - 24;
   const bc = GAME_CONFIG.bulletColors;
   const mfColor = bc[w] || bc.normal;
-  for (let i = 0; i < 8; i++) {
-    game.particles.push({ x: mx + rand(-5, 5), y: my, vx: rand(-60, 60), vy: rand(-90, -10), life: 0.25, color: mfColor, size: rand(2, 5) });
+  const burst = 8 + Math.floor(rl / 4);
+  for (let i = 0; i < burst; i++) {
+    game.particles.push({ x: mx + rand(-5, 5), y: my, vx: rand(-60, 60), vy: rand(-90, -10), life: 0.25, color: mfColor, size: rand(2, 5) * (1 + rl * 0.02) });
   }
-  game.particles.push({ x: mx, y: my, vx: 0, vy: -20, life: 0.3, color: '#ffffff', size: 10 });
-  game.particles.push({ x: mx, y: my, vx: 0, vy: -10, life: 0.3, color: mfColor, size: 7 });
+  game.particles.push({ x: mx, y: my, vx: 0, vy: -20, life: 0.3, color: '#ffffff', size: 10 + rl * 0.5 });
+  game.particles.push({ x: mx, y: my, vx: 0, vy: -10, life: 0.3, color: mfColor, size: 7 + rl * 0.25 });
 }
 
 function updateBullets(dt) {
@@ -8927,7 +8973,7 @@ function checkCollisions() {
       const m = game.monsters[j];
       if (dist(b, m) < 18 * m.size) {
         // 暴击判定（概率触发，影响伤害数值与飘字样式）
-        const isCrit = Math.random() < GAME_CONFIG.crit.chance;
+        const isCrit = Math.random() < critChance();
         const dmg = isCrit ? b.dmg * GAME_CONFIG.crit.mult : b.dmg;
         // 相位盾卫：只有玩家极性与护盾一致时才能击穿，异极子弹被偏转
         if (m.type === 'phaseshield' && m.pol !== undefined && player.polarity !== m.pol) {
@@ -9010,7 +9056,7 @@ function checkCollisions() {
       for (let j = game.groundTargets.length - 1; j >= 0; j--) {
         const g = game.groundTargets[j];
         if (dist(b, g) < g.r + 7) {
-          const isCrit = Math.random() < GAME_CONFIG.crit.chance;
+          const isCrit = Math.random() < critChance();
           const dmg = isCrit ? b.dmg * GAME_CONFIG.crit.mult : b.dmg;
           g.hp -= dmg;
           g.hitFlash = GAME_CONFIG.monsterHitFlashTime;
@@ -9066,7 +9112,7 @@ function checkCollisions() {
         if (p.dead) continue;
         const px = boss.x + p.ox * S, py = boss.y + p.oy * S;
         if (dist(b, { x: px, y: py }) < p.r) {
-          const isCrit = Math.random() < GAME_CONFIG.crit.chance;
+          const isCrit = Math.random() < critChance();
           const dmg = isCrit ? b.dmg * GAME_CONFIG.crit.mult : b.dmg;
           p.hp -= dmg;
           p.flash = GAME_CONFIG.monsterHitFlashTime;
@@ -9118,7 +9164,7 @@ function checkCollisions() {
       // 虫群之母有护卫环，本体判定收得更紧，避免隔着护卫直接打中心
       const bossHitR = game.boss.type === 'swarmmother' ? 9 * game.boss.size : 14 * game.boss.size;
       if (dist(b, game.boss) < bossHitR) {
-        const isCrit = Math.random() < GAME_CONFIG.crit.chance;
+        const isCrit = Math.random() < critChance();
         let dmg = isCrit ? b.dmg * GAME_CONFIG.crit.mult : b.dmg;
         // 磁极护盾：护盾存在时任何子弹都先打盾；异极效率 100%，同极只有 35%
         if (game.boss.type === 'magnetar' && game.boss.shieldHp > 0) {
@@ -15755,6 +15801,10 @@ function fireIntervalScale() {
   if (player.fireRateMult) s *= player.fireRateMult;
   return s;
 }
+// 暴击概率：基础 12% + 永久改装
+function critChance() {
+  return GAME_CONFIG.crit.chance + (player.critBonus || 0);
+}
 
 /* ==================== HUD ==================== */
 let _lastHudScore = 0;
@@ -16012,8 +16062,11 @@ function startGame(level, opts) {
   // ---- 永久改装 + 三选一模块 ----
   player.dmgMult = 1 + upgradeLv('damage') * 0.07;
   player.wingDmgMult = 1 + upgradeLv('wingman') * 0.08;
-  player.fireRateMult = 1 - upgradeLv('fireRate') * 0.035;
-  player.dashCDMult = 1 - upgradeLv('dash') * 0.04;
+  player.fireRateMult = fireRateMultOf(upgradeLv('fireRate'));
+  player.dashCDMult = dashCooldownMultOf(upgradeLv('dash'));
+  player.critBonus = upgradeLv('crit') * 0.006;
+  player.speedMult = 1 + upgradeLv('speed') * 0.02;
+  player.rateLv = upgradeLv('fireRate');
   player.maxShield = GAME_CONFIG.maxShield + upgradeLv('shield') * 0.3 + (game.module === 1 ? 1 : 0);
   player.shield = player.maxShield;
   if (!keepWingmen && game.module === 0) { acquireWingman(); acquireWingman(); }
@@ -16558,7 +16611,7 @@ function update(dt) {
   // 玩家移动（冲刺中覆盖普通移动）
   const prevPX = player.x, prevPY = player.y;
   // 霜冻地面：站在冰霜区里移动减速，逼迫玩家离开或承受走位劣势
-  const sp = CFG.playerSpeed * frostSlowFactor();
+  const sp = CFG.playerSpeed * frostSlowFactor() * (player.speedMult || 1);
   if (player.dashTime > 0) {
     player.dashTime -= dt;
     player.x += player.dashVX * dt;
@@ -16873,7 +16926,7 @@ function renderHangar() {
     const afford = !maxed && (save.alloy | 0) >= cost;
     const pips = Array.from({ length: def.max }, (_, i) => `<i class="${i < lv ? 'on' : ''}"></i>`).join('');
     const bonus = upgradeBonusText(def, lv);
-    const nextBonus = maxed ? '' : `<span class="next"> → 下一级 <b>${upgradeBonusText(def, lv + 1)}</b></span>`;
+    const nextBonus = maxed ? '' : `<span class="next"><b>${upgradeNextText(def, lv)}</b></span>`;
     return `<div class="hangar-row"><div class="hangar-info"><b>${def.name} <span style="display:inline;color:#7fd7ff">Lv.${lv}/${def.max}</span></b><span>${def.desc}</span>` +
       `<div class="hangar-bonus">当前 <b>${bonus}</b>${nextBonus}</div>` +
       `<div class="hangar-pips">${pips}</div></div>` +
