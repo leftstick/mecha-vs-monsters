@@ -301,7 +301,7 @@
   @keyframes bossFlicker{0%,100%{opacity:1;}48%{opacity:1;}50%{opacity:0.4;}52%{opacity:1;}}
 
   /* Boss血条 */
-  #bossBar{position:fixed;top:calc(62px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:21;width:72%;max-width:360px;display:none;}
+  #bossBar{position:absolute;top:calc(62px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:21;width:clamp(92px,30vw,360px);display:none;}
   #bossBar.show{display:block;}
   #bossBar .name{display:inline-block;padding:1px 12px;border-radius:4px;background:rgba(8,0,0,0.55);
     text-align:center;color:#ff8855;font-size:11px;letter-spacing:3px;margin-bottom:3px;text-shadow:1px 1px 0 #000;}
@@ -319,6 +319,10 @@
   #bossBar.enraged .fill{background:linear-gradient(90deg,#7a0000,#ff1a00,#ffbb00);animation:rageFill .55s ease-in-out infinite alternate;}
   @keyframes rageName{0%,100%{opacity:1;}50%{opacity:0.45;}}
   @keyframes rageFill{from{filter:brightness(1);}to{filter:brightness(1.7);}}
+  @media (max-width:600px){
+    #bossBar{top:calc(8px + env(safe-area-inset-top));width:clamp(92px,30vw,200px);}
+    #bossBar .name{max-width:100%;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:2px;padding:1px 8px;}
+  }
 
   /* 暂停/BGM按钮 */
   #pauseBtn,#bgmBtn{position:fixed;z-index:25;width:34px;height:34px;border-radius:50%;
@@ -400,8 +404,10 @@
       <span class="combo-over" id="hComboOver">OVERLOAD</span>
     </div>
   </div>
+
+  <!-- 中上：Boss 血条（占用左右面板之间的一列，窄屏也不会压字） -->
+  <div id="bossBar"><div class="name" id="bossName">BOSS</div><div class="track"><div class="fill" id="bossFill" style="width:100%"></div><i class="tick t70"></i><i class="tick t35"></i></div></div>
 </div>
-<div id="bossBar"><div class="name" id="bossName">BOSS</div><div class="track"><div class="fill" id="bossFill" style="width:100%"></div><i class="tick t70"></i><i class="tick t35"></i></div></div>
 <button id="pauseBtn">Ⅱ</button>
 <button id="bgmBtn" title="背景音乐">♪</button>
 <div id="touchArea"></div>
@@ -574,6 +580,7 @@ function resize() {
   canvas.style.height = H + 'px';
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   try { if (typeof resizeUI === 'function') resizeUI(); } catch(e) {}
+  try { if (typeof positionBossBar === 'function') positionBossBar(); } catch(e) {}
 }
 resize();
 addEventListener('resize', resize);
@@ -2487,6 +2494,26 @@ function buildBossParts(type, bossHp, size) {
   });
 }
 
+// Boss 血条：窄屏时嵌入左右 HUD 面板之间，避免压住波次/分数文本
+function positionBossBar() {
+  const bar = document.getElementById('bossBar');
+  if (!bar) return;
+  if (innerWidth > 600) {
+    bar.style.left = '';
+    bar.style.width = '';
+    bar.style.transform = '';
+    return;
+  }
+  const l = document.querySelector('.hud-left');
+  const r = document.querySelector('.hud-right');
+  if (!l || !r) return;
+  const left = l.getBoundingClientRect().right + 6;
+  const right = r.getBoundingClientRect().left - 6;
+  bar.style.transform = 'translateX(0)';
+  bar.style.left = Math.round(left) + 'px';
+  bar.style.width = Math.max(72, Math.min(200, Math.round(right - left))) + 'px';
+}
+
 function spawnBoss(type) {
   const cfg = BOSS_TYPES[type];
   const diff = getDifficulty();
@@ -2523,6 +2550,7 @@ function spawnBoss(type) {
   bb.classList.remove('core-open');
   document.getElementById('bossName').textContent = cfg.name;
   bb.classList.add('show');
+  positionBossBar();
 
   // 第12关 虫群之母：生成环绕本体的护卫蜂环（真实碰撞，会替本体挡子弹）
   if (type === 'swarmmother') {
@@ -4999,6 +5027,323 @@ function drawMonster(m) {
 }
 
 /* ==================== Boss 绘制 ==================== */
+// 每个 Boss 的「外轮廓签名」：在身体细节之前铺一层大型剪影。
+// 目的不是加特效，而是让玩家在弹幕里只看形状就能认出是谁。
+function drawBossSilhouette(b, S, themeCol) {
+  const t = b.t || 0;
+  const soft = hexToRgba(themeCol, 0.22);
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  if (b.type === 'voidlord') {
+    // 断环裁决者：两片竖向月牙刃 + 四根辐射长矛
+    for (const side of [-1, 1]) {
+      ctx.fillStyle = 'rgba(12,44,68,0.84)';
+      ctx.strokeStyle = hexToRgba(themeCol, 0.5);
+      ctx.lineWidth = 2.2 * S;
+      ctx.beginPath();
+      ctx.moveTo(side * 54 * S, -98 * S);
+      ctx.quadraticCurveTo(side * 124 * S, -46 * S, side * 88 * S, 40 * S);
+      ctx.quadraticCurveTo(side * 104 * S, -34 * S, side * 40 * S, -86 * S);
+      ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = hexToRgba(themeCol, 0.75);
+      ctx.lineWidth = 1.3 * S;
+      ctx.beginPath();
+      ctx.moveTo(side * 50 * S, -90 * S);
+      ctx.quadraticCurveTo(side * 110 * S, -42 * S, side * 82 * S, 30 * S);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = soft;
+    ctx.lineWidth = 4 * S;
+    for (const a of [0.72, 2.42, 3.86, 5.56]) {
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * 60 * S, Math.sin(a) * 60 * S);
+      ctx.lineTo(Math.cos(a) * 132 * S, Math.sin(a) * 132 * S);
+      ctx.stroke();
+    }
+  } else if (b.type === 'leviathan') {
+    // 鮟鱇巨兽：头下接长躯干与尾鳍
+    ctx.fillStyle = 'rgba(10,56,78,0.86)';
+    ctx.strokeStyle = 'rgba(90,230,255,0.32)';
+    ctx.lineWidth = 2 * S;
+    ctx.beginPath();
+    ctx.moveTo(-38 * S, 6 * S);
+    ctx.quadraticCurveTo(-34 * S, 66 * S, -8 * S, 96 * S);
+    ctx.quadraticCurveTo(0, 104 * S, 8 * S, 96 * S);
+    ctx.quadraticCurveTo(34 * S, 66 * S, 38 * S, 6 * S);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, 88 * S);
+    ctx.quadraticCurveTo(-44 * S, 112 * S, -20 * S, 142 * S);
+    ctx.quadraticCurveTo(0, 120 * S, 20 * S, 142 * S);
+    ctx.quadraticCurveTo(44 * S, 112 * S, 0, 88 * S);
+    ctx.fill(); ctx.stroke();
+  } else if (b.type === 'colossus') {
+    // 沙暴巨像：双肩岩块 + 外扩巨拳 + 双腿
+    for (const side of [-1, 1]) {
+      ctx.fillStyle = 'rgba(78,50,24,0.92)';
+      ctx.strokeStyle = 'rgba(255,170,80,0.3)';
+      ctx.lineWidth = 2 * S;
+      ctx.beginPath();
+      ctx.moveTo(side * 56 * S, -32 * S);
+      ctx.lineTo(side * 88 * S, -40 * S);
+      ctx.lineTo(side * 100 * S, -14 * S);
+      ctx.lineTo(side * 82 * S, 6 * S);
+      ctx.lineTo(side * 54 * S, -2 * S);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = 'rgba(92,60,28,0.97)';
+      ctx.beginPath(); ctx.arc(side * 84 * S, 44 * S, 24 * S, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,210,140,0.28)';
+      ctx.lineWidth = 1.6 * S;
+      for (let k = -1; k <= 1; k++) {
+        ctx.beginPath();
+        ctx.moveTo(side * (76 + k * 5) * S, 34 * S);
+        ctx.lineTo(side * (78 + k * 5) * S, 54 * S);
+        ctx.stroke();
+      }
+      ctx.fillStyle = 'rgba(72,46,22,0.98)';
+      ctx.strokeStyle = 'rgba(255,180,90,0.26)';
+      ctx.lineWidth = 1.8 * S;
+      ctx.fillRect(side * 36 * S - 13 * S, 32 * S, 26 * S, 58 * S);
+      ctx.strokeRect(side * 36 * S - 13 * S, 32 * S, 26 * S, 58 * S);
+      ctx.fillRect(side * 36 * S - 18 * S, 84 * S, 36 * S, 12 * S);
+      ctx.strokeRect(side * 36 * S - 18 * S, 84 * S, 36 * S, 12 * S);
+    }
+  } else if (b.type === 'dragon') {
+    // 机械巨龙：外扩翼膜 + 下垂长尾
+    for (const side of [-1, 1]) {
+      ctx.fillStyle = 'rgba(58,14,10,0.92)';
+      ctx.strokeStyle = 'rgba(255,110,50,0.42)';
+      ctx.lineWidth = 2 * S;
+      ctx.beginPath();
+      ctx.moveTo(side * 18 * S, -10 * S);
+      ctx.lineTo(side * 126 * S, -36 * S);
+      ctx.lineTo(side * 108 * S, 20 * S);
+      ctx.lineTo(side * 72 * S, 46 * S);
+      ctx.lineTo(side * 14 * S, 22 * S);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,150,80,0.32)';
+      ctx.lineWidth = 1.4 * S;
+      for (const [kx, ky] of [[122, -28], [108, 10], [82, 38]]) {
+        ctx.beginPath();
+        ctx.moveTo(side * 24 * S, 4 * S);
+        ctx.lineTo(side * kx * S, ky * S);
+        ctx.stroke();
+      }
+    }
+    ctx.strokeStyle = 'rgba(58,14,10,0.96)';
+    ctx.lineWidth = 14 * S;
+    ctx.beginPath();
+    ctx.moveTo(0, 34 * S);
+    ctx.quadraticCurveTo(28 * S, 74 * S, 6 * S, 116 * S);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(120,36,24,0.9)';
+    ctx.beginPath();
+    ctx.moveTo(6 * S, 112 * S);
+    ctx.lineTo(-20 * S, 140 * S);
+    ctx.lineTo(30 * S, 138 * S);
+    ctx.closePath(); ctx.fill();
+  } else if (b.type === 'guardian') {
+    // 月面守护者：加长双腿 + 肩部天线
+    ctx.fillStyle = 'rgba(58,68,84,0.98)';
+    ctx.strokeStyle = 'rgba(170,210,255,0.34)';
+    ctx.lineWidth = 1.8 * S;
+    for (const side of [-1, 1]) {
+      ctx.fillRect(side * 16 * S - 8 * S, 34 * S, 16 * S, 52 * S);
+      ctx.strokeRect(side * 16 * S - 8 * S, 34 * S, 16 * S, 52 * S);
+      ctx.fillRect(side * 16 * S - 13 * S, 82 * S, 26 * S, 11 * S);
+      ctx.strokeRect(side * 16 * S - 13 * S, 82 * S, 26 * S, 11 * S);
+      ctx.beginPath();
+      ctx.moveTo(side * 48 * S, -20 * S);
+      ctx.lineTo(side * 64 * S, -58 * S);
+      ctx.lineTo(side * 54 * S, -18 * S);
+      ctx.closePath();
+      ctx.fill(); ctx.stroke();
+    }
+  } else if (b.type === 'beastking') {
+    // 百兽之王：落地前爪 + 甩尾
+    ctx.fillStyle = 'rgba(120,72,26,0.94)';
+    ctx.strokeStyle = 'rgba(255,190,80,0.3)';
+    ctx.lineWidth = 1.8 * S;
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.ellipse(side * 50 * S, 54 * S, 19 * S, 14 * S, side * 0.12, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,235,190,0.7)';
+      ctx.lineWidth = 2 * S;
+      for (let k = -1; k <= 1; k++) {
+        ctx.beginPath();
+        ctx.moveTo(side * (46 + k * 4) * S, 64 * S);
+        ctx.lineTo(side * (45 + k * 4) * S, 75 * S);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = 'rgba(255,190,80,0.3)';
+      ctx.lineWidth = 1.8 * S;
+    }
+    ctx.strokeStyle = 'rgba(120,72,26,0.97)';
+    ctx.lineWidth = 12 * S;
+    ctx.beginPath();
+    ctx.moveTo(42 * S, 18 * S);
+    ctx.quadraticCurveTo(96 * S, 28 * S, 108 * S, -10 * S);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(150,95,36,0.95)';
+    ctx.beginPath();
+    ctx.ellipse(108 * S, -10 * S, 11 * S, 8 * S, 0.5, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (b.type === 'vinetitan') {
+    // 藤蔓巨怪：两条藤臂 + 根须，整体从圆花变成高瘦植物
+    for (const side of [-1, 1]) {
+      const sway = Math.sin(t * 1.2 + side) * 6 * S;
+      ctx.strokeStyle = 'rgba(28,86,28,0.95)';
+      ctx.lineWidth = 9 * S;
+      ctx.beginPath();
+      ctx.moveTo(side * 18 * S, 10 * S);
+      ctx.quadraticCurveTo(side * 72 * S, -40 * S + sway, side * 112 * S, 8 * S);
+      ctx.quadraticCurveTo(side * 126 * S, 40 * S, side * 104 * S, 68 * S);
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(160,240,110,0.32)';
+      ctx.lineWidth = 2 * S;
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(90,180,60,0.55)';
+      for (const [lx, ly, la] of [[62, -24, -0.6], [94, 14, 0.5], [108, 48, 1.0]]) {
+        ctx.beginPath();
+        ctx.ellipse(side * lx * S, ly * S + sway * 0.3, 13 * S, 6 * S, side * la, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.strokeStyle = 'rgba(40,70,24,0.9)';
+    ctx.lineWidth = 6 * S;
+    for (const k of [-1, 0, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(k * 12 * S, 34 * S);
+      ctx.quadraticCurveTo(k * 28 * S, 74 * S, k * 46 * S, 104 * S);
+      ctx.stroke();
+    }
+  } else if (b.type === 'kraken') {
+    // 深渊海妖：六条拖到屏幕下方的长触须
+    const tendrils = [-3, -2, -1, 1, 2, 3];
+    for (const i of tendrils) {
+      const sway = Math.sin(t * 1.3 + i * 0.8) * 9 * S;
+      const bx = i * 15 * S;
+      ctx.strokeStyle = 'rgba(36,92,168,0.62)';
+      ctx.lineWidth = 8 * S;
+      ctx.beginPath();
+      ctx.moveTo(bx, 34 * S);
+      ctx.bezierCurveTo(bx + i * 6 * S + sway, 64 * S, bx + i * 44 * S - sway, 92 * S, bx + i * 62 * S + sway * 0.5, 132 * S);
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(130,220,255,0.32)';
+      ctx.lineWidth = 2 * S;
+      ctx.stroke();
+    }
+  } else if (b.type === 'frostqueen') {
+    // 霜核女王：高冠冰刺 + 冰裙
+    ctx.fillStyle = 'rgba(170,240,255,0.5)';
+    ctx.strokeStyle = 'rgba(210,250,255,0.5)';
+    ctx.lineWidth = 1.4 * S;
+    for (let k = -2; k <= 2; k++) {
+      const len = (96 - Math.abs(k) * 12) * S;
+      ctx.beginPath();
+      ctx.moveTo(k * 16 * S - 6 * S, -54 * S);
+      ctx.lineTo(k * 16 * S, -len);
+      ctx.lineTo(k * 16 * S + 6 * S, -54 * S);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(70,160,210,0.30)';
+    ctx.strokeStyle = 'rgba(170,240,255,0.45)';
+    ctx.lineWidth = 1.8 * S;
+    ctx.beginPath();
+    ctx.moveTo(-40 * S, -2 * S);
+    ctx.lineTo(-76 * S, 72 * S);
+    ctx.lineTo(-44 * S, 58 * S);
+    ctx.lineTo(-22 * S, 92 * S);
+    ctx.lineTo(0, 66 * S);
+    ctx.lineTo(22 * S, 92 * S);
+    ctx.lineTo(44 * S, 58 * S);
+    ctx.lineTo(76 * S, 72 * S);
+    ctx.lineTo(40 * S, -2 * S);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  } else if (b.type === 'singularity') {
+    // 终焉之瞳：两条不对称吸积旋臂
+    ctx.globalCompositeOperation = 'lighter';
+    for (const dir of [1, -1]) {
+      ctx.strokeStyle = hexToRgba(themeCol, 0.30);
+      ctx.lineWidth = 9 * S;
+      ctx.beginPath();
+      for (let k = 0; k <= 22; k++) {
+        const a = dir * (k / 22) * 3.6 + t * 0.25 * dir;
+        const r = (42 + k * 4.8) * S;
+        const px = Math.cos(a) * r, py = Math.sin(a) * r * 0.72;
+        if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+  } else if (b.type === 'magnetar') {
+    // 磁极核心：横置双极磁棒 + 上下磁力线
+    ctx.fillStyle = 'rgba(36,20,44,0.94)';
+    ctx.strokeStyle = 'rgba(255,120,150,0.4)';
+    ctx.lineWidth = 2 * S;
+    ctx.beginPath();
+    ctx.moveTo(-108 * S, -13 * S);
+    ctx.lineTo(108 * S, -13 * S);
+    ctx.quadraticCurveTo(121 * S, 0, 108 * S, 13 * S);
+    ctx.lineTo(-108 * S, 13 * S);
+    ctx.quadraticCurveTo(-121 * S, 0, -108 * S, -13 * S);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,70,96,0.85)';
+    ctx.beginPath(); ctx.arc(-104 * S, 0, 17 * S, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(90,140,255,0.85)';
+    ctx.beginPath(); ctx.arc(104 * S, 0, 17 * S, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,90,130,0.2)';
+    ctx.lineWidth = 2 * S;
+    for (const dir of [-1, 1]) {
+      ctx.beginPath();
+      ctx.ellipse(-52 * S, dir * 4 * S, 62 * S, 38 * S, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  } else if (b.type === 'swarmmother') {
+    // 虫群之母：下垂卵囊 + 六足
+    for (const [ex, ey, er] of [[-34, 66, 10], [-12, 84, 11], [12, 84, 11], [34, 66, 10]]) {
+      ctx.fillStyle = 'rgba(120,80,20,0.55)';
+      ctx.strokeStyle = 'rgba(255,220,130,0.6)';
+      ctx.lineWidth = 1.4 * S;
+      ctx.beginPath(); ctx.ellipse(ex * S, ey * S, er * S, er * 1.3 * S, 0, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,240,170,0.75)';
+      ctx.beginPath(); ctx.arc(ex * S, ey * S, 2.2 * S, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.strokeStyle = 'rgba(90,60,20,0.75)';
+    ctx.lineWidth = 3 * S;
+    for (const side of [-1, 1]) {
+      for (let k = 0; k < 3; k++) {
+        ctx.beginPath();
+        ctx.moveTo(side * 34 * S, (10 + k * 14) * S);
+        ctx.quadraticCurveTo(side * 74 * S, (26 + k * 10) * S, side * 88 * S, (48 + k * 12) * S);
+        ctx.stroke();
+      }
+    }
+  } else if (b.type === 'helios') {
+    // 日冕铸炉：十二道长短交错的日冕射线
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = 'rgba(255,150,50,0.20)';
+    for (let k = 0; k < 12; k++) {
+      const a = (k / 12) * Math.PI * 2 + t * 0.12;
+      const inner = 64 * S;
+      const outer = (k % 2 ? 96 : 126) * S;
+      const half = (k % 2 ? 7 : 11) * S;
+      const ca = Math.cos(a), sa = Math.sin(a);
+      ctx.beginPath();
+      ctx.moveTo(ca * inner - sa * half, sa * inner + ca * half);
+      ctx.lineTo(ca * outer, sa * outer);
+      ctx.lineTo(ca * inner + sa * half, sa * inner - ca * half);
+      ctx.closePath(); ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
 function drawBoss(b) {
   ctx.save();
   ctx.translate(b.x, b.y);
@@ -5071,14 +5416,59 @@ function drawBoss(b) {
     helios:    ['rgba(255,220,140,0.36)', 'rgba(255,120,40,0.22)', 'rgba(120,30,0,0)'],
     duality:   ['rgba(225,200,255,0.34)', 'rgba(110,120,255,0.22)', 'rgba(20,8,60,0)'],
   };
+  // 光晕轮廓按 Boss 身份变形：横向巨兽拉宽、纵向植物/女王拉高、双子分成两团。
+  // 不再给所有 Boss 套同一个圆形光斑，否则远看都像同一艘圆飞船。
+  const AURA_SHAPE = {
+    voidlord:   { sx: 1.30, sy: 0.82, ring: true },
+    leviathan:  { sx: 1.55, sy: 0.72, oy: 8 },
+    colossus:   { sx: 1.60, sy: 0.60, oy: 16 },
+    dragon:     { sx: 1.60, sy: 0.90 },
+    guardian:   { sx: 0.86, sy: 1.20 },
+    beastking:  { sx: 1.35, sy: 0.95 },
+    vinetitan:  { sx: 0.78, sy: 1.40 },
+    kraken:     { sx: 1.10, sy: 1.35, oy: 8 },
+    frostqueen: { sx: 0.72, sy: 1.50 },
+    singularity:{ sx: 1.40, sy: 0.85 },
+    magnetar:   { sx: 1.55, sy: 0.62 },
+    swarmmother:{ sx: 1.20, sy: 1.25 },
+    helios:     { sx: 1.05, sy: 1.05, ring: true },
+    duality:    { sx: 1.90, sy: 0.80, twin: true },
+  };
+  const ash = AURA_SHAPE[b.type] || {};
   const auraR = 78 * S;
-  const aura = ctx.createRadialGradient(0, 0, 8*S, 0, 0, auraR);
   const ac = BOSS_AURA[b.type] || ['rgba(255,240,200,0.30)', 'rgba(255,180,80,0.16)', 'rgba(255,120,40,0)'];
-  aura.addColorStop(0, ac[0]);
-  aura.addColorStop(0.45, ac[1]);
-  aura.addColorStop(1, ac[2]);
-  ctx.fillStyle = aura;
-  ctx.beginPath(); ctx.arc(0, 0, auraR, 0, Math.PI*2); ctx.fill();
+  const paintAura = (ox, oy, radius) => {
+    const aura = ctx.createRadialGradient(ox, oy, 8*S, ox, oy, radius);
+    aura.addColorStop(0, ac[0]);
+    aura.addColorStop(0.45, ac[1]);
+    aura.addColorStop(1, ac[2]);
+    ctx.fillStyle = aura;
+    ctx.beginPath(); ctx.arc(ox, oy, radius, 0, Math.PI*2); ctx.fill();
+  };
+  ctx.save();
+  if (ash.twin) {
+    // 双子：两团分离的光晕，中间留出观测链的空隙
+    for (const side of [-1, 1]) paintAura(side * 36 * S, 0, 58 * S);
+  } else {
+    ctx.translate(0, (ash.oy || 0) * S);
+    ctx.scale(ash.sx || 1, ash.sy || 1);
+    paintAura(0, 0, auraR);
+  }
+  ctx.restore();
+  if (ash.ring) {
+    // 星环/日冕：叠两圈倾斜虚线环，强调「环」而不是「球」
+    ctx.save();
+    ctx.strokeStyle = hexToRgba(themeCol, 0.20);
+    ctx.lineWidth = 2.4 * S;
+    ctx.setLineDash([24 * S, 16 * S]);
+    ctx.beginPath(); ctx.ellipse(0, 0, 94 * S, 56 * S, -0.28, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = hexToRgba(themeCol, 0.14);
+    ctx.beginPath(); ctx.ellipse(0, 0, 76 * S, 44 * S, 0.34, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  drawBossSilhouette(b, S, themeCol);
 
   if (b.type === 'voidlord') {
     // 星环裁决者·奥尔特：三层破碎星环旋转环绕 + 中央裁决核心 + 双侧能量翼
@@ -7490,6 +7880,14 @@ function drawBoss(b) {
   }
 
   // ---- 可破坏炮台 / 核心暴露 ----
+  // 部位不再统一是两个大圆舱：有机体缩小并贴近身体，机械体保留外挂感。
+  const PART_SCALE = {
+    leviathan: 0.78, beastking: 0.70, vinetitan: 0.76, kraken: 0.74,
+    swarmmother: 0.68, frostqueen: 0.76, guardian: 0.84, dragon: 0.84,
+    duality: 0.78, singularity: 0.84, magnetar: 0.88, voidlord: 0.94,
+    colossus: 0.92, helios: 0.84,
+  };
+  const partScale = PART_SCALE[b.type] || 0.84;
   if (b.phase === 'fight' && b.parts && b.type !== 'helios') {
     for (const p of b.parts) {
       const px = p.ox * S, py = p.oy * S;
@@ -7512,6 +7910,7 @@ function drawBoss(b) {
       }
       ctx.save();
       ctx.translate(px, py);
+      ctx.scale(partScale, partScale);
       // 部位外形按 Boss 身份区分：同一套碰撞与血量规则，读图就能认出是谁的部件
       const style = p.style || 'cannon';
       ctx.fillStyle = '#2a1a14';
@@ -7623,14 +8022,17 @@ function drawBoss(b) {
         ctx.beginPath(); ctx.arc(18 * S, 0, 3 * S, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
       }
-      // 核心灯 + 剩余血量环
-      ctx.fillStyle = p.flash > 0 ? '#ffffff' : '#ff8844';
-      ctx.beginPath(); ctx.arc(0, 0, 4.5 * S, 0, Math.PI * 2); ctx.fill();
+      // 核心灯 + 剩余血量环：跟 Boss 主题色走，满血时只留一圈很淡的轮廓
+      ctx.fillStyle = p.flash > 0 ? '#ffffff' : themeCol;
+      ctx.shadowColor = themeCol; ctx.shadowBlur = 8 * S;
+      ctx.beginPath(); ctx.arc(0, 0, 3.6 * S, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
       const rat = clamp(p.hp / p.maxHp, 0, 1);
-      ctx.strokeStyle = 'rgba(255,180,90,0.85)';
-      ctx.lineWidth = 2.2 * S;
+      const full = rat >= 0.999;
+      ctx.strokeStyle = hexToRgba(themeCol, full ? 0.24 : 0.9);
+      ctx.lineWidth = (full ? 1.1 : 1.9) * S;
       ctx.beginPath();
-      ctx.arc(0, 0, 16 * S, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * rat);
+      ctx.arc(0, 0, 15 * S, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * rat);
       ctx.stroke();
       ctx.restore();
     }
@@ -11270,8 +11672,8 @@ const BOSS_MOTION = {
 };
 
 function bossMotionTarget(b, mv, station) {
-  // 统一下移 20px：避免 Boss 上半身被顶部血条压住，轮廓能完整露出来
-  const baseY = (station.y == null ? 104 : station.y) + 20;
+  // 统一下移 56px：顶部血条压在脸/冠饰上的话，所有 Boss 都只剩「圆身子 + 两个侧舱」
+  const baseY = (station.y == null ? 104 : station.y) + 56;
   const alt = ((b.motionStep = (b.motionStep || 0) + 1) & 1) === 0;
   b.motionPhase = (b.motionPhase || 0) + (mv.step || 1);
   const ph = b.motionPhase;
@@ -11396,7 +11798,7 @@ function updateBossScript(b, dt) {
   if (b.scriptPause > 0) {
     b.scriptPause -= dt;
     b.x += (W / 2 - b.x) * Math.min(1, 2.4 * dt);
-    b.y += (128 - b.y) * Math.min(1, 2.4 * dt);
+    b.y += (160 - b.y) * Math.min(1, 2.4 * dt);
     return;
   }
 
