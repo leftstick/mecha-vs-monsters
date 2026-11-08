@@ -145,6 +145,14 @@
   .lv .medals i.on{background:#ffd23f;border-color:#ffe89a;box-shadow:0 0 6px rgba(255,180,40,0.85);}
   .lv.locked{opacity:0.4;border-color:#333;cursor:not-allowed;}
   .lv.locked .num{color:#666;text-shadow:none;}
+  /* 难度选择 */
+  .diff-select{display:flex;gap:8px;justify-content:center;margin-bottom:8px;flex-wrap:wrap;}
+  .diff-select .opt-btn{padding:7px 16px;font-size:13px;border-radius:8px;}
+  .diff-desc{font-size:11px;color:#6fa8c8;text-align:center;margin-bottom:12px;min-height:16px;line-height:1.5;}
+  .diff-desc b{color:#ffd23f;}
+  /* 关卡星级：★★☆☆ */
+  .lv .stars{font-size:11px;letter-spacing:1px;color:#ffd23f;margin-top:4px;text-shadow:0 0 6px rgba(255,190,60,0.55);}
+  .lv .stars .off{color:#25384a;text-shadow:none;}
 
   /* 任务简报 */
   .brief-card{background:linear-gradient(180deg,rgba(10,18,30,0.95),rgba(5,9,16,0.97));
@@ -235,6 +243,12 @@
   .medal.on b{color:#3a2500;background:radial-gradient(circle at 35% 30%,#fff3b0,#ffc02e 55%,#b87400);
     border-color:#ffe89a;box-shadow:0 0 14px rgba(255,190,60,0.7);}
   .medal.on em{color:#ffd88a;}
+  /* 结算星级：通关/精准/无伤/救援各 1 星 */
+  .star-row{display:flex;gap:7px;justify-content:center;margin:8px 0 4px;
+    font-size:clamp(18px,5vw,24px);color:#ffd23f;text-shadow:0 0 10px rgba(255,190,60,0.7);}
+  .star-row .off{color:#25384a;text-shadow:none;}
+  .ov-diff{font-size:11px;color:#6fa8c8;margin:2px 0 6px;letter-spacing:1px;}
+  .ov-diff b{color:#ffd23f;}
   .hint{font-size:11px;color:#5a7a9a;margin-top:18px;line-height:1.7;}
 
   /* Boss 预告 */
@@ -314,6 +328,10 @@
       <span class="hud-label">SOS</span>
       <span class="hud-val" id="hRescue">0/2</span>
     </div>
+    <div class="hud-row weapon-row" id="bombRow" style="opacity:0">
+      <span class="hud-label">BOMB</span>
+      <span class="hud-val" id="hBomb">0/2</span>
+    </div>
   </div>
 
   <!-- 中上：血量 + 护盾 进度条 -->
@@ -353,7 +371,7 @@
 
 <!-- 手柄按键图例（仅手柄连接时显示） -->
 <div id="gpLegend" style="display:none;position:fixed;bottom:calc(12px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.55);color:#9ff;padding:6px 14px;border-radius:10px;font-size:12px;z-index:50;pointer-events:none;white-space:nowrap;border:1px solid rgba(0,255,255,0.25);">
-  🎮 移动:摇杆/十字键 · 射击:<b style="color:#0f0">A</b>/<b style="color:#0f0">X</b> · 冲刺:<b style="color:#f80">B</b> · 磁极:<b style="color:#58f">Y</b> · 暂停:Start
+  🎮 移动:摇杆/十字键 · 射击:<b style="color:#0f0">A</b>/<b style="color:#0f0">X</b>/<b style="color:#0f0">RT</b> · 冲刺:<b style="color:#f80">B</b> · 炸弹:<b style="color:#f66">RB</b> · 磁极:<b style="color:#58f">Y</b> · 暂停:Start
 </div>
 
 <!-- 标题 -->
@@ -365,7 +383,7 @@
     <button class="btn ghost" id="btnLevel">选择关卡</button>
     <button class="btn ghost" id="btnSettings">操作设置</button>
   </div>
-  <div class="hint">桌面: 方向键/WASD 移动 · 空格 射击<br/>手机: 触摸拖动移动 · 自动射击<br/>第11关: Shift / 手柄 Y / 右侧按钮切换磁极<br/>每关 4 枚勋章: 通关 / 精准 / 无伤 / 救援</div>
+  <div class="hint">桌面: 方向键/WASD 移动 · J/空格 射击 · K 冲刺 · L 炸弹<br/>手机: 触摸拖动移动 · 自动射击 · 右下角 冲刺/炸弹 按钮<br/>第11关: Shift / 手柄 Y / 右侧按钮切换磁极<br/>每关 4 枚勋章: 通关 / 精准 / 无伤 / 救援</div>
 </div>
 
 <!-- 操作设置 -->
@@ -387,6 +405,12 @@
 <!-- 关卡选择 -->
 <div class="ov hidden" id="ovLevel">
   <div class="title" style="font-size:clamp(24px,7vw,48px)">选择关卡</div>
+  <div class="diff-select" id="diffSelect">
+    <button class="opt-btn" data-diff="0">普通</button>
+    <button class="opt-btn" data-diff="1">困难</button>
+    <button class="opt-btn" data-diff="2">噩梦</button>
+  </div>
+  <div class="diff-desc" id="diffDesc"></div>
   <div class="grid" id="lvGrid"></div>
   <button class="btn ghost" id="btnBack" style="margin-top:20px">返回</button>
 </div>
@@ -425,8 +449,10 @@
     <div class="title" id="overTitle" style="font-size:clamp(26px,8vw,56px)">胜利!</div>
     <div class="new-record" id="newRecord" style="display:none">★ 新 纪 录 ★</div>
     <div class="rank" id="rank">S</div>
+    <div class="star-row" id="starRow"></div>
     <div class="medal-row" id="medalRow"></div>
     <div class="ov-stat">关卡 <b id="ovLv">1</b> · 得分 <b id="ovSc">0</b></div>
+    <div class="ov-diff" id="ovDiff"></div>
     <div class="ov-stat">消灭怪兽 <b id="ovKill">0</b> · 命中率 <b id="ovHit">0%</b></div>
     <div class="ov-stat">救援 <b id="ovRescue">0/0</b> · 受击 <b id="ovHitTaken">0</b></div>
     <div class="over-btns">
@@ -536,9 +562,42 @@ const LEVEL_BALANCE = [
   { enemySpeed: 1.42, enemyFire: 1.28, enemyBulletSpeed: 252, trickle: 1.32, bossRate: 1.22, maxBullets: 144 },
   { enemySpeed: 1.46, enemyFire: 1.30, enemyBulletSpeed: 256, trickle: 1.34, bossRate: 1.24, maxBullets: 150 },
 ];
+
+/* ==================== 难度分层 ==================== */
+// 难度只做温和的数值放大，主要压力仍来自关卡机制与读招。
+// 得分倍率用于补偿高难度的时间成本。
+const DIFFICULTIES = [
+  { id: 0, name: '普通', short: 'NORMAL', color: '#00e5ff',
+    desc: '标准难度，适合首次通关', enemySpeed: 1.00, enemyFire: 1.00,
+    bulletSpeed: 1.00, bossHp: 1.00, bossRate: 1.00, maxBullets: 1.00, scoreMult: 1.00 },
+  { id: 1, name: '困难', short: 'HARD', color: '#ffb347',
+    desc: '弹速与射速提升，Boss 更耐打', enemySpeed: 1.04, enemyFire: 1.08,
+    bulletSpeed: 1.06, bossHp: 1.12, bossRate: 1.06, maxBullets: 1.05, scoreMult: 1.25 },
+  { id: 2, name: '噩梦', short: 'NIGHTMARE', color: '#ff5566',
+    desc: '高压弹幕，只有一条命的空间', enemySpeed: 1.08, enemyFire: 1.15,
+    bulletSpeed: 1.12, bossHp: 1.25, bossRate: 1.12, maxBullets: 1.10, scoreMult: 1.60 },
+];
+function getDifficulty(d) {
+  const i = clamp(d === undefined ? (game.difficulty | 0) : (d | 0), 0, DIFFICULTIES.length - 1);
+  return DIFFICULTIES[i];
+}
+let _balanceCache = { key: '', val: null };
 function getBalance() {
   const i = clamp(game.level | 0, 0, LEVEL_BALANCE.length - 1);
-  return LEVEL_BALANCE[i];
+  const diff = getDifficulty();
+  const key = i + ':' + diff.id;
+  if (_balanceCache.key === key) return _balanceCache.val;
+  const b = LEVEL_BALANCE[i];
+  const val = {
+    enemySpeed: b.enemySpeed * diff.enemySpeed,
+    enemyFire: b.enemyFire * diff.enemyFire,
+    enemyBulletSpeed: Math.min(300, b.enemyBulletSpeed * diff.bulletSpeed),
+    trickle: b.trickle,
+    bossRate: b.bossRate * diff.bossRate,
+    maxBullets: Math.min(180, Math.round(b.maxBullets * diff.maxBullets)),
+  };
+  _balanceCache = { key, val };
+  return val;
 }
 
 /* ==================== 战斗手感参数 ==================== */
@@ -715,6 +774,9 @@ const GAME_CONFIG = {
     color: '#8a7a6a',     // 碎片颜色（金属残片）
   },
 };
+
+// 清屏炸弹库存上限：拾取不再自动释放，由玩家选择时机
+const BOMB_MAX = 2;
 
 /* ==================== 美术统一配置 GAME_ART_CONFIG ====================
  * 仅管理视觉渲染参数与开关，不影响任何玩法数值。
@@ -910,11 +972,20 @@ function loadSave() {
             if (Number.isFinite(n)) medals[k] = Math.max(0, Math.min(15, Math.floor(n)));
           }
         }
-        return { v: 1, unlocked, bestScores, medals };
+        // 星级按「关卡_难度」存 0-4 星；旧存档没有该字段时默认空
+        const stars = {};
+        if (data.stars && typeof data.stars === 'object' && !Array.isArray(data.stars)) {
+          for (const [k, v] of Object.entries(data.stars)) {
+            const n = Number(v);
+            if (Number.isFinite(n)) stars[k] = Math.max(0, Math.min(4, Math.floor(n)));
+          }
+        }
+        const difficulty = Math.max(0, Math.min(DIFFICULTIES.length - 1, Math.floor(Number(data.difficulty)) || 0));
+        return { v: 1, unlocked, bestScores, medals, stars, difficulty };
       }
     }
   } catch(e) {}
-  return { v: 1, unlocked: 1, bestScores: {}, medals: {} }; // 默认解锁第 1 关
+  return { v: 1, unlocked: 1, bestScores: {}, medals: {}, stars: {}, difficulty: 0 }; // 默认解锁第 1 关
 }
 function saveSave(data) {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch(e) {}
@@ -924,11 +995,36 @@ function unlockLevel(idx) {
   const next = Math.min(LEVELS.length, idx + 1);
   if (next > save.unlocked) { save.unlocked = next; saveSave(save); }
 }
-function recordBest(idx, score) {
+function recordBest(idx, score, diff) {
   // 默认值为 0；saveSave 内部已 try-catch，存储禁用时静默降级不报错
-  const cur = save.bestScores[idx] || 0;
+  const key = progressKey(idx, diff);
+  const cur = (save.bestScores && save.bestScores[key]) || 0;
   if (score > cur) {
-    save.bestScores[idx] = score;
+    if (!save.bestScores || typeof save.bestScores !== 'object') save.bestScores = {};
+    save.bestScores[key] = score;
+    saveSave(save);
+  }
+}
+
+/* ==================== 难度进度键 ==================== */
+// 普通难度沿用旧存档的纯关卡键，困难/噩梦用「关卡_难度」，保证旧存档可直接读取。
+function progressKey(idx, diff) {
+  const d = clamp(diff === undefined ? (game.difficulty | 0) : (diff | 0), 0, DIFFICULTIES.length - 1);
+  return d === 0 ? String(idx) : idx + '_' + d;
+}
+function getBestScore(idx, diff) {
+  return ((save.bestScores && save.bestScores[progressKey(idx, diff)]) | 0);
+}
+function getStars(idx, diff) {
+  return ((save.stars && save.stars[progressKey(idx, diff)]) | 0);
+}
+function recordStars(idx, diff, n) {
+  const val = clamp(n | 0, 0, 4);
+  const key = progressKey(idx, diff);
+  const cur = getStars(idx, diff);
+  if (val > cur) {
+    if (!save.stars || typeof save.stars !== 'object') save.stars = {};
+    save.stars[key] = val;
     saveSave(save);
   }
 }
@@ -942,8 +1038,8 @@ const MEDAL_META = [
   { bit: MEDAL.FLAWLESS, icon: '韧', label: '无伤' },
   { bit: MEDAL.RESCUE,   icon: '救', label: '救援' },
 ];
-function getMedalMask(idx) {
-  return (save.medals && save.medals[idx]) | 0;
+function getMedalMask(idx, diff) {
+  return ((save.medals && save.medals[progressKey(idx, diff)]) | 0);
 }
 // 单局达成情况；救援勋章要求本关确实存在救援目标且全部救回
 function computeMedalMask(win, hitRate) {
@@ -954,17 +1050,30 @@ function computeMedalMask(win, hitRate) {
   if (game.rescueTotal > 0 && game.rescued >= game.rescueTotal) mask |= MEDAL.RESCUE;
   return mask;
 }
-function mergeMedals(idx, mask) {
+function mergeMedals(idx, mask, diff) {
   if (!mask) return;
   if (!save.medals || typeof save.medals !== 'object') save.medals = {};
-  save.medals[idx] = (getMedalMask(idx) | mask) & 15;
+  const key = progressKey(idx, diff);
+  save.medals[key] = (getMedalMask(idx, diff) | mask) & 15;
   saveSave(save);
+}
+function starCount(mask) {
+  let n = 0;
+  for (const m of MEDAL_META) if (mask & m.bit) n++;
+  return n;
 }
 function renderMedalRow(mask) {
   const row = document.getElementById('medalRow');
   if (!row) return;
   row.innerHTML = MEDAL_META.map(m =>
     `<div class="medal ${mask & m.bit ? 'on' : ''}" title="${m.label}"><b>${m.icon}</b><em>${m.label}</em></div>`
+  ).join('');
+}
+function renderStarRow(n) {
+  const row = document.getElementById('starRow');
+  if (!row) return;
+  row.innerHTML = [0, 1, 2, 3].map(i =>
+    `<span class="${i < n ? '' : 'off'}">★</span>`
   ).join('');
 }
 
@@ -998,6 +1107,7 @@ function saveRunSnapshot() {
     const snap = {
       v: 1,
       level: game.level,
+      difficulty: game.difficulty,
       score: game.score,
       kills: game.kills,
       shots: game.shots,
@@ -1008,6 +1118,7 @@ function saveRunSnapshot() {
       shield: player.shield,
       weapon: player.weapon,
       weaponTime: player.weaponTime,
+      bombs: player.bombs,
       polarity: player.polarity,
       wingmen: player.wingmen.map(w => ({ side: w.side, slot: w.slot, hp: w.hp, maxHp: w.maxHp })),
       pity: game.powerupPity,
@@ -1041,6 +1152,7 @@ document.addEventListener('visibilitychange', () => {
 let game = {
   state: 'title', // title/level/playing/pause/over
   level: 0,
+  difficulty: 0, // 0 普通 / 1 困难 / 2 噩梦
   score: 0,
   kills: 0,
   shots: 0,
@@ -1107,6 +1219,9 @@ let player = {
   dashCD: 0,     // 冲刺冷却
   dashVX: 0,     // 冲刺速度X
   dashVY: 0,     // 冲刺速度Y
+  lastDX: 0,     // 上一帧实际位移，用于触屏冲刺方向
+  lastDY: 0,
+  bombs: 0,      // 清屏炸弹库存（手动释放）
   polarity: 0,   // 磁极（第11关）：0=红⊕ / 1=蓝⊖
   polarityLock: 0, // 磁极切换锁定（秒），EMP 强制反转后短暂禁用
   polarityFlash: 0, // 切换高光计时（纯视觉）
@@ -1129,7 +1244,10 @@ function mergeInput() {
 // 手柄状态
 let gamepadConnected = false;
 let gamepadPrevButtons = []; // 上一帧按键状态，用于边沿检测
-let inputDash = false; // B键冲刺请求（边沿触发，消费后置false）
+let inputDash = false; // 冲刺请求（键盘 K / 手柄 B / 触摸按钮，边沿触发）
+let inputBomb = false; // 炸弹释放请求（键盘 L / 手柄 RB / 触摸按钮，边沿触发）
+let dashKeyDown = false; // K 键是否处于按下（边沿检测）
+let bombKeyDown = false; // L 键是否处于按下（边沿检测）
 let inputPolarity = false; // 磁极切换请求（键盘 Shift / 手柄 Y / 触摸按钮，边沿触发）
 let polarityKeyDown = false; // Shift 键是否处于按下（用于边沿检测，避免长按连续切换）
 // 手柄菜单导航
@@ -1266,6 +1384,10 @@ function pollGamepad() {
   if (game.state === 'playing' && isPressed(1) && !wasPressed(1)) {
     inputDash = true;
   }
+  // RB键(5) 炸弹 — 仅游戏中按下瞬间触发
+  if (game.state === 'playing' && isPressed(5) && !wasPressed(5)) {
+    inputBomb = true;
+  }
   // Y键(3) 磁极切换 — 仅游戏中按下瞬间触发（第11关）
   if (game.state === 'playing' && isPressed(3) && !wasPressed(3)) {
     inputPolarity = true;
@@ -1335,6 +1457,9 @@ addEventListener('keydown', e => {
     if (k==='arrowup'||k==='w') kbInput.up=true;
     if (k==='arrowdown'||k==='s') kbInput.down=true;
     if (k===' '||k==='j') kbInput.shoot = true;
+    // 冲刺（K）与炸弹（L）：边沿触发，长按不重复
+    if (k==='k' && !dashKeyDown) { dashKeyDown = true; inputDash = true; }
+    if (k==='l' && !bombKeyDown) { bombKeyDown = true; inputBomb = true; }
     // 磁极切换（第11关）：Shift 边沿触发
     if (k==='shift' && !polarityKeyDown) { polarityKeyDown = true; inputPolarity = true; }
   }
@@ -1348,6 +1473,8 @@ addEventListener('keyup', e => {
   if (k==='arrowup'||k==='w') kbInput.up=false;
   if (k==='arrowdown'||k==='s') kbInput.down=false;
   if (k===' '||k==='j') kbInput.shoot = false;
+  if (k==='k') dashKeyDown = false;
+  if (k==='l') bombKeyDown = false;
   if (k==='shift') polarityKeyDown = false;
 });
 
@@ -1359,6 +1486,9 @@ const uiCtx = uiCv.getContext('2d');
 // 摇杆状态
 let stick = { active:false, id:null, cx:0, cy:0, dx:0, dy:0 };
 let shootBtn = { active:false, id:null, pressed:false };
+// 冲刺 / 炸弹按钮：拖拽与摇杆模式都可用，右下拇指区
+let dashBtn = { cx:0, cy:0, r:25, flash:0 };
+let bombBtn = { cx:0, cy:0, r:25, flash:0 };
 // 磁极切换按钮（第11关，触摸操作；同时兼容拖拽/摇杆两种模式）
 let polarBtn = { cx:0, cy:0, r:26, flash:0 };
 let touchActive = false, touchId = null;
@@ -1372,6 +1502,13 @@ function resizeUI() {
   // 射击按钮中心：右下角
   shootBtn.cx = W - tc.shootBtnMargin - tc.shootBtnSize/2;
   shootBtn.cy = H - tc.shootBtnMargin - tc.shootBtnSize/2;
+  // 冲刺 / 炸弹按钮：射击键左侧的 2×2 拇指区
+  dashBtn.r = 25;
+  dashBtn.cx = shootBtn.cx - 64;
+  dashBtn.cy = shootBtn.cy - 54;
+  bombBtn.r = 25;
+  bombBtn.cx = shootBtn.cx - 64;
+  bombBtn.cy = shootBtn.cy + 26;
   // 磁极按钮：射击按钮正上方，拇指可自然上移触发
   polarBtn.cx = W - tc.shootBtnMargin - tc.shootBtnSize/2;
   polarBtn.cy = H - tc.shootBtnMargin - tc.shootBtnSize - 46;
@@ -1391,6 +1528,23 @@ ta.addEventListener('pointerdown', e => {
     vibrateGamepad(0.12, 30);
     e.preventDefault();
     return;
+  }
+  // 冲刺 / 炸弹按钮：两种触控模式都优先命中（仅触屏设备，与绘制条件一致）
+  if (actionButtonsVisible()) {
+    if (Math.hypot(e.clientX - bombBtn.cx, e.clientY - bombBtn.cy) <= bombBtn.r + 16) {
+      inputBomb = true;
+      bombBtn.flash = 0.35;
+      vibrateGamepad(0.16, 40);
+      e.preventDefault();
+      return;
+    }
+    if (Math.hypot(e.clientX - dashBtn.cx, e.clientY - dashBtn.cy) <= dashBtn.r + 16) {
+      inputDash = true;
+      dashBtn.flash = 0.35;
+      vibrateGamepad(0.14, 35);
+      e.preventDefault();
+      return;
+    }
   }
   if (GAME_CONFIG.touch.mode === 'joystick') {
     // 摇杆模式：判断点在摇杆区还是射击按钮区
@@ -1835,6 +1989,63 @@ function drawPolarityButton() {
   ctx.restore();
 }
 
+// 冲刺 / 炸弹触控按钮是否可用：绘制与命中检测共用同一条件，
+// 避免桌面端鼠标在右下角点到不可见的隐形热区
+function actionButtonsVisible() {
+  return IS_MOBILE_DEVICE || (navigator.maxTouchPoints || 0) > 0;
+}
+
+// 冲刺 / 炸弹触控按钮：拖拽与摇杆模式共用，显示冷却与库存
+function drawActionButtons() {
+  if (game.state !== 'playing') return;
+  if (!actionButtonsVisible()) return;
+  if (dashBtn.flash > 0) dashBtn.flash = Math.max(0, dashBtn.flash - 0.03);
+  if (bombBtn.flash > 0) bombBtn.flash = Math.max(0, bombBtn.flash - 0.03);
+
+  const drawBtn = (btn, label, color, ready, ringPct, sub) => {
+    ctx.save();
+    ctx.translate(btn.cx, btn.cy);
+    ctx.globalAlpha = ready ? 0.94 : 0.45;
+    // 外环 + 冷却进度
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 10 + (btn.flash > 0 ? 16 : 0);
+    ctx.beginPath(); ctx.arc(0, 0, btn.r, 0, Math.PI * 2); ctx.stroke();
+    ctx.shadowBlur = 0;
+    if (ringPct < 1) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, btn.r + 4, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * ringPct);
+      ctx.stroke();
+    }
+    // 内盘
+    const g = ctx.createRadialGradient(0, 0, 1, 0, 0, btn.r);
+    g.addColorStop(0, hexToRgba(color, 0.35));
+    g.addColorStop(1, 'rgba(4,10,22,0.82)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0, 0, btn.r - 2.5, 0, Math.PI * 2); ctx.fill();
+    // 文字
+    ctx.fillStyle = ready ? '#fff' : 'rgba(200,220,235,0.7)';
+    ctx.font = '900 ' + Math.round(btn.r * 0.82) + 'px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, 0, 1);
+    if (sub) {
+      ctx.fillStyle = 'rgba(220,240,255,0.9)';
+      ctx.font = '700 9px monospace';
+      ctx.fillText(sub, 0, btn.r + 11);
+    }
+    ctx.restore();
+  };
+
+  const dashPct = player.dashCD > 0 ? 1 - clamp(player.dashCD / 2.0, 0, 1) : 1;
+  drawBtn(dashBtn, '冲', '#00e5ff', player.dashCD <= 0, dashPct, '冲刺');
+  const bombReady = player.bombs > 0;
+  drawBtn(bombBtn, '弹', '#ff4d6d', bombReady, 1, player.bombs + '/' + BOMB_MAX);
+}
+
 document.getElementById('touchArea').style.display = 'block';
 resizeUI();
 
@@ -1935,9 +2146,11 @@ function spawnWave(wave) {
 
 function spawnBoss(type) {
   const cfg = BOSS_TYPES[type];
+  const diff = getDifficulty();
+  const bossHp = Math.round(cfg.hp * diff.bossHp);
   game.boss = {
     type, x: W / 2, y: -150,
-    hp: cfg.hp, maxHp: cfg.hp,
+    hp: bossHp, maxHp: bossHp,
     size: cfg.size, score: cfg.score, name: cfg.name,
     t: 0, shootCD: 1.8, phase: 'enter',
     atkPhase: 0, atkTimer: 0, charging: false, chargeX: 0, chargeY: 0,
@@ -1945,8 +2158,8 @@ function spawnBoss(type) {
     vx: 0, vy: 0, shootAlt: 0,
     // 可破坏部位：左右炮台，存活时独立索敌射击；全部摧毁后本体核心暴露
     parts: [
-      { ox: -58, oy: 6, hp: Math.max(5, Math.round(cfg.hp * 0.06)), maxHp: Math.max(5, Math.round(cfg.hp * 0.06)), r: 16 * (cfg.size / 5), cd: 1.6, flash: 0, dead: false },
-      { ox: 58, oy: 6, hp: Math.max(5, Math.round(cfg.hp * 0.06)), maxHp: Math.max(5, Math.round(cfg.hp * 0.06)), r: 16 * (cfg.size / 5), cd: 2.1, flash: 0, dead: false },
+      { ox: -58, oy: 6, hp: Math.max(5, Math.round(bossHp * 0.06)), maxHp: Math.max(5, Math.round(bossHp * 0.06)), r: 16 * (cfg.size / 5), cd: 1.6, flash: 0, dead: false },
+      { ox: 58, oy: 6, hp: Math.max(5, Math.round(bossHp * 0.06)), maxHp: Math.max(5, Math.round(bossHp * 0.06)), r: 16 * (cfg.size / 5), cd: 2.1, flash: 0, dead: false },
     ],
     coreOpen: false,
   };
@@ -2545,7 +2758,7 @@ function triggerBossIntro(type) {
     const cfg = BOSS_TYPES[type];
     document.getElementById('bossIntroName').textContent = cfg.name;
     document.getElementById('bossIntroDesc').textContent = cfg.desc;
-    document.getElementById('bossIntroHP').textContent = cfg.hp;
+    document.getElementById('bossIntroHP').textContent = Math.round(cfg.hp * getDifficulty().bossHp);
     document.getElementById('bossIntroLv').textContent = '第 ' + (game.level + 1) + ' 关 · ' + LEVELS[game.level].name;
     // 先显示 overlay，再画头像（即使头像失败也能看到预告界面）
     document.getElementById('ovBossIntro').classList.remove('hidden');
@@ -7659,11 +7872,39 @@ function drawPowerups() {
   }
 }
 function applyPowerup(type) {
-  if (type === 'bomb') { triggerLaserWall('bomb'); return; }
+  if (type === 'bomb') {
+    if (player.bombs < BOMB_MAX) {
+      player.bombs++;
+      addFloatText(player.x, player.y - 26, '炸弹 +1 (' + player.bombs + '/' + BOMB_MAX + ')', true);
+      addShockwave(player.x, player.y, '#ff4d6d', 42, 0.35, 3);
+      sfx('powerup');
+    } else {
+      // 库存已满：转化为分数，避免玩家觉得白捡
+      game.score += 300;
+      addFloatText(player.x, player.y - 26, '炸弹已满 +300', false);
+      sfx('powerup');
+    }
+    return;
+  }
   if (type === 'wingman') { acquireWingman(); return; }
   player.weapon = type;
   player.weaponTime = 10; // 持续 10 秒
   flashWeapon();
+}
+
+// 手动释放炸弹：库存 -1，触发全屏激光墙
+function useBomb() {
+  if (game.state !== 'playing') return false;
+  if (game.laserWall && game.laserWall.t < game.laserWall.dur) return false;
+  if (player.bombs <= 0) {
+    addFloatText(player.x, player.y - 26, '没有炸弹', false);
+    sfx('hit');
+    return false;
+  }
+  player.bombs--;
+  bombBtn.flash = 0.35;
+  triggerLaserWall('bomb');
+  return true;
 }
 
 /* ==================== 清屏激光墙 ==================== */
@@ -11314,6 +11555,7 @@ function getComboMult() {
 let _lastHudScore = 0;
 let _lastHudWave = '';
 let _lastHudRescue = '';
+let _lastHudBomb = '';
 let _lastScoreBounceAt = 0;
 const _reduceMotion = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
 // HUD 元素缓存：updateHUD 每帧调用，避免重复查询 DOM 触发样式计算
@@ -11417,6 +11659,21 @@ function updateHUD() {
     rescueRow.classList.remove('rescue-alert');
   }
 
+  // 炸弹库存：有库存时显示，提醒玩家可手动释放
+  const bombRow = hudEl('bombRow');
+  if (player.bombs > 0) {
+    const bTxt = player.bombs + '/' + BOMB_MAX;
+    if (bTxt !== _lastHudBomb) {
+      _lastHudBomb = bTxt;
+      const bEl = hudEl('hBomb');
+      bEl.textContent = bTxt;
+      bEl.style.color = '#ff8899';
+    }
+    bombRow.style.opacity = '1';
+  } else {
+    bombRow.style.opacity = '0';
+  }
+
   // 连击显示：仅 combo >= 2 时显示；>=5 放大+外发光；>=10 切换警示橙光
   const comboRow = hudEl('comboRow');
   const hCombo = hudEl('hCombo');
@@ -11483,7 +11740,12 @@ function floatScore(x, y, text) {
 function startGame(level, opts) {
   initAudio(); // 覆盖关卡选择/下一关等不经过标题页的开局路径
   const keepWingmen = !!(opts && opts.keepWingmen);
+  const diff = clamp(
+    (opts && opts.difficulty != null) ? (opts.difficulty | 0) : (save.difficulty | 0),
+    0, DIFFICULTIES.length - 1
+  );
   game.level = level;
+  game.difficulty = diff;
   game.score = 0; game.kills = 0; game.shots = 0; game.hits = 0;
   game.time = 0; game.waveIdx = 0;
   game.monsters = []; game.bullets = []; game.enemyBullets = []; game.particles = [];
@@ -11503,7 +11765,11 @@ function startGame(level, opts) {
   player.hp = CFG.maxHP; player.shield = GAME_CONFIG.maxShield; player.shieldRegenTimer = 0; player.invuln = 0; player.fireCD = 0;
   player.weapon = 'normal'; player.weaponTime = 0;
   player.dashTime = 0; player.dashCD = 0; player.dashVX = 0; player.dashVY = 0;
+  player.lastDX = 0; player.lastDY = 0;
   player.polarity = 0; player.polarityLock = 0; player.polarityFlash = 0;
+  // 炸弹库存：新开一局清零；连续闯关时保留（与僚机一致）
+  if (!keepWingmen) player.bombs = 0;
+  else player.bombs = clamp(player.bombs | 0, 0, BOMB_MAX);
   // 僚机：默认清空；从“下一关”进入时保留存活僚机与剩余血量
   if (!keepWingmen) player.wingmen = [];
   else player.wingmen = player.wingmen.filter(w => w.hp > 0);
@@ -11531,8 +11797,9 @@ function resumeGame(snap) {
   if (!snap) { startGame(0); return; }
   const lvIdx = clamp(snap.level | 0, 0, LEVELS.length - 1);
   const lv = LEVELS[lvIdx];
+  const snapDiff = clamp(snap.difficulty | 0, 0, DIFFICULTIES.length - 1);
   // 先用 startGame 建立干净的关卡初始态（星空、HUD、状态切换等）
-  startGame(lvIdx);
+  startGame(lvIdx, { difficulty: snapDiff });
   // 还原累计统计
   game.score = Math.max(0, snap.score | 0);
   game.kills = Math.max(0, snap.kills | 0);
@@ -11553,6 +11820,9 @@ function resumeGame(snap) {
   }
   // 第11关的磁极状态也需要续上，否则续玩后与弹幕颜色对不上
   player.polarity = snap.polarity === 1 ? 1 : 0;
+  // 炸弹库存与冲刺朝向
+  player.bombs = clamp(snap.bombs | 0, 0, BOMB_MAX);
+  player.lastDX = 0; player.lastDY = 0;
   // 还原宝箱保底计数
   game.powerupPity = clamp(snap.pity | 0, 0, POWERUP_PITY_LIMIT);
   // 还原救援进度（旧快照没有该字段时按 0 处理，不会误发救援目标）
@@ -11603,7 +11873,8 @@ function resumeSummary(snap) {
   const lv = LEVELS[lvIdx];
   const total = lv.waves.length;
   const stage = snap.bossActive ? 'BOSS 战' : `波次 ${Math.min(snap.waveIdx | 0, total)}/${total}`;
-  return `第 ${lvIdx + 1} 关 · ${lv.name} · ${stage} · 得分 ${(snap.score | 0).toLocaleString()}`;
+  const diffName = DIFFICULTIES[clamp(snap.difficulty | 0, 0, DIFFICULTIES.length - 1)].name;
+  return `第 ${lvIdx + 1} 关 · ${lv.name} · ${diffName} · ${stage} · 得分 ${(snap.score | 0).toLocaleString()}`;
 }
 
 // Boss战失败后重试：直接重开Boss战，跳过小怪波次，保留当前分数
@@ -11632,7 +11903,9 @@ function retryBoss() {
   player.hp = CFG.maxHP; player.shield = GAME_CONFIG.maxShield; player.shieldRegenTimer = 0; player.invuln = 1.5; player.fireCD = 0;
   player.weapon = 'normal'; player.weaponTime = 0;
   player.dashTime = 0; player.dashCD = 0; player.dashVX = 0; player.dashVY = 0;
+  player.lastDX = 0; player.lastDY = 0;
   player.polarity = 0; player.polarityLock = 0; player.polarityFlash = 0;
+  player.bombs = 0;
   player.wingmen = [];
   if (bgmOn) bgmStep = 0;
   initStars(level);
@@ -11659,8 +11932,16 @@ function endLevel(win) {
   game.bossRetry = !win && game.bossActive;
   document.getElementById('overTitle').textContent = win ? '关卡通过!' : '机甲损毁';
   document.getElementById('overTitle').style.color = win ? '#00ff88' : '#ff3b3b';
+  // 难度加成：仅在通关时结算，补偿高难度的时间成本
+  const diff = getDifficulty();
+  const diffBonus = win ? Math.round(game.score * (diff.scoreMult - 1)) : 0;
+  if (diffBonus > 0) game.score += diffBonus;
   document.getElementById('ovLv').textContent = game.level + 1;
   document.getElementById('ovSc').textContent = game.score.toLocaleString();
+  const diffEl = document.getElementById('ovDiff');
+  if (diffEl) {
+    diffEl.innerHTML = `难度 <b>${diff.name}</b>${diffBonus > 0 ? ' · 加成 <b>+' + diffBonus.toLocaleString() + '</b>' : ''}`;
+  }
   document.getElementById('ovKill').textContent = game.kills;
   const hitRate = game.shots > 0 ? Math.round(game.hits / game.shots * 100) : 0;
   document.getElementById('ovHit').textContent = hitRate + '%';
@@ -11671,9 +11952,11 @@ function endLevel(win) {
   document.getElementById('ovRescue').textContent = game.rescued + '/' + game.rescueTotal;
   document.getElementById('ovHitTaken').textContent = game.hitsTaken;
   renderMedalRow(medalMask);
+  const stars = starCount(medalMask);
+  renderStarRow(stars);
 
-  // 新纪录检测
-  const prevBest = save.bestScores[game.level] || 0;
+  // 新纪录检测（按关卡 + 难度分别记录）
+  const prevBest = getBestScore(game.level, game.difficulty);
   const isRecord = win && game.score > prevBest;
   const nrEl = document.getElementById('newRecord');
   nrEl.style.display = isRecord ? 'block' : 'none';
@@ -11681,11 +11964,12 @@ function endLevel(win) {
   document.getElementById('btnNext').style.display = (win && game.level < LEVELS.length - 1) ? '' : 'none';
   hideAllOverlays();
   document.getElementById('ovOver').classList.remove('hidden');
-  // 存档: 解锁下一关 + 记录最高分
+  // 存档: 解锁下一关 + 记录最高分 / 勋章 / 星级
   if (win) {
     unlockLevel(game.level + 1);
-    recordBest(game.level, game.score);
-    mergeMedals(game.level, medalMask);
+    recordBest(game.level, game.score, game.difficulty);
+    mergeMedals(game.level, medalMask, game.difficulty);
+    recordStars(game.level, game.difficulty, stars);
   }
 }
 
@@ -11714,6 +11998,9 @@ function resetInput() {
   input.shoot = false;
   input.kbShoot = false;
   inputDash = false;
+  inputBomb = false;
+  dashKeyDown = false;
+  bombKeyDown = false;
   inputPolarity = false;
   polarityKeyDown = false;
   touchActive = false; touchId = null;
@@ -11960,29 +12247,42 @@ function update(dt) {
   if (game.bossRageTimer > 0) game.bossRageTimer -= dt;
   if (game.flash > 0) game.flash = Math.max(0, game.flash - dt * 2.4);
 
-  // 触发冲刺 (B键 / 手柄)
-  if (inputDash && player.dashCD <= 0) {
+  // 触发冲刺（键盘 K / 手柄 B / 触屏按钮）
+  if (inputDash) {
     inputDash = false;
-    // 计算冲刺方向：优先当前移动方向，无方向则向上
-    let dx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-    let dy = (input.down ? 1 : 0) - (input.up ? 1 : 0);
-    if (dx === 0 && dy === 0) { dy = -1; } // 默认向上
-    const len = Math.hypot(dx, dy) || 1;
-    dx /= len; dy /= len;
-    const dashSpeed = CFG.playerSpeed * 3.2;
-    player.dashVX = dx * dashSpeed;
-    player.dashVY = dy * dashSpeed;
-    player.dashTime = 0.22;
-    player.invuln = Math.max(player.invuln, 0.32); // 冲刺无敌
-    player.dashCD = 2.0;
-    vibrateGamepad(0.25, 80);
-    // 冲刺特效
-    for (let i = 0; i < 8; i++) {
-      game.particles.push({ x: player.x, y: player.y, vx: -dx * rand(50,150), vy: -dy * rand(50,150), life: 0.3, maxLife: 0.3, color: '#0ff', size: 3 });
+    if (player.dashCD <= 0) {
+      // 计算冲刺方向：优先当前移动方向；触屏无方向键时沿用上一帧实际位移
+      let dx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+      let dy = (input.down ? 1 : 0) - (input.up ? 1 : 0);
+      if (dx === 0 && dy === 0) {
+        const mag = Math.hypot(player.lastDX, player.lastDY);
+        if (mag > 0.5) { dx = player.lastDX / mag; dy = player.lastDY / mag; }
+        else { dy = -1; } // 站立不动时默认向上
+      }
+      const len = Math.hypot(dx, dy) || 1;
+      dx /= len; dy /= len;
+      const dashSpeed = CFG.playerSpeed * 3.2;
+      player.dashVX = dx * dashSpeed;
+      player.dashVY = dy * dashSpeed;
+      player.dashTime = 0.22;
+      player.invuln = Math.max(player.invuln, 0.32); // 冲刺无敌
+      player.dashCD = 2.0;
+      dashBtn.flash = 0.35;
+      vibrateGamepad(0.25, 80);
+      // 冲刺特效
+      for (let i = 0; i < 8; i++) {
+        game.particles.push({ x: player.x, y: player.y, vx: -dx * rand(50,150), vy: -dy * rand(50,150), life: 0.3, maxLife: 0.3, color: '#0ff', size: 3 });
+      }
     }
+  }
+  // 手动释放炸弹（键盘 L / 手柄 RB / 触屏按钮）
+  if (inputBomb) {
+    inputBomb = false;
+    useBomb();
   }
 
   // 玩家移动（冲刺中覆盖普通移动）
+  const prevPX = player.x, prevPY = player.y;
   const sp = CFG.playerSpeed;
   if (player.dashTime > 0) {
     player.dashTime -= dt;
@@ -12002,6 +12302,9 @@ function update(dt) {
   const pb = GAME_CONFIG.playerBounds;
   player.x = clamp(player.x, pb.marginX, W - pb.marginX);
   player.y = clamp(player.y, H * pb.marginTop, H - pb.marginBottom);
+  // 记录实际位移，供触屏冲刺判断朝向（拖拽模式没有数字方向键）
+  player.lastDX = player.x - prevPX;
+  player.lastDY = player.y - prevPY;
   updateGravityWells(dt);
 
   if (player.invuln > 0) player.invuln -= dt;
@@ -12228,6 +12531,7 @@ function render() {
   drawWarning();
   drawBossRageText();
   drawTouchUI();
+  drawActionButtons();
   drawPolarityButton();
 
   // 玩家受击红边（读 player.invuln，全屏红角渐隐）
@@ -12260,17 +12564,36 @@ function render() {
 }
 
 /* ==================== 关卡选择 UI ==================== */
+function updateDiffSelect() {
+  const sel = document.getElementById('diffSelect');
+  if (!sel) return;
+  const cur = clamp(save.difficulty | 0, 0, DIFFICULTIES.length - 1);
+  sel.querySelectorAll('.opt-btn').forEach(btn => {
+    btn.classList.toggle('active', (parseInt(btn.dataset.diff, 10) | 0) === cur);
+  });
+  const desc = document.getElementById('diffDesc');
+  if (desc) {
+    const d = DIFFICULTIES[cur];
+    desc.innerHTML = `${d.desc} · 得分倍率 <b>×${d.scoreMult.toFixed(2)}</b>`;
+  }
+}
 function buildLevelGrid() {
   const grid = document.getElementById('lvGrid');
   grid.innerHTML = '';
+  const diff = clamp(save.difficulty | 0, 0, DIFFICULTIES.length - 1);
+  updateDiffSelect();
   LEVELS.forEach((lv, i) => {
     const locked = i >= save.unlocked;
-    const best = save.bestScores[i] || 0;
-    const mask = getMedalMask(i);
+    const best = getBestScore(i, diff);
+    const mask = getMedalMask(i, diff);
+    const starN = getStars(i, diff);
     const d = document.createElement('div');
     d.className = 'lv' + (locked ? ' locked' : '');
     const medals = locked ? '' : `<div class="medals">${MEDAL_META.map(m => `<i class="${mask & m.bit ? 'on' : ''}" title="${m.label}"></i>`).join('')}</div>`;
-    d.innerHTML = `<div class="num">${locked ? '🔒' : i+1}</div><div class="nm">${lv.name}</div>${best > 0 ? `<div class="best">最高 ${best.toLocaleString()}</div>` : ''}${medals}`;
+    const stars = (!locked && starN > 0)
+      ? `<div class="stars">${[0,1,2,3].map(k => `<span class="${k < starN ? '' : 'off'}">★</span>`).join('')}</div>`
+      : '';
+    d.innerHTML = `<div class="num">${locked ? '🔒' : i+1}</div><div class="nm">${lv.name}</div>${best > 0 ? `<div class="best">最高 ${best.toLocaleString()}</div>` : ''}${medals}${stars}`;
     if (!locked) {
       d.addEventListener('click', () => showBriefing(i, 'level'));
     }
@@ -12295,12 +12618,19 @@ function showBriefing(level, returnTo, opts) {
   pendingBriefLevel = level;
   briefReturnTo = returnTo || 'title';
   briefOpts = opts || null;
-  const best = save.bestScores[level] || 0;
-  const mask = getMedalMask(level);
+  // 连续闯关/续玩时沿用当前对局难度，避免简报显示与开局难度不一致
+  const diff = clamp(
+    (opts && opts.difficulty != null) ? (opts.difficulty | 0) : (save.difficulty | 0),
+    0, DIFFICULTIES.length - 1
+  );
+  const best = getBestScore(level, diff);
+  const mask = getMedalMask(level, diff);
+  const starN = getStars(level, diff);
   document.getElementById('briefName').textContent = `第 ${level + 1} 关 · ${lv.name}`;
+  const starTxt = starN > 0 ? `已获 ${'★'.repeat(starN)}${'☆'.repeat(4 - starN)}` : '尚未获得星级';
   document.getElementById('briefSub').textContent = best > 0
-    ? `历史最高分 ${best.toLocaleString()}`
-    : '首次挑战 · 击毁 BOSS 解锁下一关';
+    ? `${DIFFICULTIES[diff].name}难度 · ${starTxt} · 历史最高分 ${best.toLocaleString()}`
+    : `${DIFFICULTIES[diff].name}难度 · 首次挑战 · 击毁 BOSS 解锁下一关`;
   document.getElementById('briefGoals').innerHTML = BRIEF_GOALS.map(g => {
     const on = !!(mask & g.bit);
     return `<div class="brief-goal ${on ? 'on' : ''}"><i class="g-ico">${g.icon}</i>` +
@@ -12339,10 +12669,20 @@ function deployFromBriefing() {
 /* ==================== 事件绑定 ==================== */
 document.getElementById('btnStart').addEventListener('click', () => { initAudio(); showBriefing(0, 'title'); });
 document.getElementById('btnLevel').addEventListener('click', () => { game.state = 'level'; hideAllOverlays(); buildLevelGrid(); document.getElementById('ovLevel').classList.remove('hidden'); });
+// 难度切换：只改存档选择，关卡解锁进度共享
+document.querySelectorAll('#diffSelect .opt-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    save.difficulty = clamp(parseInt(btn.dataset.diff, 10) | 0, 0, DIFFICULTIES.length - 1);
+    saveSave(save);
+    updateDiffSelect();
+    buildLevelGrid();
+    try { refreshMenuButtons(); } catch (e) {}
+  });
+});
 document.getElementById('btnBack').addEventListener('click', () => { game.state = 'title'; hideAllOverlays(); document.getElementById('ovTitle').classList.remove('hidden'); });
 document.getElementById('btnResume').addEventListener('click', togglePause);
 document.getElementById('btnQuit').addEventListener('click', () => { clearRunSave(); game.state = 'title'; hideAllOverlays(); document.getElementById('ovTitle').classList.remove('hidden'); });
-document.getElementById('btnNext').addEventListener('click', () => showBriefing(game.level + 1, 'over', { keepWingmen: true }));
+document.getElementById('btnNext').addEventListener('click', () => showBriefing(game.level + 1, 'over', { keepWingmen: true, difficulty: game.difficulty }));
 document.getElementById('btnDeploy').addEventListener('click', deployFromBriefing);
 document.getElementById('btnBriefBack').addEventListener('click', cancelBriefing);
 document.getElementById('btnRetry').addEventListener('click', () => {
@@ -12375,7 +12715,8 @@ document.getElementById('btnSetBack').addEventListener('click', () => {
 });
 function setTouchMode(mode) {
   GAME_CONFIG.touch.mode = mode;
-  document.querySelectorAll('.opt-btn').forEach(b => {
+  // 只处理操作设置里的按钮，避免误改难度选择器的选中态
+  document.querySelectorAll('#ovSettings .opt-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.mode === mode);
   });
   document.getElementById('settingDesc').textContent =
@@ -12384,7 +12725,7 @@ function setTouchMode(mode) {
   // 显示/隐藏 UI Canvas
   document.getElementById('uiCanvas').style.display = mode === 'joystick' ? 'block' : 'none';
 }
-document.querySelectorAll('.opt-btn').forEach(b => {
+document.querySelectorAll('#ovSettings .opt-btn').forEach(b => {
   b.addEventListener('click', () => setTouchMode(b.dataset.mode));
 });
 setTouchMode(GAME_CONFIG.touch.mode);
