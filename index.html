@@ -976,14 +976,14 @@ for (const lv of LEVELS) {
 // 每种怪兽: hp, score, speed, size, shoot?, draw(ctx, m, t)
 const MONSTER_TYPES = {
   octopus: { hp:1, score:100, speed:1.0, size:1.0, shoot:false },
-  scorpion:{ hp:2, score:200, speed:0.9, size:1.1, shoot:true, shootInterval:2.2 },
+  scorpion:{ hp:2, score:200, speed:0.9, size:1.1, shoot:false },
   ufo:     { hp:2, score:250, speed:0.6, size:1.2, shoot:true, shootInterval:1.8 },
   bug:     { hp:1, score:150, speed:1.6, size:0.8, shoot:false },
   turret:  { hp:3, score:300, speed:0.3, size:1.3, shoot:true, shootInterval:1.6 },
   bomber:  { hp:6, score:500, speed:0.5, size:2.0, shoot:true, shootInterval:1.5 },
-  crystal: { hp:3, score:350, speed:0.45, size:1.15, shoot:true, shootInterval:2.4 },
-  jelly:   { hp:2, score:300, speed:0.55, size:1.2, shoot:true, shootInterval:2.6 },
-  gravity: { hp:3, score:400, speed:0.50, size:1.25, shoot:true, shootInterval:2.8 },
+  crystal: { hp:3, score:350, speed:0.45, size:1.15, shoot:false },
+  jelly:   { hp:2, score:300, speed:0.55, size:1.2, shoot:false },
+  gravity: { hp:3, score:400, speed:0.50, size:1.25, shoot:false },
   rift:    { hp:4, score:450, speed:0.80, size:1.3, shoot:false },
   // ---- 第11关 磁暴风暴 ----
   polarbot:  { hp:3, score:400, speed:0.55, size:1.1, shoot:true, shootInterval:2.0 },
@@ -997,6 +997,16 @@ const MONSTER_TYPES = {
   solaris:   { hp:3, score:380, speed:0.42, size:1.1, shoot:true, shootInterval:2.2 },
   flarejet:  { hp:2, score:300, speed:1.9, size:0.9, shoot:false },
 };
+
+// 小怪火力角色：绝大多数只靠撞击，只有少量炮手按编队齐射。
+// volley = 编队同步齐射；elite = 精英本体单独开火；none = 不开火。
+const VOLLEY_TYPES = new Set(['ufo', 'turret', 'bomber', 'polarbot', 'stormcloud', 'drone', 'solaris']);
+const ELITE_SHOOTER_TYPES = new Set(['queen']);
+function fireRoleFor(type) {
+  if (ELITE_SHOOTER_TYPES.has(type)) return 'elite';
+  if (VOLLEY_TYPES.has(type)) return 'volley';
+  return 'none';
+}
 
 const BOSS_TYPES = {
   voidlord:  { hp:80,  score:6000,  size:5.0, name:'星环裁决者·奥尔特', desc:'由破碎星环聚合而成的轨道裁决兵器，以旋转星弧与陨星坠落碾碎入侵者' },
@@ -1333,6 +1343,9 @@ let game = {
   rescueBossBomb: false, // 救援全清：Boss 战开场 +1 炸弹（待发放）
   waveWait: false,    // 当前是否在等待上一波清场
   solarSweep: null,   // 日冕耀斑事件状态（第13关）
+  telegraphs: [],     // 攻击预警几何（Boss 剧本 / 编队齐射共用）
+  fireGroupState: {}, // 编队齐射状态（按 wave 分组）
+  nextGroupId: 1,     // 小怪编队自增 ID
   alloyGain: 0,       // 本局获得合金（结算展示）
   module: 0,          // 本局三选一模块
   debris: [],      // 战场碎屑（独立于粒子，无碰撞无伤害）
@@ -2247,6 +2260,7 @@ function spawnWave(wave) {
   const bal = getBalance();
   const n = wave.n;
   const sp = GAME_CONFIG.spawn;
+  const groupId = game.nextGroupId++;
   // 生成 Y 范围：刚在屏幕外上方，不太远也不太近（不会凭空出现在脸上）
   const startY = sp.minY;
   const maxGenY = sp.maxY;
@@ -2279,6 +2293,7 @@ function spawnWave(wave) {
       size: cfg.size, score: cfg.score,
       shootCD: cfg.shoot ? rand(0.5, shootInt) : 0,
       shootInterval: shootInt,
+      groupId, fireRole: fireRoleFor(wave.type),
       t: Math.random() * Math.PI * 2,
       t0: Math.random() * Math.PI * 2,
       pattern: wave.pattern,
@@ -2308,6 +2323,7 @@ function spawnBoss(type) {
     atkPhase: 0, atkTimer: 0, charging: false, chargeX: 0, chargeY: 0,
     hitFlash: 0, enraged: false, tele: 0, teleMax: 0, teleKind: null, teleTargets: null,
     vx: 0, vy: 0, shootAlt: 0,
+    scriptState: null, scriptPause: 0, // Sprint 5：攻击剧本运行时
     // 可破坏部位：左右炮台，存活时独立索敌射击；全部摧毁后本体核心暴露
     parts: [
       { ox: -58, oy: 6, hp: Math.max(5, Math.round(bossHp * 0.06)), maxHp: Math.max(5, Math.round(bossHp * 0.06)), r: 16 * (cfg.size / 5), cd: 1.6, flash: 0, dead: false },
@@ -2376,6 +2392,7 @@ function spawnGuard(ang, owner, target) {
     type: 'drone', x: target.x, y: target.y, vx: 0, vy: 0,
     hp: 2, maxHp: 2, size: 1.15, score: 60,
     shootCD: rand(1.2, 2.8), shootInterval: 3.4,
+    fireRole: 'none', groupId: null,
     t: Math.random() * Math.PI * 2, t0: 0,
     pattern: 'line', phase: 'fight', hitFlash: 0, kbVX: 0, kbVY: 0, shootAlt: 0,
     orbit: { owner, target, ang, r: 92, speed: 1.15 },
@@ -8854,9 +8871,584 @@ function playerHit() {
   if (player.hp <= 0) endLevel(false);
 }
 
+/* ==================== 攻击语法库 / 预警 / 编队齐射 ==================== */
+// 所有伤害弹道都从固定几何发射：环形留缺口、轨道留安全道、落点提前标记。
+const ATTACK_LIB = {
+  ring(o) {
+    const count = o.count || 16;
+    const gapStart = o.gapStart || 0;
+    const gapCount = o.gapCount || 0;
+    const speed = o.speed || 140;
+    // x/y 省略时以 Boss 当前位置为圆心，剧本招式无需重复写坐标
+    const ox = o.x == null ? (game.boss ? game.boss.x : W / 2) : o.x;
+    const oy = o.y == null ? (game.boss ? game.boss.y : H * 0.2) : o.y;
+    for (let i = 0; i < count; i++) {
+      if (gapCount > 0 && ((i - gapStart + count) % count) < gapCount) continue;
+      const ang = (i / count) * Math.PI * 2 + (o.rotate || 0);
+      game.enemyBullets.push({
+        x: ox, y: oy,
+        vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed,
+        color: o.color || '#9fe8ff', radius: o.radius || 5,
+        delay: o.delay || 0,
+      });
+    }
+  },
+  lanes(o) {
+    const shots = o.shots || 3;
+    const speed = o.speed || 170;
+    const xs = o.xs || [];
+    for (let i = 0; i < xs.length; i++) {
+      if (i === o.gapIndex) continue;
+      for (let k = 0; k < shots; k++) {
+        game.enemyBullets.push({
+          x: W * xs[i], y: o.y == null ? -24 : o.y,
+          vx: o.drift || 0, vy: speed,
+          color: o.color || '#ffcc66', radius: o.radius || 5,
+          delay: (o.delay || 0) * k,
+        });
+      }
+    }
+  },
+  fan(o) {
+    const count = o.count || 5;
+    const spread = o.spread || 0.16;
+    const center = (count - 1) / 2;
+    for (let i = 0; i < count; i++) {
+      if (i === o.skipIndex) continue;
+      const ang = o.angle + (i - center) * spread;
+      game.enemyBullets.push({
+        x: o.x, y: o.y,
+        vx: Math.cos(ang) * (o.speed || 170),
+        vy: Math.sin(ang) * (o.speed || 170),
+        color: o.color || '#ff8844', radius: o.radius || 5,
+        delay: o.delay || 0,
+      });
+    }
+  },
+  markers(o) {
+    const angles = o.angles;
+    for (const p of (o.points || [])) {
+      const x = W * p.fx, y = p.y == null ? -24 : p.y;
+      const list = angles || (() => {
+        const count = o.count || 4;
+        const center = (count - 1) / 2;
+        const arr = [];
+        for (let i = 0; i < count; i++) arr.push((o.baseAngle == null ? Math.PI / 2 : o.baseAngle) + (i - center) * (o.spread || 0.22));
+        return arr;
+      })();
+      for (const ang of list) {
+        game.enemyBullets.push({
+          x, y,
+          vx: Math.cos(ang) * (o.speed || 150),
+          vy: Math.sin(ang) * (o.speed || 150),
+          color: o.color || '#ffaa44', radius: o.radius || 6,
+          delay: (o.delay || 0) + (p.delay || 0),
+        });
+      }
+    }
+  },
+};
+
+function pushTelegraph(t) {
+  const life = t.life || 0.8;
+  game.telegraphs.push(Object.assign({ life, maxLife: life, owner: t.owner || 'boss' }, t));
+}
+function clearBossTelegraphs() {
+  game.telegraphs = game.telegraphs.filter(t => t.owner !== 'boss');
+}
+function updateTelegraphs(dt) {
+  for (let i = game.telegraphs.length - 1; i >= 0; i--) {
+    const t = game.telegraphs[i];
+    t.life -= dt;
+    if (t.life <= 0) game.telegraphs.splice(i, 1);
+  }
+}
+function drawTelegraphs() {
+  if (!game.telegraphs || game.telegraphs.length === 0) return;
+  const now = game.time;
+  ctx.save();
+  for (const t of game.telegraphs) {
+    const k = clamp(1 - t.life / Math.max(t.maxLife, 0.001), 0, 1);
+    const pulse = 0.55 + 0.45 * Math.sin(now * 16);
+    const color = t.color || '#ff8844';
+    if (t.kind === 'safe') {
+      const w = t.w || W * 0.22;
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, 'rgba(80,220,255,0)');
+      g.addColorStop(0.15, 'rgba(80,220,255,0.20)');
+      g.addColorStop(0.85, 'rgba(80,220,255,0.10)');
+      g.addColorStop(1, 'rgba(80,220,255,0)');
+      ctx.globalAlpha = 0.35 + 0.35 * k;
+      ctx.fillStyle = g;
+      ctx.fillRect(t.x - w / 2, 0, w, H);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.4;
+      ctx.setLineDash([12, 10]);
+      ctx.lineDashOffset = -now * 70;
+      ctx.beginPath();
+      ctx.moveTo(t.x - w / 2, 0); ctx.lineTo(t.x - w / 2, H);
+      ctx.moveTo(t.x + w / 2, 0); ctx.lineTo(t.x + w / 2, H);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      if (t.label) {
+        ctx.globalAlpha = 0.9;
+        ctx.font = 'bold 13px sans-serif';
+        ctx.textAlign = 'center';
+        const tw = ctx.measureText(t.label).width;
+        ctx.fillStyle = 'rgba(0,18,28,0.62)';
+        ctx.fillRect(t.x - tw / 2 - 6, 14, tw + 12, 21);
+        ctx.fillStyle = '#bff4ff';
+        ctx.fillText(t.label, t.x, 30);
+        ctx.textAlign = 'left';
+      }
+    } else if (t.kind === 'lane') {
+      const w = t.w || 46;
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, hexToRgba(color, 0));
+      g.addColorStop(0.12, hexToRgba(color, 0.42));
+      g.addColorStop(0.88, hexToRgba(color, 0.26));
+      g.addColorStop(1, hexToRgba(color, 0));
+      ctx.globalAlpha = 0.45 + 0.35 * k;
+      ctx.fillStyle = g;
+      ctx.fillRect(t.x - w / 2, 0, w, H);
+      ctx.globalAlpha = 0.55;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.3;
+      ctx.setLineDash([10, 9]);
+      ctx.lineDashOffset = -now * 80;
+      ctx.beginPath();
+      ctx.moveTo(t.x, 0); ctx.lineTo(t.x, H);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    } else if (t.kind === 'ring') {
+      const r = t.r || 170;
+      const count = t.count || 16;
+      const gapStart = t.gapStart || 0;
+      const gapCount = t.gapCount || 0;
+      const rotate = t.rotate || 0;
+      ctx.globalAlpha = 0.35 + 0.35 * k;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.6;
+      ctx.setLineDash([8, 8]);
+      ctx.lineDashOffset = now * 40;
+      ctx.beginPath(); ctx.arc(t.x, t.y, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 0.7;
+      ctx.fillStyle = color;
+      for (let i = 0; i < count; i++) {
+        if (gapCount > 0 && ((i - gapStart + count) % count) < gapCount) continue;
+        const a = (i / count) * Math.PI * 2 + rotate;
+        const px = t.x + Math.cos(a) * r;
+        const py = t.y + Math.sin(a) * r;
+        ctx.beginPath(); ctx.arc(px, py, 3.2, 0, Math.PI * 2); ctx.fill();
+      }
+      if (gapCount > 0) {
+        // 用蓝色高亮缺口弧，而不是横穿屏幕的指示线，避免被误读成激光
+        const start = (gapStart / count) * Math.PI * 2 + rotate;
+        const span = (gapCount / count) * Math.PI * 2;
+        ctx.globalAlpha = 0.55 + 0.25 * pulse;
+        ctx.strokeStyle = '#7ef0ff';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, r, start + 0.015, start + span - 0.015);
+        ctx.stroke();
+      }
+    } else if (t.kind === 'marker') {
+      const r = t.r || 30;
+      ctx.globalAlpha = 0.18 + 0.25 * k;
+      ctx.fillStyle = color;
+      ctx.beginPath(); ctx.arc(t.x, t.y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 0.7;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.8;
+      ctx.beginPath(); ctx.arc(t.x, t.y, r * (0.65 + 0.35 * k), 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(t.x - r * 0.4, t.y); ctx.lineTo(t.x + r * 0.4, t.y);
+      ctx.moveTo(t.x, t.y - r * 0.4); ctx.lineTo(t.x, t.y + r * 0.4);
+      ctx.stroke();
+    } else if (t.kind === 'charge') {
+      const r = t.r || 16;
+      ctx.globalAlpha = 0.35 + 0.45 * k;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(t.x, t.y, r * (0.6 + 0.5 * k), 0, Math.PI * 2); ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+// 编队齐射：同一时刻只允许 1 组进入蓄力，保证“安全柱”始终真实有效。
+const FIRE_CHARGE = 0.7;
+const FIRE_SLOT_MAX = 1;
+
+function updateFireDirector(dt) {
+  if (!game.fireGroupState) return;
+  const groups = new Map();
+  for (const m of game.monsters) {
+    if (m.fireRole !== 'volley' || m.phase !== 'fight' || m.groupId == null) continue;
+    if (!groups.has(m.groupId)) groups.set(m.groupId, []);
+    groups.get(m.groupId).push(m);
+  }
+  for (const key of Object.keys(game.fireGroupState)) {
+    if (!groups.has(Number(key))) delete game.fireGroupState[key];
+  }
+  let active = 0;
+  for (const st of Object.values(game.fireGroupState)) if (st.charge > 0) active++;
+  for (const [id, members] of groups) {
+    let st = game.fireGroupState[id];
+    if (!st) st = game.fireGroupState[id] = { cd: 1.4 + (id % 3) * 0.35, charge: 0, safe: id % 3, volley: 0 };
+    if (st.charge > 0) {
+      st.charge -= dt;
+      if (st.charge <= 0) { st.charge = 0; fireVolleyGroup(members, st); }
+      continue;
+    }
+    st.cd -= dt;
+    if (st.cd <= 0 && active < FIRE_SLOT_MAX) {
+      st.cd = 3.0;
+      st.charge = FIRE_CHARGE;
+      st.safe = (st.safe + 1) % 3;
+      st.volley++;
+      active++;
+      addVolleyTelegraph(members, st);
+    }
+  }
+}
+
+function volleySafeX(members, st) {
+  if (members[0] && members[0].type === 'stormcloud') {
+    return W * [0.22, 0.5, 0.78][st.safe];
+  }
+  return W * (st.safe + 0.5) / 3;
+}
+
+function addVolleyTelegraph(members, st) {
+  const isStorm = members[0] && members[0].type === 'stormcloud';
+  const safeX = volleySafeX(members, st);
+  pushTelegraph({
+    kind: 'safe',
+    x: safeX,
+    w: isStorm ? W * 0.18 : W * 0.26,
+    life: FIRE_CHARGE,
+    color: '#66ddff',
+    label: '安全',
+    owner: 'wave',
+  });
+  for (const m of members) {
+    pushTelegraph({
+      kind: 'charge', x: m.x, y: m.y, r: 15 * m.size,
+      life: FIRE_CHARGE, color: '#ffcc66', owner: 'wave',
+    });
+  }
+}
+
+function fireVolleyGroup(members, st) {
+  if (!members.length) return;
+  const type = members[0].type;
+  const bal = getBalance();
+  const speed = Math.min(215, bal.enemyBulletSpeed * 0.9);
+  if (type === 'stormcloud') {
+    const lanes = [0.22, 0.5, 0.78];
+    for (let i = 0; i < lanes.length; i++) {
+      if (i === st.safe) continue;
+      const pol = (st.volley + i) % 2;
+      for (let k = 0; k < 3; k++) {
+        game.enemyBullets.push({
+          x: W * lanes[i], y: -24, vx: 0, vy: speed * 1.05,
+          color: POLAR_COLOR[pol], radius: 5, delay: k * 0.2, pol,
+        });
+      }
+    }
+    return;
+  }
+  if (type === 'solaris') {
+    // 四角斜射，正上/正下留出通道；所有日冕体同步发射。
+    for (const m of members) {
+      for (let i = 0; i < 4; i++) {
+        const ang = Math.PI / 4 + i * Math.PI / 2;
+        game.enemyBullets.push({
+          x: m.x, y: m.y,
+          vx: Math.cos(ang) * speed * 0.78, vy: Math.sin(ang) * speed * 0.78,
+          color: '#ffc75a', radius: 4,
+        });
+      }
+    }
+    return;
+  }
+  const safeX = volleySafeX(members, st);
+  const half = W / 6 * 0.9;
+  const pol = type === 'polarbot' ? (st.volley % 2) : undefined;
+  const color = pol !== undefined ? POLAR_COLOR[pol] : '#ffcc66';
+  for (let i = 0; i < members.length; i++) {
+    const m = members[i];
+    if (Math.abs(m.x - safeX) < half) continue;
+    for (let k = 0; k < 2; k++) {
+      const b = {
+        x: m.x, y: m.y + 8 * m.size,
+        vx: 0, vy: speed,
+        color, radius: 4,
+        delay: k * 0.18 + i * 0.05,
+      };
+      if (pol !== undefined) b.pol = pol;
+      game.enemyBullets.push(b);
+    }
+  }
+}
+
 /* ==================== Boss 预警 / 特殊攻击 ==================== */
 function bossBulletScale() {
   return 0.94 + game.level * 0.025; // 第 1 关 0.965 → 第 10 关 1.19
+}
+
+/* ==================== Boss 攻击剧本 ==================== */
+// 每个 Boss 的招式是固定顺序的 deck；阶段只换 deck，不靠随机角度堆难度。
+const BOSS_SCRIPTS = {
+  voidlord: {
+    stations: {
+      left:   { fx: 0.28, y: 112 },
+      center: { fx: 0.50, y: 98 },
+      right:  { fx: 0.72, y: 112 },
+    },
+    phases: [
+      { hp: 1.00, deck: ['starRing', 'meteorLanes'] },
+      { hp: 0.50, deck: ['meteorLanes', 'starRing', 'starLanes'] },
+    ],
+    patterns: {
+      // 旋转星弧：16 向环，正下方留 4 连缺口
+      starRing: {
+        station: 'center', tele: 0.95, recover: 1.0,
+        steps: [{ t: 0, emit: 'ring', args: { count: 16, gapStart: 3, gapCount: 4, speed: 135, color: '#9fe8ff' } }],
+      },
+      // 陨星轨道：四条纵向轨道，第二条为安全道
+      meteorLanes: {
+        station: 'left', tele: 0.95, recover: 1.0,
+        steps: [{ t: 0, emit: 'lanes', args: { xs: [0.20, 0.40, 0.60, 0.80], gapIndex: 1, shots: 3, speed: 160, delay: 0.16, color: '#d8f6ff' } }],
+      },
+      // 半血追加：反向轨道，安全道换到第三条
+      starLanes: {
+        station: 'right', tele: 1.0, recover: 1.1,
+        steps: [{ t: 0, emit: 'lanes', args: { xs: [0.18, 0.38, 0.62, 0.82], gapIndex: 2, shots: 4, speed: 180, delay: 0.14, color: '#9fe8ff' } }],
+      },
+    },
+  },
+  dragon: {
+    stations: {
+      left:   { fx: 0.30, y: 108 },
+      center: { fx: 0.50, y: 100 },
+      right:  { fx: 0.70, y: 108 },
+    },
+    phases: [
+      { hp: 1.00, deck: ['flameWallA', 'seedCross'] },
+      { hp: 0.50, deck: ['seedCross', 'flameWallB', 'flameWallA'] },
+    ],
+    patterns: {
+      // 火焰墙：四条轨道，第二条安全；第二阶段换第三条
+      flameWallA: {
+        station: 'center', tele: 1.0, recover: 1.0,
+        steps: [{ t: 0, emit: 'lanes', args: { xs: [0.16, 0.34, 0.66, 0.84], gapIndex: 1, shots: 3, speed: 175, delay: 0.18, color: '#ff6622' } }],
+      },
+      flameWallB: {
+        station: 'center', tele: 1.0, recover: 1.0,
+        steps: [{ t: 0, emit: 'lanes', args: { xs: [0.16, 0.34, 0.66, 0.84], gapIndex: 2, shots: 3, speed: 175, delay: 0.18, color: '#ff6622' } }],
+      },
+      // 种子绽放：三个固定落点，各自向四角分裂，正上/正下留空
+      seedCross: {
+        station: 'right', tele: 0.95, recover: 1.1,
+        steps: [{
+          t: 0, emit: 'markers',
+          args: {
+            points: [{ fx: 0.30 }, { fx: 0.50 }, { fx: 0.70 }],
+            angles: [Math.PI / 4, Math.PI * 3 / 4, Math.PI * 5 / 4, Math.PI * 7 / 4],
+            speed: 145, color: '#ff3300', radius: 7,
+          },
+        }],
+      },
+    },
+  },
+  helios: {
+    stations: {
+      left:   { fx: 0.32, y: 126 },
+      center: { fx: 0.50, y: 128 },
+      right:  { fx: 0.68, y: 126 },
+    },
+    phases: [
+      { hp: 1.00, deck: ['solarRing', 'sunSpearsA'] },
+      { hp: 0.67, deck: ['sunSpearsB', 'solarRing', 'sunSpearsA'] },
+      { hp: 0.35, deck: ['solarRingFast', 'sunSpearsFastB', 'sunSpearsFastA'] },
+    ],
+    patterns: {
+      solarRing: {
+        station: 'center', tele: 0.95, recover: 1.0,
+        steps: [{ t: 0, emit: 'ring', args: { count: 16, gapStart: 3, gapCount: 4, speed: 125, color: '#ffb347' } }],
+      },
+      // 熔炉失控：更快但仍保留 4 连缺口
+      solarRingFast: {
+        station: 'center', tele: 0.8, recover: 0.9,
+        steps: [{ t: 0, emit: 'ring', args: { count: 16, gapStart: 7, gapCount: 4, speed: 138, color: '#ffc75a' } }],
+      },
+      // 太阳光矛：三条固定轨道，第二阶段换安全轨
+      sunSpearsA: {
+        station: 'left', tele: 1.0, recover: 1.0,
+        steps: [{ t: 0, emit: 'lanes', args: { xs: [0.22, 0.50, 0.78], gapIndex: 1, shots: 3, speed: 190, delay: 0.20, color: '#ffcc66' } }],
+      },
+      sunSpearsB: {
+        station: 'right', tele: 1.0, recover: 1.0,
+        steps: [{ t: 0, emit: 'lanes', args: { xs: [0.22, 0.50, 0.78], gapIndex: 0, shots: 3, speed: 190, delay: 0.20, color: '#ffcc66' } }],
+      },
+      sunSpearsFastA: {
+        station: 'left', tele: 0.85, recover: 0.9,
+        steps: [{ t: 0, emit: 'lanes', args: { xs: [0.22, 0.50, 0.78], gapIndex: 2, shots: 4, speed: 205, delay: 0.17, color: '#ffcc66' } }],
+      },
+      sunSpearsFastB: {
+        station: 'right', tele: 0.85, recover: 0.9,
+        steps: [{ t: 0, emit: 'lanes', args: { xs: [0.22, 0.50, 0.78], gapIndex: 1, shots: 4, speed: 205, delay: 0.17, color: '#ffcc66' } }],
+      },
+    },
+  },
+};
+
+function showBossPatternTelegraph(b, pat) {
+  const step = pat.steps[0];
+  if (!step) return;
+  const a = step.args || {};
+  if (step.emit === 'ring') {
+    pushTelegraph({
+      kind: 'ring', x: b.x, y: b.y, r: Math.min(W * 0.46, 210),
+      count: a.count || 16, gapStart: a.gapStart || 0, gapCount: a.gapCount || 0,
+      rotate: a.rotate || 0, life: pat.tele, color: a.color || '#ffb066',
+    });
+  } else if (step.emit === 'lanes') {
+    const xs = a.xs || [];
+    for (let i = 0; i < xs.length; i++) {
+      if (i === a.gapIndex) continue;
+      pushTelegraph({ kind: 'lane', x: W * xs[i], w: 44, life: pat.tele, color: a.color || '#ff8844' });
+    }
+    if (a.gapIndex != null && xs[a.gapIndex] != null) {
+      pushTelegraph({
+        kind: 'safe', x: W * xs[a.gapIndex], w: W * 0.12,
+        life: pat.tele, color: '#7ef0ff', label: '安全',
+      });
+    }
+  } else if (step.emit === 'markers') {
+    for (const p of (a.points || [])) {
+      pushTelegraph({ kind: 'marker', x: W * p.fx, y: 36, r: 32, life: pat.tele, color: a.color || '#ff8844' });
+    }
+  }
+}
+
+// 第 13 关 Boss 的熔炉核心状态：保留 6 秒窗口与三阶段永久暴露
+function updateHeliosCore(b, dt) {
+  const hpRatio = b.hp / b.maxHp;
+  if (b.coreWindow > 0) {
+    b.coreWindow -= dt;
+    if (b.coreWindow <= 0) {
+      b.coreWindow = 0;
+      if (hpRatio > 0.35) {
+        b.coreOpen = false;
+        for (const p of b.parts) {
+          p.dead = false;
+          p.hp = Math.round(p.maxHp * 0.6);
+          p.flash = 0;
+          p.cd = 1.4;
+        }
+        addFloatText(b.x, b.y - 24, '铸炉闭锁 · 喷口重启', false);
+        addShockwave(b.x, b.y, '#ff8844', 96, 0.55, 4);
+        sfx('charge');
+      }
+    }
+  }
+  if (hpRatio <= 0.35 && !b.coreOpen) {
+    b.coreOpen = true;
+    b.coreWindow = 0;
+    addFloatText(b.x, b.y - 28, '熔炉失控 · 核心永久暴露', true);
+    addShockwave(b.x, b.y, '#ff5522', 140, 0.7, 6);
+    game.shake = Math.max(game.shake, 0.25);
+  }
+}
+
+// 剧本运行时：移动 → 预警 → 发射 → 恢复。同一时刻只跑一个招式。
+function updateBossScript(b, dt) {
+  const script = BOSS_SCRIPTS[b.type];
+  if (!script) return;
+  if (b.type === 'helios') updateHeliosCore(b, dt);
+
+  if (b.scriptPause > 0) {
+    b.scriptPause -= dt;
+    b.x += (W / 2 - b.x) * Math.min(1, 2.4 * dt);
+    b.y += (128 - b.y) * Math.min(1, 2.4 * dt);
+    return;
+  }
+
+  if (!b.scriptState) {
+    b.scriptState = { phase: 'idle', timer: 0, step: 0, stepT: 0, idx: 0, pattern: null, name: '' };
+  }
+  const s = b.scriptState;
+
+  if (s.phase === 'idle') {
+    const ratio = b.hp / b.maxHp;
+    let phase = script.phases[0];
+    for (const p of script.phases) if (ratio <= p.hp) phase = p;
+    const deck = phase.deck;
+    const name = deck[s.idx % deck.length];
+    s.idx++;
+    s.name = name;
+    s.pattern = script.patterns[name];
+    s.phase = 'move';
+    s.timer = 0.5;
+    const station = script.stations[s.pattern.station] || script.stations.center;
+    s.tx = W * station.fx;
+    s.ty = station.y;
+    clearBossTelegraphs();
+    return;
+  }
+
+  if (s.phase === 'move') {
+    const k = Math.min(1, 5.5 * dt);
+    b.x += (s.tx - b.x) * k;
+    b.y += (s.ty - b.y) * k;
+    s.timer -= dt;
+    if (s.timer <= 0) {
+      b.x = s.tx; b.y = s.ty;
+      s.phase = 'tele';
+      s.timer = s.pattern.tele;
+      b.teleMax = s.pattern.tele;
+      b.tele = s.pattern.tele;
+      b.teleKind = null;
+      showBossPatternTelegraph(b, s.pattern);
+      sfx('charge');
+    }
+    return;
+  }
+
+  if (s.phase === 'tele') {
+    s.timer -= dt;
+    b.tele = Math.max(0, s.timer);
+    if (s.timer <= 0) {
+      s.phase = 'fire';
+      s.step = 0;
+      s.stepT = 0;
+      b.tele = 0;
+    }
+    return;
+  }
+
+  if (s.phase === 'fire') {
+    s.stepT += dt;
+    while (s.step < s.pattern.steps.length && s.stepT >= s.pattern.steps[s.step].t) {
+      const step = s.pattern.steps[s.step];
+      ATTACK_LIB[step.emit](step.args);
+      s.step++;
+    }
+    if (s.step >= s.pattern.steps.length) {
+      s.phase = 'recover';
+      s.timer = s.pattern.recover;
+    }
+    return;
+  }
+
+  if (s.phase === 'recover') {
+    s.timer -= dt;
+    if (s.timer <= 0) s.phase = 'idle';
+  }
 }
 
 // 特殊攻击先进入“蓄力预警”，让玩家有 0.9~1.1 秒观察和走位
@@ -9088,7 +9680,7 @@ function fireBossSpecial(b) {
           y: b.y + 46 + Math.sin(ang) * 18,
           vx: 0, vy: cfg.speed * CFG.baseMonsterSpeed * bal.enemySpeed,
           hp: cfg.hp, maxHp: cfg.hp, size: cfg.size, score: cfg.score,
-          shootCD: 0, shootInterval: 0, t: 0, t0: Math.random() * Math.PI * 2,
+          shootCD: 0, shootInterval: 0, fireRole: 'none', groupId: null, t: 0, t0: Math.random() * Math.PI * 2,
           pattern: 'line', phase: 'fight', hitFlash: 0, kbVX: 0, kbVY: 0, shootAlt: 0,
         });
       }
@@ -9165,13 +9757,6 @@ function updateMonsters(dt) {
         o.ang += o.speed * dt;
         m.x = tgt.x + Math.cos(o.ang) * o.r;
         m.y = tgt.y + Math.sin(o.ang) * o.r * 0.66;
-        if (m.shootCD > 0) m.shootCD -= dt;
-        if (m.shootCD <= 0) {
-          m.shootCD = m.shootInterval;
-          const dx = player.x - m.x, dy = player.y - m.y;
-          const d = Math.max(Math.hypot(dx, dy), 0.001);
-          game.enemyBullets.push({ x: m.x, y: m.y + 8, vx: dx / d * 120, vy: dy / d * 120, color: '#ffcc44', radius: 4 });
-        }
         continue;
       }
     }
@@ -9269,7 +9854,8 @@ function updateMonsters(dt) {
         m.y += m.vy * 0.4 * dt + Math.sin(m.t * 2) * 6 * dt;
       }
 
-      if (cfg.shoot) {
+      // 编队炮手由 FireDirector 统一齐射；这里只保留精英本体（蜂后）的独立攻击
+      if (cfg.shoot && m.fireRole === 'elite') {
         m.shootCD -= dt;
         if (m.shootCD <= 0) {
           m.shootCD = m.shootInterval;
@@ -9379,7 +9965,8 @@ function updateMonsters(dt) {
       b.y += 60 * dt;
       if (b.y > 110) { b.phase = 'fight'; b.shootCD = 1.8; b.atkTimer = 0; }
     } else {
-      // ---- 可破坏部位：存活时独立索敌射击，逼迫玩家先清炮台 ----
+      const scriptedBoss = !!BOSS_SCRIPTS[b.type];
+      // ---- 可破坏部位：存活时独立射击；剧本 Boss 只在恢复窗口开火，避免和主招式叠加 ----
       if (b.parts) {
         const S = b.size / 5;
         for (const p of b.parts) {
@@ -9387,24 +9974,44 @@ function updateMonsters(dt) {
           if (p.flash > 0) p.flash -= dt;
           p.cd -= dt;
           if (p.cd <= 0 && !b.coreOpen) {
-            p.cd = 2.4 + Math.random() * 0.7;
             const px = b.x + p.ox * S, py = b.y + p.oy * S;
-            const ang = Math.atan2(player.y - py, player.x - px);
-            const spd = 185 + game.level * 6;
-            game.enemyBullets.push({
-              x: px, y: py,
-              vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
-              color: '#ffb066', radius: 4,
-            });
+            if (scriptedBoss) {
+              const s = b.scriptState;
+              if (!s || s.phase !== 'recover') { p.cd = 0.3; continue; }
+              p.cd = 2.6;
+              const spd = 165 + game.level * 4;
+              for (let k = -1; k <= 1; k += 2) {
+                game.enemyBullets.push({
+                  x: px, y: py,
+                  vx: Math.cos(Math.PI / 2 + k * 0.12) * spd,
+                  vy: Math.sin(Math.PI / 2 + k * 0.12) * spd,
+                  color: '#ffb066', radius: 4,
+                });
+              }
+            } else {
+              p.cd = 2.4 + Math.random() * 0.7;
+              const ang = Math.atan2(player.y - py, player.x - px);
+              const spd = 185 + game.level * 6;
+              game.enemyBullets.push({
+                x: px, y: py,
+                vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
+                color: '#ffb066', radius: 4,
+              });
+            }
             addExplosion(px, py, '#ffaa55', 3, 0.35);
           }
         }
       }
-      // ---- 半血狂暴：清弹 + 冲击波 + 攻击节奏小幅提升 ----
+      // ---- 半血狂暴：清弹 + 冲击波；剧本 Boss 换阶段 deck 并留出安全窗 ----
       if (!b.enraged && b.hp <= b.maxHp * 0.5) {
         b.enraged = true;
         b.tele = 0; b.teleKind = null; b.teleTargets = null;
-        b.atkTimer = 0; b.shootCD = 1.2;
+        if (scriptedBoss) {
+          b.scriptState = null;
+          b.scriptPause = 1.2;
+        } else {
+          b.atkTimer = 0; b.shootCD = 1.2;
+        }
         game.enemyBullets.length = 0;
         addShockwave(b.x, b.y, '#ff6644', 210 * (b.size / 5), 0.9, 10);
         addExplosion(b.x, b.y, '#ffaa44', 34, 1.5);
@@ -9416,18 +10023,22 @@ function updateMonsters(dt) {
         if (bb) bb.classList.add('enraged');
         sfx('bossWarn');
       }
-      // ---- 特殊攻击预警：先亮警示，再真正出弹 ----
-      if (b.tele > 0) {
-        b.tele -= dt;
-        if (b.tele <= 0) { b.tele = 0; fireBossSpecial(b); }
+      // ---- 旧版特殊攻击预警：剧本 Boss 由 updateBossScript 接管 ----
+      if (!scriptedBoss) {
+        if (b.tele > 0) {
+          b.tele -= dt;
+          if (b.tele <= 0) { b.tele = 0; fireBossSpecial(b); }
+        }
+        b.atkTimer += dt;
+        b.shootCD -= dt;
       }
-      b.atkTimer += dt;
-      b.shootCD -= dt;
       // 特殊攻击间隔：随关卡温和缩短，且狂暴后略快
       const specialCD = (5.0 - game.level * 0.10) / (diff * rage);
       const shotGap = 1 / (diff * rage);
 
-      if (b.type === 'voidlord') {
+      if (scriptedBoss) {
+        updateBossScript(b, dt);
+      } else if (b.type === 'voidlord') {
         // 星环裁决者: 环绕横移 + 环炮瞄准齐射（中间留缝）
         b.x = W/2 + Math.sin(b.t * 0.55) * (W * 0.33);
         b.y = 96 + Math.sin(b.t * 1.05) * 16;
@@ -9924,6 +10535,7 @@ function spawnTrickle(lv) {
   const bal = getBalance();
   const count = Math.random() < 0.35 ? 2 : 1;
   const sp = GAME_CONFIG.spawn;
+  const groupId = game.nextGroupId++;
   for (let i = 0; i < count; i++) {
     const x = clamp(rand(W * 0.15, W * 0.85), sp.marginX, W - sp.marginX);
     const shootInt = cfg.shoot ? cfg.shootInterval / bal.enemyFire : 0;
@@ -9932,6 +10544,7 @@ function spawnTrickle(lv) {
       vx: rand(-30, 30) * bal.enemySpeed, vy: cfg.speed * CFG.baseMonsterSpeed * bal.enemySpeed,
       hp: cfg.hp, maxHp: cfg.hp, size: cfg.size, score: cfg.score,
       shootCD: cfg.shoot ? rand(0.5, shootInt) : 0, shootInterval: shootInt,
+      groupId, fireRole: fireRoleFor(type),
       t: Math.random() * Math.PI * 2, t0: Math.random() * Math.PI * 2, pattern: 'wave', phase: 'enter',
       hitFlash: 0, kbVX: 0, kbVY: 0, shootAlt: 0,
     });
@@ -12708,6 +13321,9 @@ function startGame(level, opts) {
   game.rings = []; game.bossDeath = null; game.bossRageTimer = 0; game.flash = 0; game.hitStop = 0;
   game.gravityWells = [];
   game.solarSweep = null;
+  game.telegraphs = [];
+  game.fireGroupState = {};
+  game.nextGroupId = 1;
   game.alloyGain = 0;
   game.module = clamp(save.module | 0, 0, MODULES.length - 1);
   // 救援目标：每关固定 2 名，重新开局重置统计
@@ -12875,6 +13491,9 @@ function retryBoss() {
   game.rings = []; game.bossDeath = null; game.bossRageTimer = 0; game.flash = 0; game.hitStop = 0;
   game.gravityWells = [];
   game.solarSweep = null;
+  game.telegraphs = [];
+  game.fireGroupState = {};
+  game.nextGroupId = 1;
   // Boss 重试只打 Boss，不再补发救援目标；救援勋章需完整通关达成
   game.rescues = []; game.rescueTotal = 0;
   game.rescued = 0; game.rescueLost = 0; game.rescueSpawned = 0; game.rescueClock = 0;
@@ -13321,6 +13940,8 @@ function update(dt) {
 
   updateBullets(dt);
   updateMonsters(dt);
+  updateFireDirector(dt);
+  updateTelegraphs(dt);
   updateWaves(dt);
   updateParticles(dt);
   updateFloatTexts(dt);
@@ -13488,6 +14109,7 @@ function render() {
   if (game.state === 'pause' || game.state === 'over' || game.state === 'bossIntro') {
     // 暂停/结算时保留最后一帧背景
     drawBackground(0.016);
+    drawTelegraphs();
     drawInkCloud();
     drawBossAmbience();
     drawGravityWells();
@@ -13508,6 +14130,7 @@ function render() {
     return;
   }
   drawBackground(0.016);
+  drawTelegraphs();
   drawInkCloud();
   drawBossAmbience();
   drawGravityWells();
