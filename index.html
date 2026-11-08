@@ -227,14 +227,19 @@
   .hangar-card{width:min(94vw,560px);max-height:88vh;overflow:auto;}
   .hangar-alloy{font-size:13px;color:#80d8ff;margin:-10px 0 12px;letter-spacing:1px;}
   .hangar-alloy b{color:#ffd23f;font-size:1.6em;text-shadow:0 0 10px rgba(255,200,60,0.5);}
+  .hangar-need{margin-left:10px;font-size:10px;color:#5a7a9a;letter-spacing:0.5px;}
+  .hangar-bonus{margin-top:4px;font-size:10px;color:#7fd7ff;letter-spacing:0.5px;}
+  .hangar-bonus b{color:#ffd23f;font-weight:900;}
+  .hangar-bonus .next{color:#5a7a9a;}
+  .hangar-bonus .next b{color:#8ff7c9;}
   .hangar-list{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;text-align:left;}
   .hangar-row{display:flex;align-items:center;gap:10px;padding:8px 10px;
     border:1px solid rgba(0,229,255,0.18);border-radius:10px;background:rgba(8,16,26,0.72);}
   .hangar-info{flex:1;min-width:0;}
   .hangar-info b{display:block;font-size:13px;color:#c8e6ff;}
   .hangar-info span{display:block;font-size:10px;color:#5a7a9a;margin-top:2px;}
-  .hangar-pips{display:flex;gap:3px;margin-top:5px;}
-  .hangar-pips i{width:9px;height:6px;border-radius:2px;background:#1d3145;border:1px solid #2a4560;}
+  .hangar-pips{display:flex;gap:2px;margin-top:5px;flex-wrap:wrap;}
+  .hangar-pips i{width:7px;height:5px;border-radius:2px;background:#1d3145;border:1px solid #2a4560;}
   .hangar-pips i.on{background:#00e5ff;border-color:#8ff;box-shadow:0 0 6px rgba(0,229,255,0.8);}
   .hangar-buy{padding:7px 9px;font-size:11px;min-width:78px;border-radius:7px;}
   .hangar-buy:disabled{opacity:0.32;cursor:default;border-color:rgba(0,229,255,0.15);}
@@ -441,7 +446,7 @@
 <div class="ov hidden" id="ovHangar">
   <div class="panel-card hangar-card">
     <div class="panel-title" style="font-size:clamp(20px,5vw,28px)">机库改装</div>
-    <div class="hangar-alloy">合金 <b id="hangarAlloy">0</b></div>
+    <div class="hangar-alloy">合金 <b id="hangarAlloy">0</b><span class="hangar-need" id="hangarNeed"></span></div>
     <div class="hangar-list" id="hangarList"></div>
     <button class="btn ghost" id="btnHangarBack">返回</button>
   </div>
@@ -622,13 +627,13 @@ const LEVEL_BALANCE = [
 const DIFFICULTIES = [
   { id: 0, name: '普通', short: 'NORMAL', color: '#00e5ff',
     desc: '标准难度，适合首次通关', enemySpeed: 1.00, enemyFire: 1.00,
-    bulletSpeed: 1.00, bossHp: 1.00, bossRate: 1.00, maxBullets: 1.00, scoreMult: 1.00 },
+    bulletSpeed: 1.00, bossHp: 1.00, bossRate: 1.00, maxBullets: 1.00, scoreMult: 1.00, alloyMult: 1.00 },
   { id: 1, name: '困难', short: 'HARD', color: '#ffb347',
     desc: '弹速与射速提升，Boss 更耐打', enemySpeed: 1.04, enemyFire: 1.08,
-    bulletSpeed: 1.06, bossHp: 1.12, bossRate: 1.06, maxBullets: 1.05, scoreMult: 1.25 },
+    bulletSpeed: 1.06, bossHp: 1.12, bossRate: 1.06, maxBullets: 1.05, scoreMult: 1.25, alloyMult: 1.25 },
   { id: 2, name: '噩梦', short: 'NIGHTMARE', color: '#ff5566',
     desc: '高压弹幕，只有一条命的空间', enemySpeed: 1.08, enemyFire: 1.15,
-    bulletSpeed: 1.12, bossHp: 1.25, bossRate: 1.12, maxBullets: 1.10, scoreMult: 1.60 },
+    bulletSpeed: 1.12, bossHp: 1.25, bossRate: 1.12, maxBullets: 1.10, scoreMult: 1.60, alloyMult: 1.55 },
 ];
 function getDifficulty(d) {
   const i = clamp(d === undefined ? (game.difficulty | 0) : (d | 0), 0, DIFFICULTIES.length - 1);
@@ -1144,14 +1149,15 @@ function hexToRgba(hex, alpha) {
 
 /* ==================== 存档 (localStorage) ==================== */
 const SAVE_KEY = 'mecha_vs_monsters_save_v1';
-// 永久改装：6 条线 × 5 级，总增益控制在 +25%~30%
+// 永久改装：6 条线 × 10 级。单次通关的合金不足以点满任何一条线，
+// 但每级收益都足够直观，满级时 6 条线合计是质变而不是数值装饰。
 const UPGRADE_DEFS = [
-  { key: 'damage',  name: '主炮伤害', desc: '每级 +4% 子弹伤害',   max: 5, costs: [40, 70, 110, 160, 220], value: 0.04 },
-  { key: 'fireRate',name: '射速',     desc: '每级 -3% 射击间隔',   max: 5, costs: [50, 85, 130, 190, 260], value: 0.03 },
-  { key: 'wingman', name: '僚机火力', desc: '每级 +5% 僚机伤害',   max: 5, costs: [45, 80, 120, 175, 240], value: 0.05 },
-  { key: 'shield',  name: '护盾上限', desc: '每级 +0.2 护盾上限',  max: 5, costs: [60, 100, 150, 215, 290], value: 0.20 },
-  { key: 'bomb',    name: '炸弹容量', desc: '每级 +0.4 炸弹上限',  max: 5, costs: [70, 110, 170, 240, 320], value: 0.40 },
-  { key: 'dash',    name: '冲刺冷却', desc: '每级 -4% 冲刺冷却',   max: 5, costs: [50, 90, 135, 195, 265], value: 0.04 },
+  { key: 'damage',  name: '主炮伤害', desc: '每级 +7% 子弹伤害',   kind: 'pctUp',   max: 10, costs: [30, 40, 50, 65, 80, 100, 125, 155, 190, 230], value: 0.07 },
+  { key: 'fireRate',name: '射速',     desc: '每级 -3.5% 射击间隔', kind: 'pctDown', max: 10, costs: [35, 45, 55, 70, 90, 110, 135, 165, 205, 250], value: 0.035 },
+  { key: 'wingman', name: '僚机火力', desc: '每级 +8% 僚机伤害',   kind: 'pctUp',   max: 10, costs: [25, 35, 45, 55, 70, 90, 110, 140, 175, 215], value: 0.08 },
+  { key: 'shield',  name: '护盾上限', desc: '每级 +0.3 护盾上限',  kind: 'shield',  max: 10, costs: [40, 50, 65, 80, 100, 125, 155, 190, 230, 280], value: 0.30 },
+  { key: 'bomb',    name: '炸弹容量', desc: '每级 +0.5 炸弹上限',  kind: 'bomb',    max: 10, costs: [45, 60, 75, 95, 115, 140, 175, 210, 255, 310], value: 0.50 },
+  { key: 'dash',    name: '冲刺冷却', desc: '每级 -4% 冲刺冷却',   kind: 'pctDown', max: 10, costs: [30, 40, 55, 70, 85, 105, 130, 160, 195, 240], value: 0.04 },
 ];
 // 三选一模块：开局 Build 差异
 const MODULES = [
@@ -1165,7 +1171,19 @@ function upgradeLv(key) {
   return clamp(((save.upgrades || {})[key] | 0), 0, def.max);
 }
 function bombCap() {
-  return BOMB_MAX + Math.floor(upgradeLv('bomb') * 0.4);
+  return BOMB_MAX + Math.floor(upgradeLv('bomb') * 0.5);
+}
+// 机库展示用：把当前等级换算成玩家一眼能看懂的收益文本
+function upgradeBonusText(def, lv) {
+  const v = Math.max(0, lv) * def.value;
+  if (def.kind === 'pctUp') return '+' + Math.round(v * 100) + '%';
+  if (def.kind === 'pctDown') return '-' + Math.round(v * 100) + '%';
+  if (def.kind === 'shield') return '+' + v.toFixed(1);
+  if (def.kind === 'bomb') return '+' + Math.floor(v);
+  return '';
+}
+function upgradeTotalCost() {
+  return UPGRADE_DEFS.reduce((sum, def) => sum + def.costs.reduce((a, b) => a + b, 0), 0);
 }
 function loadSave() {
   try {
@@ -1221,9 +1239,11 @@ let save = loadSave();
 if (!save.upgrades || typeof save.upgrades !== 'object') save.upgrades = {};
 if (save.alloy == null) save.alloy = 0;
 if (save.module == null) save.module = 0;
-// 合金：击毁精英 / Boss、结算星级发放；不做局内刷取
+// 合金：击毁精英 / Boss、结算星级发放；不做局内刷取。
+// 高难度按 alloyMult 结算，但基础产出刻意压到「一次全通点不满一条线」。
 function grantAlloy(n) {
-  n = Math.max(0, Math.round(n));
+  const mult = (getDifficulty().alloyMult || 1);
+  n = Math.max(0, Math.round(n * mult));
   if (!n) return;
   save.alloy = (save.alloy | 0) + n;
   game.alloyGain = (game.alloyGain | 0) + n;
@@ -2479,6 +2499,7 @@ function spawnBoss(type) {
     atkPhase: 0, atkTimer: 0, charging: false, chargeX: 0, chargeY: 0,
     hitFlash: 0, enraged: false, tele: 0, teleMax: 0, teleKind: null, teleTargets: null,
     vx: 0, vy: 0, shootAlt: 0,
+    motionPhase: Math.random() * Math.PI * 2, motionStep: 0, motionFxT: 0,
     scriptState: null, scriptPause: 0, // Sprint 5：攻击剧本运行时
     // 可破坏部位：每个 Boss 的位置/外形/火力不同；全部摧毁后核心暴露 6 秒
     parts: buildBossParts(type, bossHp, cfg.size),
@@ -8483,7 +8504,7 @@ function destroyBoss(dead) {
   player.invuln = Math.max(player.invuln, 3);
   // Boss 必掉 1 个特殊宝箱（僚机/清屏），自动飞向玩家
   spawnBossReward(dead.x, dead.y);
-  grantAlloy(35 + game.level * 8);
+  grantAlloy(16 + game.level * 3);
   sfx('bossDie');
   game.boss = null;
   game.bossActive = false;
@@ -10487,7 +10508,7 @@ const BOSS_SCRIPTS = {
     },
     phases: [
       { hp: 1.00, deck: ['starRing', 'meteorLanes'] },
-      { hp: 0.50, deck: ['meteorLanes', 'starRing', 'starLanes'] },
+      { hp: 0.50, deck: ['meteorLanes', 'starRing', 'starLanes', 'starPincer'] },
     ],
     patterns: {
       // 旋转星弧：16 向环，正下方留 4 连缺口
@@ -10505,6 +10526,14 @@ const BOSS_SCRIPTS = {
         station: 'right', tele: 1.0, recover: 1.1,
         steps: [{ t: 0, emit: 'lanes', args: { xs: [0.18, 0.38, 0.62, 0.82], gapIndex: 2, shots: 4, speed: 180, delay: 0.14, color: '#9fe8ff' } }],
       },
+      // 双翼夹击：左右各一组斜向扇射，中央留出稳定楔形
+      starPincer: {
+        station: 'center', tele: 0.95, recover: 1.1,
+        steps: [
+          { t: 0, emit: 'fan', args: { count: 5, spread: 0.15, angle: Math.PI * 0.66, speed: 152, color: '#9fe8ff', radius: 5 } },
+          { t: 0.05, emit: 'fan', args: { count: 5, spread: 0.15, angle: Math.PI * 0.34, speed: 152, color: '#d8f6ff', radius: 5 } },
+        ],
+      },
     },
   },
   dragon: {
@@ -10515,7 +10544,7 @@ const BOSS_SCRIPTS = {
     },
     phases: [
       { hp: 1.00, deck: ['flameWallA', 'seedCross'] },
-      { hp: 0.50, deck: ['seedCross', 'flameWallB', 'flameWallA'] },
+      { hp: 0.50, deck: ['seedCross', 'flameWallB', 'flameCascade', 'flameWallA'] },
     ],
     patterns: {
       // 火焰墙：四条轨道，第二条安全；第二阶段换第三条
@@ -10526,6 +10555,20 @@ const BOSS_SCRIPTS = {
       flameWallB: {
         station: 'center', tele: 1.0, recover: 1.0,
         steps: [{ t: 0, emit: 'lanes', args: { xs: [0.16, 0.34, 0.66, 0.84], gapIndex: 2, shots: 3, speed: 175, delay: 0.18, color: '#ff6622' } }],
+      },
+      // 龙息瀑布：四道落点依次砸下，落点之间有明确空隙
+      flameCascade: {
+        station: 'center', tele: 1.0, recover: 1.15,
+        steps: [{
+          t: 0, emit: 'markers',
+          args: {
+            points: [
+              { fx: 0.16, delay: 0 }, { fx: 0.38, delay: 0.12 },
+              { fx: 0.62, delay: 0.24 }, { fx: 0.84, delay: 0.36 },
+            ],
+            angles: [Math.PI / 2], speed: 168, color: '#ff6622', radius: 7,
+          },
+        }],
       },
       // 种子绽放：三个固定落点，各自向四角分裂，正上/正下留空
       seedCross: {
@@ -10550,7 +10593,7 @@ const BOSS_SCRIPTS = {
     phases: [
       { hp: 1.00, deck: ['solarRing', 'sunSpearsA'] },
       { hp: 0.67, deck: ['sunSpearsB', 'solarRing', 'sunSpearsA'] },
-      { hp: 0.35, deck: ['solarRingFast', 'sunSpearsFastB', 'sunSpearsFastA'] },
+      { hp: 0.35, deck: ['solarRingFast', 'flareCascade', 'sunSpearsFastB', 'sunSpearsFastA'] },
     ],
     patterns: {
       solarRing: {
@@ -10579,6 +10622,17 @@ const BOSS_SCRIPTS = {
         station: 'right', tele: 0.85, recover: 0.9,
         steps: [{ t: 0, emit: 'lanes', args: { xs: [0.22, 0.50, 0.78], gapIndex: 1, shots: 4, speed: 205, delay: 0.17, color: '#ffcc66' } }],
       },
+      // 日珥 cascade：四道日冕落点后接一圈缺口环
+      flareCascade: {
+        station: 'center', tele: 1.0, recover: 1.2,
+        steps: [
+          { t: 0, emit: 'markers', args: {
+            points: [{ fx: 0.14, delay: 0 }, { fx: 0.38, delay: 0.10 }, { fx: 0.62, delay: 0.20 }, { fx: 0.86, delay: 0.30 }],
+            angles: [Math.PI / 2], speed: 176, color: '#ffd08a', radius: 7,
+          } },
+          { t: 0.55, emit: 'ring', args: { count: 16, gapStart: 4, gapCount: 4, speed: 145, color: '#ffb347' } },
+        ],
+      },
     },
   },
   leviathan: {
@@ -10589,7 +10643,7 @@ const BOSS_SCRIPTS = {
     },
     phases: [
       { hp: 1.00, deck: ['sonarRing', 'torpedoTrio'] },
-      { hp: 0.50, deck: ['inkVeil', 'sonarRingB', 'torpedoTrio'] },
+      { hp: 0.50, deck: ['inkVeil', 'sonarRingB', 'sonarDouble', 'torpedoTrio'] },
     ],
     patterns: {
       // 声呐环：16 向，3 连缺口；半血换缺口方位
@@ -10600,6 +10654,14 @@ const BOSS_SCRIPTS = {
       sonarRingB: {
         station: 'right', tele: 0.9, recover: 1.0,
         steps: [{ t: 0, emit: 'ring', args: { count: 16, gapStart: 7, gapCount: 3, speed: 110, color: '#5cf2d8' } }],
+      },
+      // 双声呐：两层缺口错开，逼玩家先穿第一层再横移
+      sonarDouble: {
+        station: 'left', tele: 0.95, recover: 1.15,
+        steps: [
+          { t: 0, emit: 'ring', args: { count: 16, gapStart: 3, gapCount: 3, speed: 104, color: '#5cf2d8' } },
+          { t: 0.30, emit: 'ring', args: { count: 16, gapStart: 9, gapCount: 3, rotate: 0.1, speed: 112, color: '#8affe0' } },
+        ],
       },
       // 三枚慢速鱼雷：顶部固定入水点，可拖掉
       torpedoTrio: {
@@ -10687,7 +10749,7 @@ const BOSS_SCRIPTS = {
     },
     phases: [
       { hp: 1.00, deck: ['lockLanes', 'missileFan'] },
-      { hp: 0.50, deck: ['missileFan', 'lockCross', 'lockLanes'] },
+      { hp: 0.50, deck: ['missileFan', 'pincer', 'lockCross', 'lockLanes'] },
     ],
     patterns: {
       // 预判激光：预警时锁定玩家当前左右两侧的纵向轨道
@@ -10700,6 +10762,14 @@ const BOSS_SCRIPTS = {
         station: 'center', tele: 1.0, recover: 1.1, lockCount: 3,
         onTele: teleGuardianLock,
         steps: [{ t: 0, emit: 'special', special: 'guardianLaser' }],
+      },
+      // 双臂交叉火力：左右两组斜射，中央通道始终可站
+      pincer: {
+        station: 'center', tele: 1.0, recover: 1.1,
+        steps: [
+          { t: 0, emit: 'fan', args: { count: 4, spread: 0.14, angle: Math.PI * 0.64, speed: 168, color: '#88bbff', radius: 5 } },
+          { t: 0.10, emit: 'fan', args: { count: 4, spread: 0.14, angle: Math.PI * 0.36, speed: 168, color: '#bcd8ff', radius: 5 } },
+        ],
       },
       // 追踪导弹：三枚慢速，可拖掉
       missileFan: {
@@ -10770,7 +10840,7 @@ const BOSS_SCRIPTS = {
     },
     phases: [
       { hp: 1.00, deck: ['arcRing', 'tentacleLanes'] },
-      { hp: 0.50, deck: ['tentacleLanes', 'arcRingB', 'arcRing'] },
+      { hp: 0.50, deck: ['tentacleLanes', 'arcDouble', 'arcRingB', 'arcRing'] },
     ],
     patterns: {
       // 电弧环：12 向，2 连缺口
@@ -10781,6 +10851,14 @@ const BOSS_SCRIPTS = {
       arcRingB: {
         station: 'left', tele: 0.9, recover: 1.0,
         steps: [{ t: 0, emit: 'ring', args: { count: 12, gapStart: 8, gapCount: 2, speed: 155, color: '#ff66cc' } }],
+      },
+      // 双弧电环：两层缺口交错旋转，触手同时收束
+      arcDouble: {
+        station: 'left', tele: 0.95, recover: 1.2,
+        steps: [
+          { t: 0, emit: 'ring', args: { count: 12, gapStart: 2, gapCount: 2, speed: 140, color: '#ff66cc' } },
+          { t: 0.08, emit: 'ring', args: { count: 12, gapStart: 8, gapCount: 2, speed: 150, color: '#ff9ade' } },
+        ],
       },
       // 触手打击：三条固定纵向轨道，轨道之间为安全区
       tentacleLanes: {
@@ -11171,6 +11249,125 @@ function fireBossPart(b, p, px, py, scriptedBoss) {
   addExplosion(px, py, color, 3, 0.35);
 }
 
+// 每个 Boss 的移动身份：不再共用「左中右三个点来回挪」。
+// style 决定目标点生成与插值手感，drift 是恢复期的余摆，用来消除“站桩感”。
+const BOSS_MOTION = {
+  default:    { style: 'drift',  ax: 0.22, ay: 14, step: 1.15, k: 3.2, move: 0.85, drift: 5, color: '#ffb066' },
+  voidlord:   { style: 'orbit',  ax: 0.30, ay: 18, step: 0.95, k: 4.6, move: 0.85, drift: 4, color: '#9fe8ff' },
+  leviathan:  { style: 'float',  ax: 0.27, ay: 28, step: 0.75, k: 2.8, move: 1.00, drift: 6, color: '#5cf2d8' },
+  colossus:   { style: 'stomp',  ax: 0.20, ay: 8,  step: 1.05, k: 3.0, move: 0.95, drift: 2, lowY: 0.26, color: '#ffaa44' },
+  dragon:     { style: 'figure8',ax: 0.28, ay: 26, step: 0.75, k: 6.2, move: 0.75, drift: 7, color: '#ff5522' },
+  guardian:   { style: 'strafe', ax: 0.33, ay: 10, step: 1.15, k: 9.0, move: 0.42, drift: 3, color: '#88bbff' },
+  beastking:  { style: 'pounce', ax: 0.24, ay: 16, step: 1.25, k: 7.5, move: 0.62, drift: 2, lowY: 0.27, color: '#ffbb44' },
+  vinetitan:  { style: 'sway',   ax: 0.18, ay: 8,  step: 0.55, k: 2.2, move: 1.10, drift: 3, color: '#99ee55' },
+  kraken:     { style: 'drift',  ax: 0.29, ay: 22, step: 0.60, k: 2.6, move: 1.05, drift: 6, color: '#ff44aa' },
+  frostqueen: { style: 'hover',  ax: 0.30, ay: 16, step: 0.80, k: 4.0, move: 0.80, drift: 5, color: '#8ff6ff' },
+  singularity:{ style: 'warp',   ax: 0.34, ay: 0,  step: 1.50, k: 0,   move: 0.50, drift: 0, color: '#c58bff' },
+  magnetar:   { style: 'orbit',  ax: 0.31, ay: 30, step: 0.85, k: 4.0, move: 0.80, drift: 4, color: '#ff5566' },
+  swarmmother:{ style: 'lunge',  ax: 0.26, ay: 14, step: 1.15, k: 6.2, move: 0.70, drift: 2, lowY: 0.24, color: '#ffcc44' },
+  helios:     { style: 'spin',   ax: 0.34, ay: 12, step: 0.70, k: 5.2, move: 0.78, drift: 5, color: '#ffb347' },
+  duality:    { style: 'mirror', ax: 0.30, ay: 18, step: 1.10, k: 7.0, move: 0.55, drift: 4, color: '#c9a0ff' },
+};
+
+function bossMotionTarget(b, mv, station) {
+  // 统一下移 20px：避免 Boss 上半身被顶部血条压住，轮廓能完整露出来
+  const baseY = (station.y == null ? 104 : station.y) + 20;
+  const alt = ((b.motionStep = (b.motionStep || 0) + 1) & 1) === 0;
+  b.motionPhase = (b.motionPhase || 0) + (mv.step || 1);
+  const ph = b.motionPhase;
+  let x = W / 2;
+  let y = baseY;
+  let k = mv.k;
+
+  switch (mv.style) {
+    case 'orbit':
+      x = W / 2 + Math.cos(ph) * W * mv.ax;
+      y = baseY + Math.sin(ph * 1.7) * mv.ay;
+      break;
+    case 'figure8':
+      x = W / 2 + Math.sin(ph) * W * mv.ax;
+      y = baseY + Math.sin(ph * 2) * mv.ay;
+      break;
+    case 'stomp':
+      x = W / 2 + Math.sin(ph) * W * mv.ax;
+      y = alt ? H * (mv.lowY || 0.26) : baseY;
+      k = alt ? 3.2 : 2.2;
+      break;
+    case 'strafe':
+      x = W / 2 + Math.sin(ph) * W * mv.ax;
+      y = baseY + (alt ? 10 : -8);
+      break;
+    case 'pounce':
+    case 'lunge':
+      x = clamp(player.x + Math.sin(ph * 1.7) * W * 0.12, W * 0.18, W * 0.82);
+      y = alt ? H * (mv.lowY || 0.26) : baseY;
+      break;
+    case 'mirror':
+      x = W / 2 + (alt ? -1 : 1) * W * mv.ax;
+      y = baseY + (alt ? 16 : -12);
+      break;
+    case 'warp':
+      x = W * (0.16 + (0.5 + 0.5 * Math.sin(ph * 1.9)) * 0.68);
+      y = baseY + (H * 0.22 - baseY) * (0.5 + 0.5 * Math.cos(ph * 1.3));
+      break;
+    case 'spin':
+      x = W / 2 + Math.cos(ph) * W * mv.ax;
+      y = baseY + Math.sin(ph * 2) * mv.ay;
+      break;
+    case 'float':
+    case 'drift':
+    case 'hover':
+    case 'sway':
+    default:
+      x = W / 2 + Math.sin(ph) * W * mv.ax;
+      y = baseY + Math.sin(ph * 1.6) * mv.ay;
+      break;
+  }
+
+  return {
+    x: clamp(x, W * 0.14, W * 0.86),
+    y: clamp(y, 70, H * 0.32),
+    k,
+  };
+}
+
+// 移动落地反馈：重装 Boss 的踏地、突进 Boss 的急停都要让玩家“听得见/看得见”
+function bossMotionArrive(b, mv) {
+  const S = b.size / 5;
+  if ((mv.style === 'stomp' || mv.style === 'pounce' || mv.style === 'lunge') && b.y > H * 0.16) {
+    const heavy = mv.style === 'stomp';
+    addShockwave(b.x, b.y + 26 * S, mv.color, (heavy ? 96 : 66) * S, 0.5, heavy ? 5 : 3);
+    game.shake = Math.max(game.shake, heavy ? 0.28 : 0.15);
+    for (let i = 0; i < (heavy ? 10 : 6); i++) {
+      game.particles.push({
+        x: b.x + rand(-28, 28) * S, y: b.y + 24 * S,
+        vx: rand(-90, 90), vy: rand(-70, -10),
+        life: rand(0.3, 0.6), color: heavy ? '#d9b072' : mv.color, size: rand(2, 5) * S,
+      });
+    }
+  } else if (mv.style === 'strafe') {
+    for (let i = 0; i < 4; i++) {
+      game.particles.push({
+        x: b.x + rand(-20, 20) * S, y: b.y + rand(-8, 8) * S,
+        vx: rand(-60, 60), vy: rand(-10, 10),
+        life: rand(0.18, 0.3), color: mv.color, size: rand(1.5, 3) * S,
+      });
+    }
+  }
+}
+
+function spawnBossMotionFx(b, mv, dt) {
+  b.motionFxT = (b.motionFxT || 0) - dt;
+  if (b.motionFxT > 0) return;
+  b.motionFxT = (mv.style === 'strafe' || mv.style === 'figure8') ? 0.06 : 0.10;
+  const S = b.size / 5;
+  game.particles.push({
+    x: b.x + rand(-14, 14) * S, y: b.y + rand(-10, 14) * S,
+    vx: rand(-25, 25), vy: rand(-8, 28),
+    life: rand(0.25, 0.5), color: mv.color, size: rand(1.5, 3.4) * S,
+  });
+}
+
 // 剧本运行时：移动 → 预警 → 发射 → 恢复。同一时刻只跑一个招式。
 function updateBossScript(b, dt) {
   const script = BOSS_SCRIPTS[b.type];
@@ -11180,6 +11377,8 @@ function updateBossScript(b, dt) {
   if (b.type === 'magnetar') updateMagnetarCore(b, dt);
   else if (b.type === 'swarmmother') updateSwarmCore(b, dt);
 
+  const mv = BOSS_MOTION[b.type] || BOSS_MOTION.default;
+
   // 冲撞招式：预警后沿锁定方向推进，接近终点或越界时停止
   if (b.charging) {
     b.x += b.vx * dt;
@@ -11188,6 +11387,8 @@ function updateBossScript(b, dt) {
     if (remain < 28 || b.y >= (b.chargeY || H * 0.6)) {
       b.charging = false;
       b.y = clamp(b.y, 70, H * 0.72);
+      // 冲撞结束后以当前位置作为恢复锚点，避免下一帧瞬移回原位
+      if (b.scriptState) { b.scriptState.tx = b.x; b.scriptState.ty = b.y; }
     }
     b.x = clamp(b.x, 30, W - 30);
   }
@@ -11214,21 +11415,48 @@ function updateBossScript(b, dt) {
     s.name = name;
     s.pattern = script.patterns[name];
     s.phase = 'move';
-    s.timer = 0.5;
     const station = script.stations[s.pattern.station] || script.stations.center;
-    s.tx = W * station.fx;
-    s.ty = station.y;
+    const tgt = bossMotionTarget(b, mv, station);
+    s.tx = tgt.x;
+    s.ty = tgt.y;
+    s.moveK = tgt.k || mv.k || 4;
+    s.moveT = 0;
+    s.warpDone = false;
+    s.timer = mv.move || 0.7;
     clearBossTelegraphs();
     return;
   }
 
   if (s.phase === 'move') {
-    const k = Math.min(1, 5.5 * dt);
-    b.x += (s.tx - b.x) * k;
-    b.y += (s.ty - b.y) * k;
     s.timer -= dt;
+    s.moveT = (s.moveT || 0) + dt;
+    if (mv.style === 'warp') {
+      // 空间跳跃：短暂蓄力后瞬移，旧位置与新位置各留一圈相位残响
+      if (!s.warpDone && s.moveT >= 0.14) {
+        const S = b.size / 5;
+        addShockwave(b.x, b.y, mv.color, 46 * S, 0.32, 3);
+        b.x = s.tx;
+        b.y = s.ty;
+        addShockwave(b.x, b.y, mv.color, 78 * S, 0.42, 4);
+        game.shake = Math.max(game.shake, 0.12);
+        s.warpDone = true;
+      }
+    } else {
+      const k = Math.min(1, (s.moveK || 4) * dt);
+      b.x += (s.tx - b.x) * k;
+      b.y += (s.ty - b.y) * k;
+      spawnBossMotionFx(b, mv, dt);
+    }
     if (s.timer <= 0) {
-      b.x = s.tx; b.y = s.ty;
+      if (mv.style === 'warp' && !s.warpDone) {
+        b.x = s.tx; b.y = s.ty;
+      }
+      // 平滑风格允许保留少量误差，重装/突进则精确落点
+      if (mv.style !== 'float' && mv.style !== 'drift' && mv.style !== 'sway') {
+        b.x = s.tx; b.y = s.ty;
+      }
+      s.tx = b.x; s.ty = b.y;
+      bossMotionArrive(b, mv);
       s.phase = 'tele';
       s.timer = s.pattern.tele;
       b.teleMax = s.pattern.tele;
@@ -11273,6 +11501,12 @@ function updateBossScript(b, dt) {
 
   if (s.phase === 'recover') {
     s.timer -= dt;
+    // 恢复期不再站桩：围绕当前锚点做小幅余摆，让下一次起手前的位移连续可见
+    if (mv.drift > 0 && !b.charging) {
+      const ph = b.t * 1.5 + (b.motionPhase || 0);
+      b.x = clamp(s.tx + Math.sin(ph) * mv.drift, 34, W - 34);
+      b.y = clamp(s.ty + Math.cos(ph * 1.3) * mv.drift * 0.45, 64, H * 0.34);
+    }
     if (s.timer <= 0) s.phase = 'idle';
   }
 }
@@ -12366,7 +12600,7 @@ function updateEliteEvent(dt) {
     if (game.eliteList.length === 0) {
       game.eliteState = 'done';
       game.score += ev.rewardScore;
-      grantAlloy(10 + game.level * 2);
+      grantAlloy(5 + Math.floor(game.level / 2));
       addFloatText(W / 2, H * 0.34, '精英击破 +' + ev.rewardScore, true);
       addShockwave(W / 2, H * 0.34, '#ffcc44', 150, 0.6, 4);
       sfx('powerup');
@@ -15374,11 +15608,11 @@ function startGame(level, opts) {
     w.invuln = 0.5; w.flash = 0;
   }
   // ---- 永久改装 + 三选一模块 ----
-  player.dmgMult = 1 + upgradeLv('damage') * 0.04;
-  player.wingDmgMult = 1 + upgradeLv('wingman') * 0.05;
-  player.fireRateMult = 1 - upgradeLv('fireRate') * 0.03;
+  player.dmgMult = 1 + upgradeLv('damage') * 0.07;
+  player.wingDmgMult = 1 + upgradeLv('wingman') * 0.08;
+  player.fireRateMult = 1 - upgradeLv('fireRate') * 0.035;
   player.dashCDMult = 1 - upgradeLv('dash') * 0.04;
-  player.maxShield = GAME_CONFIG.maxShield + upgradeLv('shield') * 0.2 + (game.module === 1 ? 1 : 0);
+  player.maxShield = GAME_CONFIG.maxShield + upgradeLv('shield') * 0.3 + (game.module === 1 ? 1 : 0);
   player.shield = player.maxShield;
   if (!keepWingmen && game.module === 0) { acquireWingman(); acquireWingman(); }
   if (game.module === 2) player.bombs = Math.min(bombCap(), player.bombs + 1);
@@ -15581,7 +15815,7 @@ function endLevel(win) {
   const stars = starCount(medalMask);
   renderStarRow(stars);
   // 合金结算：通关 + 星级奖励；局内精英/Boss 合金已即时入账
-  grantAlloy((win ? 15 : 0) + stars * 6);
+  grantAlloy((win ? 7 : 0) + stars * 3);
   const alloyEl = document.getElementById('ovAlloy');
   if (alloyEl) alloyEl.textContent = '+' + game.alloyGain;
   const hangarEl = document.getElementById('ovHangarTotal');
@@ -16219,6 +16453,15 @@ function render() {
 function renderHangar() {
   const alloyEl = document.getElementById('hangarAlloy');
   if (alloyEl) alloyEl.textContent = save.alloy | 0;
+  const needEl = document.getElementById('hangarNeed');
+  if (needEl) {
+    let spent = 0;
+    for (const def of UPGRADE_DEFS) {
+      const lv = upgradeLv(def.key);
+      for (let i = 0; i < lv; i++) spent += def.costs[i];
+    }
+    needEl.textContent = `· 全满需 ${upgradeTotalCost().toLocaleString()}（已投入 ${spent.toLocaleString()}）`;
+  }
   const list = document.getElementById('hangarList');
   if (!list) return;
   list.innerHTML = UPGRADE_DEFS.map(def => {
@@ -16227,7 +16470,10 @@ function renderHangar() {
     const cost = maxed ? 0 : def.costs[lv];
     const afford = !maxed && (save.alloy | 0) >= cost;
     const pips = Array.from({ length: def.max }, (_, i) => `<i class="${i < lv ? 'on' : ''}"></i>`).join('');
-    return `<div class="hangar-row"><div class="hangar-info"><b>${def.name}</b><span>${def.desc}</span>` +
+    const bonus = upgradeBonusText(def, lv);
+    const nextBonus = maxed ? '' : `<span class="next"> → 下一级 <b>${upgradeBonusText(def, lv + 1)}</b></span>`;
+    return `<div class="hangar-row"><div class="hangar-info"><b>${def.name} <span style="display:inline;color:#7fd7ff">Lv.${lv}/${def.max}</span></b><span>${def.desc}</span>` +
+      `<div class="hangar-bonus">当前 <b>${bonus}</b>${nextBonus}</div>` +
       `<div class="hangar-pips">${pips}</div></div>` +
       `<button class="opt-btn hangar-buy" data-key="${def.key}" ${maxed || !afford ? 'disabled' : ''}>` +
       `${maxed ? 'MAX' : '升级 ' + cost}</button></div>`;
@@ -16274,7 +16520,7 @@ function updateDiffSelect() {
   const desc = document.getElementById('diffDesc');
   if (desc) {
     const d = DIFFICULTIES[cur];
-    desc.innerHTML = `${d.desc} · 得分倍率 <b>×${d.scoreMult.toFixed(2)}</b>`;
+    desc.innerHTML = `${d.desc} · 得分 <b>×${d.scoreMult.toFixed(2)}</b> · 合金 <b>×${d.alloyMult.toFixed(2)}</b>`;
   }
 }
 function buildLevelGrid() {
