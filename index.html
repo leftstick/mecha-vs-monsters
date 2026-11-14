@@ -1728,6 +1728,9 @@ let player = {
   maxShield: GAME_CONFIG.maxShield,
   shieldRegenTimer: 0, // 受伤后回盾冷却
   shieldPulse: 0,      // 护盾受击冲击环（0-1，衰减）
+  shieldHitT: 0,       // 护盾蜂窝受击反馈（0-1，衰减）
+  shieldHitSeed: 0,    // 受击网格方位
+  deployT: 0.6,        // 出击部署进度（秒），0.6 表示完成
   invuln: 0,
   fireCD: 0,
   tilt: 0,
@@ -4188,6 +4191,91 @@ function drawHullFalcon(V) {
   hullFlare(V, 0, 31, 3.2, t, 15);
 }
 
+/* 出击部署特效：能量光柱 + 展开冲击环 + 横向翼展光 */
+function drawDeployFx(SV, dep, de) {
+  const a = 1 - de;
+  if (a <= 0.01) return;
+  const R = SV.shieldR || 44;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  // 垂直降落光柱
+  const cg = ctx.createLinearGradient(0, -R * 2.6, 0, R * 1.4);
+  cg.addColorStop(0, hexToRgba(SV.accent, 0));
+  cg.addColorStop(0.55, hexToRgba(SV.accent, 0.3 * a));
+  cg.addColorStop(1, hexToRgba(SV.accent, 0));
+  ctx.fillStyle = cg;
+  ctx.fillRect(-9 * a - 2, -R * 2.6, 18 * a + 4, R * 4);
+  // 展开冲击环
+  for (let i = 0; i < 3; i++) {
+    const rr = R * (0.35 + 1.15 * ((1 - a) * 1.4 + i * 0.18));
+    ctx.strokeStyle = hexToRgba(SV.accent, 0.5 * a * (1 - i * 0.25));
+    ctx.lineWidth = 2.2 - i * 0.5;
+    ctx.beginPath(); ctx.ellipse(0, 4, rr, rr * 0.42, 0, 0, Math.PI * 2); ctx.stroke();
+  }
+  // 翼展光带
+  const wl = R * 1.25 * de;
+  const lg = ctx.createLinearGradient(-wl, 8, wl, 8);
+  lg.addColorStop(0, hexToRgba(SV.accent, 0));
+  lg.addColorStop(0.5, 'rgba(235,255,255,0.85)');
+  lg.addColorStop(1, hexToRgba(SV.accent, 0));
+  ctx.strokeStyle = lg; ctx.lineWidth = 2.4;
+  ctx.beginPath(); ctx.moveTo(-wl, 8); ctx.lineTo(wl, 8); ctx.stroke();
+  // 中心高光
+  const fg = ctx.createRadialGradient(0, 0, 1, 0, 0, R * 1.1);
+  fg.addColorStop(0, 'rgba(255,255,255,' + (0.5 * a) + ')');
+  fg.addColorStop(0.4, hexToRgba(SV.accent, 0.28 * a));
+  fg.addColorStop(1, hexToRgba(SV.accent, 0));
+  ctx.fillStyle = fg;
+  ctx.beginPath(); ctx.ellipse(0, 2, R * 1.1, R * 0.8, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+/* 护盾蜂窝受击：格栅闪现 + 命中格高亮 + 放射裂纹 */
+function drawShieldHitFx(SV, hh, seed) {
+  const R = SV.shieldR || 44;
+  const det = GAME_ART_CONFIG.quality !== 'low';
+  const a0 = ((seed || 0) / 6) * Math.PI * 2 - Math.PI / 2;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  if (det) {
+    // 蜂窝格栅（仅显示护盾范围内）
+    const cell = R / 3.6;
+    ctx.strokeStyle = 'rgba(170,250,255,' + (0.34 * hh) + ')';
+    ctx.lineWidth = 0.7;
+    for (let row = -3; row <= 3; row++) {
+      for (let col = -3; col <= 3; col++) {
+        const hx = col * cell * 1.52;
+        const hy = row * cell * 1.75 + (col & 1 ? cell * 0.875 : 0);
+        if (Math.hypot(hx, hy) > R - cell * 0.6) continue;
+        hullHex(hx, hy, cell * 0.9, 0);
+        ctx.stroke();
+      }
+    }
+  }
+  // 命中格高亮（两格）
+  for (let i = 0; i < 2; i++) {
+    const a = a0 + i * Math.PI / 3;
+    const hx = Math.cos(a) * R * 0.7, hy = Math.sin(a) * R * 0.7;
+    hullHex(hx, hy, R * 0.3, 0);
+    const ag = ctx.createRadialGradient(hx, hy, 0.5, hx, hy, R * 0.62);
+    ag.addColorStop(0, 'rgba(255,255,255,' + (0.8 * hh) + ')');
+    ag.addColorStop(0.45, 'rgba(120,240,255,' + (0.42 * hh) + ')');
+    ag.addColorStop(1, 'rgba(120,240,255,0)');
+    ctx.fillStyle = ag; ctx.fill();
+  }
+  // 放射裂纹
+  ctx.strokeStyle = 'rgba(205,250,255,' + (0.5 * hh) + ')';
+  ctx.lineWidth = 1.1;
+  for (let i = 0; i < 6; i++) {
+    const a = a0 + i * Math.PI / 3 + 0.26;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * R * 0.32, Math.sin(a) * R * 0.32);
+    ctx.lineTo(Math.cos(a) * R * 0.82, Math.sin(a) * R * 0.82);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function drawPlayer() {
   if (player.invuln > 0 && Math.floor(player.invuln * 12) % 2) return;
   const x = player.x, y = player.y;
@@ -4195,10 +4283,13 @@ function drawPlayer() {
   drawPlayerGhosts(x, y, renderTilt);
   const shipKey = player.ship || 'balanced';
   const SV = getShip(shipKey).visual;
+  // 出击部署：机体自下而上浮出，双翼横向展开，能量环点亮
+  const dep = clamp((player.deployT || 0) / 0.6, 0, 1);
+  const de = 1 - Math.pow(1 - dep, 3);
   ctx.save();
-  ctx.translate(x, y);
+  ctx.translate(x, y + (1 - de) * 34);
   ctx.rotate(tilt);
-  ctx.scale(1.08 * SV.scale, 1.08 * SV.scale);
+  ctx.scale(1.08 * SV.scale * (0.4 + 0.6 * de), 1.08 * SV.scale * (0.84 + 0.16 * de));
 
   // ---- 磁极立场（相位关卡）：机体外圈极色光环，切换瞬间爆发 ----
   if (levelPhaseMode()) {
@@ -4227,6 +4318,8 @@ function drawPlayer() {
   if (shipKey === 'fortress') drawHullBastion(SV);
   else if (shipKey === 'falcon') drawHullFalcon(SV);
   else drawHullSirius(SV);
+
+  if (dep < 1) drawDeployFx(SV, dep, de);
 
   // 枪口锥形闪光（读 player.fireCD，不写状态）
   if (GAME_ART_CONFIG.fx.muzzleFlash && player.fireCD > 0) {
@@ -4354,6 +4447,9 @@ function drawPlayer() {
     ctx.shadowBlur = 0;
     ctx.globalCompositeOperation = 'source-over';
   }
+
+  // 护盾蜂窝受击反馈：格栅闪现 + 命中格高亮 + 放射裂纹
+  if (player.shieldHitT > 0 && player.shield > 0) drawShieldHitFx(SV, player.shieldHitT, player.shieldHitSeed);
 
   // 动态引擎投影（随喷焰脉动，不写 player）
   const ACp = GAME_ART_CONFIG;
@@ -11074,6 +11170,8 @@ function playerHit() {
     // 护盾吸收伤害
     player.shield--;
     player.shieldPulse = 1; // 触发护盾冲击环
+    player.shieldHitT = 1;
+    player.shieldHitSeed = ((player.shieldHitSeed || 0) + 1 + ((Math.random() * 6) | 0)) % 6;
     game.shake = 0.15;
     addExplosion(player.x, player.y, '#00ddff', 8, 0.6);
     sfx('hit');
@@ -16913,6 +17011,7 @@ function startGame(level, opts) {
   renderTilt = 0;
   player.x = W / 2; player.y = H - 100;
   player.hp = CFG.maxHP; player.maxShield = GAME_CONFIG.maxShield; player.shield = GAME_CONFIG.maxShield; player.shieldRegenTimer = 0; player.invuln = 0; player.fireCD = 0;
+  player.deployT = 0; player.shieldHitT = 0;
   player.weapon = 'normal'; player.weaponTime = 0;
   player.dashTime = 0; player.dashCD = 0; player.dashVX = 0; player.dashVY = 0;
   player.lastDX = 0; player.lastDY = 0;
@@ -16990,6 +17089,7 @@ function resumeGame(snap) {
   player.shield = clamp(+snap.shield || 0, 0, player.maxShield);
   player.shieldRegenTimer = GAME_CONFIG.shieldRegenDelay;
   player.invuln = 1.5; // 续玩后短暂无敌，避免加载即受击
+  player.deployT = 0.6; // 续玩不重播部署动画
   const wpn = ['normal', 'laser', 'shotgun', 'rocket'].includes(snap.weapon) ? snap.weapon : 'normal';
   if (wpn !== 'normal' && (+snap.weaponTime || 0) > 0) {
     player.weapon = wpn;
@@ -17102,6 +17202,7 @@ function retryBoss() {
   game.bossRetry = false;
   player.x = W / 2; player.y = H - 100;
   player.hp = player.maxHp || CFG.maxHP; player.maxShield = GAME_CONFIG.maxShield; player.shield = GAME_CONFIG.maxShield; player.shieldRegenTimer = 0; player.invuln = 1.5; player.fireCD = 0;
+  player.deployT = 0; player.shieldHitT = 0;
   player.weapon = 'normal'; player.weaponTime = 0;
   player.dashTime = 0; player.dashCD = 0; player.dashVX = 0; player.dashVY = 0;
   player.lastDX = 0; player.lastDY = 0;
@@ -17536,6 +17637,8 @@ function update(dt) {
   }
   // 护盾冲击环衰减
   if (player.shieldPulse > 0) player.shieldPulse = Math.max(0, player.shieldPulse - dt * 2.5);
+  if (player.shieldHitT > 0) player.shieldHitT = Math.max(0, player.shieldHitT - dt * 2.6);
+  if (player.deployT < 0.6) player.deployT = Math.min(0.6, player.deployT + dt);
   player.fireCD -= dt;
   // 武器持续时间
   if (player.weaponTime > 0) {
