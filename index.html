@@ -19,13 +19,17 @@
   #scan{position:fixed;inset:0;pointer-events:none;z-index:40;
     background:repeating-linear-gradient(0deg,rgba(0,0,0,0.10) 0px,rgba(0,0,0,0.10) 1px,transparent 1px,transparent 3px);
     mix-blend-mode:multiply;}
-  /* 低画质：移除高成本合成层（全屏混合、backdrop 模糊、滤镜动画） */
-  body.perf-low #scan,body.perf-wechat #scan{display:none;}
+  /* 轻量特效层：移动端统一关闭高成本合成层。
+     夸克/UC 等 Chromium 内核对全屏 mix-blend-mode 与 backdrop-filter 的合成回退极慢，
+     扫描线 + 半透明 HUD 模糊叠在一起时每帧都要整屏重混合，帧率会直接腰斩。 */
+  body.perf-lite #scan,body.perf-low #scan,body.perf-wechat #scan{display:none;}
+  body.perf-lite .hud-panel,body.perf-lite .ov,
   body.perf-low .hud-panel,body.perf-low .ov,
   body.perf-wechat .hud-panel,body.perf-wechat .ov{
     backdrop-filter:none;-webkit-backdrop-filter:none;}
-  body.perf-low .bar-scan,body.perf-wechat .bar-scan{display:none;}
-  body.perf-low .title,body.perf-wechat .title{animation:none;}
+  body.perf-lite .bar-scan,body.perf-low .bar-scan,body.perf-wechat .bar-scan{display:none;}
+  body.perf-lite .title,body.perf-low .title,body.perf-wechat .title{animation:none;}
+  body.perf-lite #hud,body.perf-lite #wrap{will-change:auto;}
 
   /* ============ HUD 三段式 ============ */
   #hud{position:fixed;top:0;left:0;right:0;bottom:0;z-index:20;
@@ -576,15 +580,23 @@ let W = 0, H = 0, DPR = 1;
 // 移动端限制渲染像素比：DPR 2 会让 393×873 的视口产生 137 万像素的后备缓冲，
 // 叠加上多层全屏特效后填充率直接翻倍，是手机上掉帧的首要原因。
 const MOBILE_DPR_CAP = 1.5;
+// 单帧后备缓冲的像素预算：超过就把 DPR 压到预算内，避免大屏手机直接爆填充率。
+const PIXEL_BUDGET = 1150000;
 // 运行时自适应画质会改写这个上限：微信内浏览器起步更保守，后续按帧耗能升降。
 const IS_WECHAT_BROWSER = isWeChatBrowser();
+const IS_QUARK_BROWSER = isQuarkBrowser();
 const IS_MOBILE_DEVICE = isMobileDevice();
-let renderDPRCap = IS_MOBILE_DEVICE ? (IS_WECHAT_BROWSER ? 1.25 : MOBILE_DPR_CAP) : 2;
+let renderDPRCap = IS_MOBILE_DEVICE ? ((IS_WECHAT_BROWSER || IS_QUARK_BROWSER) ? 1.25 : MOBILE_DPR_CAP) : 2;
 const vv = () => window.visualViewport;
 function resize() {
   W = vv() ? vv().width : innerWidth;
   H = vv() ? vv().height : innerHeight;
-  DPR = Math.min(devicePixelRatio || 1, renderDPRCap);
+  let dpr = Math.min(devicePixelRatio || 1, renderDPRCap);
+  // 面积预算兜底（仅移动端）：2K 屏 + 1.5 DPR 时后备缓冲会到 300 万像素，手机 GPU 扛不住
+  if (IS_MOBILE_DEVICE && W > 0 && H > 0 && W * H * dpr * dpr > PIXEL_BUDGET) {
+    dpr = Math.max(1, Math.sqrt(PIXEL_BUDGET / (W * H)));
+  }
+  DPR = dpr;
   canvas.width = W * DPR;
   canvas.height = H * DPR;
   canvas.style.width = W + 'px';
@@ -2027,6 +2039,12 @@ function isWeChatBrowser() {
   return /MicroMessenger/i.test(navigator.userAgent);
 }
 
+// 夸克 / UC 系列：Chromium 内核，但合成器对全屏混合、backdrop-filter 的回退极慢，
+// 实际表现比微信 XWeb 更吃性能。按「低端机」策略起步。
+function isQuarkBrowser() {
+  return /Quark|UCBrowser|UCWEB|UBrowser|AliApp/i.test(navigator.userAgent);
+}
+
 /* ==================== 运行时自适应画质 ====================
  * 微信内置浏览器（XWeb 嵌在 Android View 中）无法像独立 Chromium 那样
  * 独占合成器，GPU 策略更保守。按真实渲染帧间隔动态调档：
@@ -2051,6 +2069,14 @@ const PERF_PROFILES = {
       { quality: 'low', dpr: 1.0 },
     ],
   },
+  // 夸克/UC：合成器回退比微信更慢，直接按低端机起步
+  quark: {
+    start: 0, maxIndex: 0,
+    tiers: [
+      { quality: 'low', dpr: 1.25 },
+      { quality: 'low', dpr: 1.0 },
+    ],
+  },
   desktop: {
     start: 0, maxIndex: 0,
     tiers: [
@@ -2061,7 +2087,7 @@ const PERF_PROFILES = {
   },
 };
 
-const PERF_WINDOW = 45;        // 45 个渲染帧 ≈ 0.75s 一个统计窗口
+const PERF_WINDOW = 30;        // 30 个渲染帧 ≈ 0.5s 一个统计窗口（低帧率下也能快速反应）
 const PERF_BAD_MS = 19.5;      // 平均帧间隔 > 19.5ms（低于约 51fps）
 const PERF_GOOD_MS = 17.6;     // 平均帧间隔 < 17.6ms（基本满 60fps）
 const PERF_DOWN_WINDOWS = 2;   // 连续 2 个差窗口才降档
@@ -2079,6 +2105,7 @@ const perfMeter = {
   cooldownUntil: 0,
   upBlockedUntil: 0,
   lastUpgradeAt: -Infinity,
+  hasDowngraded: false,
 };
 
 let _lowFxActive = false;
@@ -2138,6 +2165,7 @@ function removeLowFxOverrides() {
 
 function pickPerfProfile() {
   if (IS_WECHAT_BROWSER) return PERF_PROFILES.wechat;
+  if (IS_QUARK_BROWSER) return PERF_PROFILES.quark;
   if (IS_MOBILE_DEVICE) return PERF_PROFILES.mobile;
   return PERF_PROFILES.desktop;
 }
@@ -2169,6 +2197,8 @@ function resetPerfMeter(now) {
 function initPerfAdaptive() {
   perfMeter.profile = pickPerfProfile();
   if (IS_WECHAT_BROWSER) document.body.classList.add('perf-wechat');
+  // 所有移动端关闭高成本合成特效（与 Canvas 画质档位解耦）
+  if (IS_MOBILE_DEVICE) document.body.classList.add('perf-lite');
   applyPerfTier(perfMeter.profile.start);
   resetPerfMeter(0);
 }
@@ -2199,7 +2229,9 @@ function updatePerfMeter(now) {
 
   if (now < perfMeter.cooldownUntil) return;
 
-  if (perfMeter.bad >= PERF_DOWN_WINDOWS &&
+  // 首次降档只需 1 个差窗口：卡顿浏览器要先救场，之后再按 2 个窗口稳定判定
+  const needBad = perfMeter.hasDowngraded ? PERF_DOWN_WINDOWS : 1;
+  if (perfMeter.bad >= needBad &&
       perfMeter.index < perfMeter.profile.tiers.length - 1) {
     // 刚升档就掉帧，说明这一档撑不住：拉长再次尝试升档的间隔，避免周期性横跳
     if (now - perfMeter.lastUpgradeAt < 10000) {
@@ -2208,6 +2240,7 @@ function updatePerfMeter(now) {
       perfMeter.upBlockedUntil = now + 10000;
     }
     applyPerfTier(perfMeter.index + 1);
+    perfMeter.hasDowngraded = true;
     perfMeter.cooldownUntil = now + PERF_COOLDOWN_MS;
     resetPerfMeter(now);
   } else if (perfMeter.good >= PERF_UP_WINDOWS &&
