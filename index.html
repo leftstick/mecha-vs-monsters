@@ -132,6 +132,12 @@
   .btn.ghost{background:rgba(10,18,28,0.6);color:#80d8ff;border:1px solid rgba(0,229,255,0.3);
     box-shadow:inset 0 0 8px rgba(0,100,140,0.1);}
   .btn.ghost:hover{background:rgba(0,50,80,0.6);color:#00e5ff;border-color:rgba(0,229,255,0.6);}
+  .btn.danger{background:rgba(60,10,14,0.65);color:#ff9a9a;border:1px solid rgba(255,90,90,0.45);
+    box-shadow:inset 0 0 10px rgba(255,60,60,0.12);}
+  .btn.danger:hover{background:rgba(110,18,24,0.8);color:#ffd0d0;border-color:#ff5a5a;}
+  .btn.danger.armed{background:rgba(180,30,30,0.9);color:#fff;border-color:#ff8080;
+    animation:wipePulse .7s ease-in-out infinite;}
+  @keyframes wipePulse{0%,100%{box-shadow:0 0 8px rgba(255,60,60,0.4);}50%{box-shadow:0 0 22px rgba(255,60,60,0.95);}}
   .gp-sel{outline:2px solid #00e5ff;outline-offset:2px;box-shadow:0 0 18px rgba(0,229,255,0.6);transform:scale(1.04);transition:.12s;}
   .btn.ghost.gp-sel{background:rgba(0,229,255,0.2);color:#fff;}
 
@@ -443,6 +449,11 @@
         <button class="opt-btn" data-mode="joystick" id="optJoy">虚拟摇杆</button>
       </div>
       <div class="setting-desc" id="settingDesc">拖动屏幕任意位置移动机甲，自动射击</div>
+    </div>
+    <div class="setting-group">
+      <div class="setting-label">存档管理</div>
+      <button class="btn danger" id="btnWipe" style="width:100%">清除所有游戏数据</button>
+      <div class="setting-desc" id="wipeDesc">删除合金、永久改装、关卡解锁、勋章与排行榜，操作不可恢复</div>
     </div>
     <button class="btn ghost" id="btnSetBack" style="margin-top:24px">返回</button>
   </div>
@@ -1382,7 +1393,7 @@ function getMedalMask(idx, diff) {
 function computeMedalMask(win, hitRate) {
   if (!win) return 0;
   let mask = MEDAL.CLEAR;
-  if (hitRate >= 60 && game.maxCombo >= GAME_CONFIG.combo.aceCombo) mask |= MEDAL.ACE;
+  if (hitRate >= 50 && game.maxCombo >= GAME_CONFIG.combo.aceCombo) mask |= MEDAL.ACE;
   if (game.hitsTaken === 0) mask |= MEDAL.FLAWLESS;
   if (game.rescueTotal > 0 && game.rescued >= game.rescueTotal) mask |= MEDAL.RESCUE;
   return mask;
@@ -2242,8 +2253,16 @@ function enterMobileImmersive() {
   } catch (_) {}
 }
 
+// 开局/全屏切换会触发一次偶发的 blur/visibilitychange，
+// 若直接暂停就会出现“刚开始游戏就弹暂停界面”的怪异体验。
+// 因此每次进入战斗后给自动暂停加一个短暂的豁免窗口。
+let pauseGraceUntil = 0;
+function armPauseGrace(ms) { pauseGraceUntil = performance.now() + (ms || 1600); }
+
 function pauseIfPlaying() {
-  if (game.state === 'playing' && CFG.mobile.pauseOnBlur) togglePause();
+  if (!CFG.mobile.pauseOnBlur) return;
+  if (performance.now() < pauseGraceUntil) return;
+  if (game.state === 'playing') togglePause();
 }
 
 window.addEventListener('popstate', () => {
@@ -8169,6 +8188,14 @@ function drawBoss(b) {
 function setFireCooldown(base) {
   player.fireCD = Math.max(base * 0.5, player.fireCD + base);
 }
+// 命中率分母只统计「场上有可攻击目标时」打出的子弹。
+// 手机端拖动即自动射击，若把空屏扫射也计入，命中率会被永久拉低，精准勋章无法达成。
+function countShot(n) {
+  const hasTarget = game.monsters.length > 0 ||
+    (game.groundTargets && game.groundTargets.length > 0) ||
+    !!(game.boss && game.boss.phase !== 'dead');
+  if (hasTarget) game.shots += (n || 1);
+}
 function fireBullet() {
   if (player.fireCD > 0) return;
   const w = player.weapon;
@@ -8176,13 +8203,13 @@ function fireBullet() {
   if (w === 'normal') {
     setFireCooldown(CFG.fireInterval * cdScale);
     game.bullets.push({ x: player.x, y: player.y - 24, vx: 0, vy: -CFG.bulletSpeed, dmg: 1 * player.dmgMult, type: 'normal' });
-    game.shots++;
+    countShot(1);
     sfx('shoot');
   } else if (w === 'laser') {
     // 激光: 穿透, 高伤害, 宽弹
     setFireCooldown(0.08 * cdScale);
     game.bullets.push({ x: player.x, y: player.y - 24, vx: 0, vy: -CFG.bulletSpeed * 1.4, dmg: 2 * player.dmgMult, type: 'laser', pierce: true });
-    game.shots++;
+    countShot(1);
     sfx('laser');
   } else if (w === 'shotgun') {
     // 霰弹: 5 发扇形散射
@@ -8191,7 +8218,7 @@ function fireBullet() {
       const ang = -Math.PI / 2 + i * 0.18;
       game.bullets.push({ x: player.x, y: player.y - 20, vx: Math.cos(ang) * CFG.bulletSpeed, vy: Math.sin(ang) * CFG.bulletSpeed, dmg: 1 * player.dmgMult, type: 'shotgun' });
     }
-    game.shots += 5;
+    countShot(5);
     sfx('shotgun');
   } else if (w === 'rocket') {
     // 三连发火箭: 追踪, 爆炸伤害
@@ -8199,7 +8226,7 @@ function fireBullet() {
     for (let i = -1; i <= 1; i++) {
       game.bullets.push({ x: player.x + i * 12, y: player.y - 20, vx: i * 60, vy: -CFG.bulletSpeed * 0.9, dmg: 3 * player.dmgMult, type: 'rocket', track: true });
     }
-    game.shots += 3;
+    countShot(3);
     sfx('rocket');
   }
   // 炮口闪光（按武器着色，与子弹外观匹配 + 亮白核）；射速等级越高，炮口越亮越密
@@ -10292,16 +10319,16 @@ function fireWingmanBullet(w) {
       const ang = -Math.PI / 2 + i * 0.16;
       game.bullets.push({ x: bx, y: by, vx: Math.cos(ang) * CFG.bulletSpeed * 0.9, vy: Math.sin(ang) * CFG.bulletSpeed * 0.9, dmg: 0.6 * (player.wingDmgMult || 1), type: 'shotgun', fromWingman: true });
     }
-    game.shots += 3;
+    countShot(3);
   } else if (wpn === 'rocket') {
     game.bullets.push({ x: bx, y: by, vx: 0, vy: -CFG.bulletSpeed * 0.85, dmg: 1.8 * (player.wingDmgMult || 1), type: 'rocket', track: true, fromWingman: true });
-    game.shots++;
+    countShot(1);
   } else if (wpn === 'laser') {
     game.bullets.push({ x: bx, y: by, vx: 0, vy: -CFG.bulletSpeed * 1.25, dmg: 1.2 * (player.wingDmgMult || 1), type: 'laser', pierce: true, fromWingman: true });
-    game.shots++;
+    countShot(1);
   } else {
     game.bullets.push({ x: bx, y: by, vx: 0, vy: -CFG.bulletSpeed, dmg: 0.7 * (player.wingDmgMult || 1), type: 'normal', fromWingman: true });
-    game.shots++;
+    countShot(1);
   }
 }
 function hitWingman(w, dmg, sx, sy) {
@@ -16238,6 +16265,7 @@ function startGame(level, opts) {
   initStars(level);
   game.state = 'playing';
   armBackGuard();
+  armPauseGrace(1800);
   enterMobileImmersive();
   hideAllOverlays();
   const bossBarEl = document.getElementById('bossBar');
@@ -16389,6 +16417,7 @@ function retryBoss() {
   initStars(level);
   game.state = 'playing';
   armBackGuard();
+  armPauseGrace(1800);
   enterMobileImmersive();
   hideAllOverlays();
   const bossBarEl = document.getElementById('bossBar');
@@ -16421,7 +16450,7 @@ function endLevel(win) {
     diffEl.innerHTML = `难度 <b>${diff.name}</b>${diffBonus > 0 ? ' · 加成 <b>+' + diffBonus.toLocaleString() + '</b>' : ''}`;
   }
   document.getElementById('ovKill').textContent = game.kills;
-  const hitRate = game.shots > 0 ? Math.round(game.hits / game.shots * 100) : 0;
+  const hitRate = game.shots > 0 ? Math.min(100, Math.round(game.hits / game.shots * 100)) : 0;
   document.getElementById('ovHit').textContent = hitRate + '%';
   const rank = win ? (hitRate > 60 ? 'S' : hitRate > 40 ? 'A' : 'B') : 'D';
   document.getElementById('rank').textContent = rank;
@@ -16469,6 +16498,7 @@ function togglePause() {
   } else if (game.state === 'pause') {
     game.state = 'playing';
     armBackGuard();
+    armPauseGrace(800);
     document.getElementById('ovPause').classList.add('hidden');
   }
 }
@@ -16719,8 +16749,12 @@ function update(dt) {
   // 消费磁极切换请求（键盘 Shift / 手柄 Y / 触摸按钮）
   if (inputPolarity) { inputPolarity = false; togglePolarity(); }
 
-  // 连击计时：超过 timeout 无击杀则清零
-  if (game.comboTimer > 0) {
+  // 连击计时：只有场上确实存在可攻击目标时才走秒。
+  // 清场后的换波空档里没有怪，连击不该因为“没东西可打”而被迫中断。
+  const comboHasTarget = game.monsters.length > 0 ||
+    (game.groundTargets && game.groundTargets.length > 0) ||
+    !!(game.boss && game.boss.phase !== 'dead');
+  if (comboHasTarget && game.comboTimer > 0) {
     game.comboTimer -= dt;
     if (game.comboTimer <= 0) {
       game.combo = 0;
@@ -17171,7 +17205,7 @@ let briefReturnTo = 'title';
 let briefOpts = null;
 const BRIEF_GOALS = [
   { bit: MEDAL.CLEAR, icon: '通', name: '通关', desc: '击毁关卡 BOSS' },
-  { bit: MEDAL.ACE, icon: '准', name: '精准', desc: '命中率 ≥ 60% 且最高连击 ≥ 10' },
+  { bit: MEDAL.ACE, icon: '准', name: '精准', desc: '命中率 ≥ 50% 且最高连击 ≥ 10（仅统计有敌人时的射击）' },
   { bit: MEDAL.FLAWLESS, icon: '韧', name: '无伤', desc: '全程不受击' },
   { bit: MEDAL.RESCUE, icon: '救', name: '救援', desc: '救出全部幸存者' },
 ];
@@ -17291,6 +17325,46 @@ document.getElementById('btnSettings').addEventListener('click', () => {
 });
 document.getElementById('btnSetBack').addEventListener('click', () => {
   hideAllOverlays(); document.getElementById('ovTitle').classList.remove('hidden');
+});
+
+// 清除所有游戏数据：删除永久存档（合金/改装/解锁/勋章/排行榜）与进行中的对局快照。
+// 采用「二次点击确认」，避免手机误触直接清档。
+let wipeArmTimer = null;
+function disarmWipe() {
+  const btn = document.getElementById('btnWipe');
+  if (!btn) return;
+  delete btn.dataset.armed;
+  btn.classList.remove('armed');
+  btn.textContent = '清除所有游戏数据';
+}
+function wipeAllData() {
+  try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+  clearRunSave();
+  // 重新读取默认存档并写回内存，保证不刷新页面也立即生效
+  const fresh = loadSave();
+  for (const k of Object.keys(save)) delete save[k];
+  Object.assign(save, fresh);
+  game.difficulty = 0;
+  player.wingmen.length = 0;
+  game.state = 'title';
+  buildLevelGrid();
+  updateHUD();
+  const desc = document.getElementById('wipeDesc');
+  if (desc) desc.textContent = '已清除：合金、永久改装、关卡解锁、勋章与排行榜全部归零';
+}
+document.getElementById('btnWipe').addEventListener('click', () => {
+  const btn = document.getElementById('btnWipe');
+  if (!btn.dataset.armed) {
+    btn.dataset.armed = '1';
+    btn.classList.add('armed');
+    btn.textContent = '再次点击确认清除';
+    if (wipeArmTimer) clearTimeout(wipeArmTimer);
+    wipeArmTimer = setTimeout(disarmWipe, 4000);
+    return;
+  }
+  if (wipeArmTimer) clearTimeout(wipeArmTimer);
+  disarmWipe();
+  wipeAllData();
 });
 function setTouchMode(mode) {
   GAME_CONFIG.touch.mode = mode;
