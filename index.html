@@ -254,6 +254,37 @@
   .hangar-buy{padding:7px 9px;font-size:11px;min-width:78px;border-radius:7px;}
   .hangar-buy:disabled{opacity:0.32;cursor:default;border-color:rgba(0,229,255,0.15);}
 
+  /* 战机选择 */
+  .ship-current{margin-top:10px;font-size:11px;letter-spacing:2px;color:#6fa6c4;}
+  .ship-current b{color:#00e5ff;}
+  .ship-card{width:min(94vw,580px);max-height:90vh;overflow:auto;}
+  .ship-sub{font-size:10px;color:#5a7a9a;letter-spacing:1px;margin:-8px 0 14px;text-align:center;}
+  .ship-grid{display:flex;flex-direction:column;gap:10px;margin-bottom:16px;}
+  .ship-item{position:relative;display:flex;gap:12px;align-items:stretch;padding:12px;border-radius:12px;cursor:pointer;
+    border:1px solid rgba(0,229,255,0.16);background:linear-gradient(135deg,rgba(10,20,32,0.92),rgba(5,10,18,0.92));
+    transition:border-color .18s, box-shadow .18s, transform .12s;text-align:left;}
+  .ship-item:active{transform:scale(.995);}
+  .ship-item.on{border-color:var(--sc,#00e5ff);
+    box-shadow:inset 0 0 0 1px var(--sc,#00e5ff), 0 0 20px rgba(0,229,255,0.16);}
+  .ship-item .picked{position:absolute;top:8px;right:10px;font-size:9px;letter-spacing:2px;color:var(--sc,#00e5ff);opacity:0;}
+  .ship-item.on .picked{opacity:1;}
+  .ship-thumb{width:76px;flex:0 0 76px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 50% 42%,rgba(255,255,255,0.06),rgba(0,0,0,0.45));border:1px solid rgba(255,255,255,0.05);}
+  .ship-thumb svg{width:66px;height:66px;}
+  .ship-body{flex:1;min-width:0;}
+  .ship-name{font-size:16px;font-weight:900;letter-spacing:2px;color:#dff6ff;display:flex;align-items:baseline;gap:8px;}
+  .ship-name em{font-style:normal;font-size:9px;font-weight:400;letter-spacing:2px;color:#54748e;}
+  .ship-tag{display:inline-block;margin-left:2px;padding:1px 7px;border-radius:20px;font-size:9px;letter-spacing:1px;
+    color:var(--sc,#00e5ff);border:1px solid var(--sc,#00e5ff);opacity:.85;}
+  .ship-desc{font-size:11px;line-height:1.5;color:#83a3ba;margin:5px 0 8px;}
+  .ship-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:5px 10px;}
+  .ship-stat{font-size:9px;letter-spacing:1px;color:#5f8098;}
+  .ship-stat b{display:block;font-size:9px;font-weight:400;color:#7ea6bf;margin-bottom:3px;}
+  .ship-bar{height:4px;border-radius:2px;background:#122334;overflow:hidden;}
+  .ship-bar i{display:block;height:100%;border-radius:2px;background:var(--sc,#00e5ff);
+    box-shadow:0 0 6px var(--sc,#00e5ff);}
+  .ship-perk{margin-top:8px;font-size:10px;line-height:1.45;color:#8ff7c9;}
+
   /* 任务简报：三选一模块 */
   .module-select{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:4px 0;}
   .module-select .opt-btn{padding:6px 10px;font-size:11px;border-radius:7px;}
@@ -436,9 +467,11 @@
   <div class="menu-btns">
     <button class="btn" id="btnStart">开始游戏</button>
     <button class="btn ghost" id="btnLevel">选择关卡</button>
+    <button class="btn ghost" id="btnShips">选择战机</button>
     <button class="btn ghost" id="btnSettings">操作设置</button>
     <button class="btn ghost" id="btnHangar">机库改装</button>
   </div>
+  <div class="ship-current" id="titleShip">当前战机：天狼 · 均衡</div>
   <div class="hint">桌面: 方向键/WASD 移动 · J/空格 射击 · K 冲刺 · L 炸弹<br/>手机: 触摸拖动移动 · 自动射击 · 右下角 冲刺/炸弹 按钮<br/>第11/14关: Shift / 手柄 Y / 右侧按钮切换磁极<br/>每关 4 枚勋章: 通关 / 精准 / 无伤 / 救援</div>
 </div>
 
@@ -470,6 +503,16 @@
     <div class="hangar-alloy">合金 <b id="hangarAlloy">0</b><span class="hangar-need" id="hangarNeed"></span></div>
     <div class="hangar-list" id="hangarList"></div>
     <button class="btn ghost" id="btnHangarBack">返回</button>
+  </div>
+</div>
+
+<!-- 选择战机 -->
+<div class="ov hidden" id="ovShips">
+  <div class="panel-card ship-card">
+    <div class="panel-title">选择战机</div>
+    <div class="ship-sub">三种机体拥有独立的火力形态、装甲与机动性</div>
+    <div class="ship-grid" id="shipGrid"></div>
+    <button class="btn ghost" id="btnShipsBack">返回</button>
   </div>
 </div>
 
@@ -1254,6 +1297,71 @@ const MODULES = [
   { id: 1, name: '护盾 +1', short: '护盾', desc: '本局护盾上限 +1' },
   { id: 2, name: '炸弹 +1', short: '炸弹', desc: '开局携带 1 枚炸弹' },
 ];
+/* ==================== 战机（机库存档） ==================== */
+// 差异体现在「火力形态 / 生存 / 机动」三个维度，而不是单纯数值堆叠：
+//   天狼：单发机炮，全能；壁垒：三向重炮，慢而硬；游隼：双联针弹，快而脆。
+const SHIP_TYPES = [
+  {
+    key: 'balanced', name: '天狼', en: 'SIRIUS', tag: '均衡',
+    desc: '标准机炮，攻守平衡，适合熟悉关卡。',
+    perk: '开局多 1 架僚机 · 武器拾取 +2 秒',
+    color: '#00e5ff',
+    stat: { fire: 60, speed: 62, armor: 60 },
+    hp: 6, speed: 1.00, cdMult: 1.00, dashMult: 1.00,
+    pickupDmg: 1.00, pickupRate: 1.00,
+    invulnBonus: 0, shieldBonus: 0, extraWingman: true, pickupBonus: 2,
+    visual: {
+      scale: 1.00, span: 38, tipY: -6, rootY: -10, back: 16, notch: 16, hullW: 11, noseY: -30,
+      engines: [-7, 7], accent: '#00e5ff',
+      hull: ['#4d5e70', '#374757', '#23313f', '#121d28'],
+      wing: ['#3e5063', '#2b3b4c', '#1a2836'],
+    },
+  },
+  {
+    key: 'fortress', name: '壁垒', en: 'BASTION', tag: '重装',
+    desc: '三向重炮，射速偏慢，但装甲厚重、容错最高。',
+    perk: '装甲 9 点 · 受击无敌 +0.25 秒 · 护盾 +0.5',
+    color: '#ffb347',
+    stat: { fire: 82, speed: 40, armor: 96 },
+    hp: 9, speed: 0.86, cdMult: 1.12, dashMult: 1.15,
+    pickupDmg: 1.16, pickupRate: 1.00,
+    invulnBonus: 0.25, shieldBonus: 0.5, extraWingman: false, pickupBonus: 0,
+    visual: {
+      scale: 1.12, span: 46, tipY: 2, rootY: -8, back: 20, notch: 20, hullW: 14, noseY: -27,
+      engines: [-12, 0, 12], accent: '#ffb347',
+      hull: ['#6b5642', '#4f4132', '#332a21', '#1d1712'],
+      wing: ['#5a4a39', '#40342a', '#241d17'],
+    },
+  },
+  {
+    key: 'falcon', name: '游隼', en: 'FALCON', tag: '高速',
+    desc: '双联针弹，机动与射速极佳，但装甲薄弱。',
+    perk: '移速 +16% · 冲刺冷却 -35% · 弹药更密集',
+    color: '#7ef0a0',
+    stat: { fire: 74, speed: 96, armor: 30 },
+    hp: 4, speed: 1.16, cdMult: 0.84, dashMult: 0.65,
+    pickupDmg: 0.92, pickupRate: 1.12,
+    invulnBonus: 0, shieldBonus: 0, extraWingman: false, pickupBonus: 0,
+    visual: {
+      scale: 0.96, span: 31, tipY: -14, rootY: -12, back: 19, notch: 11, hullW: 9, noseY: -38,
+      engines: [-5, 5], accent: '#7ef0a0',
+      hull: ['#3f5a4c', '#2e4539', '#1f3028', '#101c17'],
+      wing: ['#35513f', '#26402f', '#16261c'],
+    },
+  },
+];
+function getShip(key) {
+  return SHIP_TYPES.find(s => s.key === key) || SHIP_TYPES[0];
+}
+function currentShip() {
+  return getShip(save.ship);
+}
+function setShip(key) {
+  if (!SHIP_TYPES.some(s => s.key === key)) return;
+  save.ship = key;
+  saveSave(save);
+}
+
 function upgradeLv(key) {
   const def = UPGRADE_DEFS.find(d => d.key === key);
   if (!def) return 0;
@@ -1335,13 +1443,14 @@ function loadSave() {
         const migrated = saveVer < 2;
         if (migrated && upgrades.bomb) upgrades.bomb = clamp(upgrades.bomb * 2, 0, 20);
         const module = clamp(Math.floor(Number(data.module)) || 0, 0, MODULES.length - 1);
-        const out = { v: 2, unlocked, bestScores, medals, stars, difficulty, alloy, upgrades, module };
+        const ship = SHIP_TYPES.some(s => s.key === data.ship) ? data.ship : 'balanced';
+        const out = { v: 2, unlocked, bestScores, medals, stars, difficulty, alloy, upgrades, module, ship };
         if (migrated) saveSave(out);
         return out;
       }
     }
   } catch(e) {}
-  return { v: 2, unlocked: 1, bestScores: {}, medals: {}, stars: {}, difficulty: 0, alloy: 0, upgrades: {}, module: 0 }; // 默认解锁第 1 关
+  return { v: 2, unlocked: 1, bestScores: {}, medals: {}, stars: {}, difficulty: 0, alloy: 0, upgrades: {}, module: 0, ship: 'balanced' }; // 默认解锁第 1 关
 }
 function saveSave(data) {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch(e) {}
@@ -1350,6 +1459,7 @@ let save = loadSave();
 if (!save.upgrades || typeof save.upgrades !== 'object') save.upgrades = {};
 if (save.alloy == null) save.alloy = 0;
 if (save.module == null) save.module = 0;
+if (!SHIP_TYPES.some(s => s.key === save.ship)) save.ship = 'balanced';
 // 合金：击毁精英 / Boss、结算星级发放；不做局内刷取。
 // 高难度按 alloyMult 结算，但基础产出刻意压到「一次全通点不满一条线」。
 function grantAlloy(n) {
@@ -1627,6 +1737,12 @@ let player = {
   critBonus: 0,
   speedMult: 1,
   rateLv: 0,
+  // 战机（机库选择）相关
+  ship: 'balanced',
+  maxHp: CFG.maxHP,
+  pickupDmg: 1,
+  pickupRate: 1,
+  invulnBonus: 0,
 };
 
 let input = { left:false, right:false, up:false, down:false, shoot:false, kbShoot:false };
@@ -1725,7 +1841,7 @@ function refreshMenuButtons() {
   }
   // 关卡格子（未锁定）先收集，再收集按钮，保证默认选中第一项且网格导航正确
   ov.querySelectorAll('.lv:not(.locked)').forEach(d => menuButtons.push(d));
-  ov.querySelectorAll('button.btn, button.opt-btn').forEach(b => {
+  ov.querySelectorAll('button.btn, button.opt-btn, .ship-item').forEach(b => {
     if (b.offsetParent !== null) menuButtons.push(b);
   });
   // 越界保护
@@ -3449,15 +3565,198 @@ function drawPlayerGhosts(x, y, tilt) {
   }
 }
 
+/* ---- 壁垒：宽厚装甲机（双翼挂架 + 三发引擎 + 钝头重炮）---- */
+function drawHullFortress(V) {
+  const t = game.time;
+  // 引擎尾焰（三台）
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const ex of V.engines) {
+    const fl = 0.75 + 0.25 * Math.sin(t * 18 + ex);
+    const g = ctx.createLinearGradient(ex, 18, ex, 78);
+    g.addColorStop(0, `rgba(255,190,110,${0.6 * fl})`);
+    g.addColorStop(0.5, 'rgba(255,140,50,0.22)');
+    g.addColorStop(1, 'rgba(255,120,40,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(ex - 4, 18); ctx.lineTo(ex + 4, 18);
+    ctx.lineTo(ex + 2, 40 + 16 * fl); ctx.lineTo(ex - 2, 40 + 16 * fl);
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+
+  // 主翼：平直宽大，翼端方形装甲
+  const wg = ctx.createLinearGradient(0, -14, 0, 22);
+  wg.addColorStop(0, V.wing[0]); wg.addColorStop(0.55, V.wing[1]); wg.addColorStop(1, V.wing[2]);
+  ctx.fillStyle = wg;
+  ctx.beginPath();
+  ctx.moveTo(-V.span, V.back);
+  ctx.lineTo(-V.span, V.back - 12);
+  ctx.lineTo(-V.span * 0.55, V.rootY);
+  ctx.lineTo(V.span * 0.55, V.rootY);
+  ctx.lineTo(V.span, V.back - 12);
+  ctx.lineTo(V.span, V.back);
+  ctx.lineTo(V.notch, 22);
+  ctx.lineTo(-V.notch, 22);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,190,120,0.35)'; ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  // 翼下装甲挂架 + 警示灯
+  for (const side of [-1, 1]) {
+    const px = side * V.span * 0.72;
+    ctx.fillStyle = V.hull[1];
+    ctx.beginPath();
+    ctx.moveTo(px - 6, 4); ctx.lineTo(px + 6, 4);
+    ctx.lineTo(px + 4, 18); ctx.lineTo(px - 4, 18);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = side < 0 ? '#ff5a4a' : '#7ef0a0';
+    ctx.beginPath(); ctx.arc(px, 13, 1.5, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // 机身：厚实矩形到钝头
+  const fg = ctx.createLinearGradient(-V.hullW, 0, V.hullW, 0);
+  fg.addColorStop(0, V.hull[3]); fg.addColorStop(0.35, V.hull[1]);
+  fg.addColorStop(0.65, V.hull[0]); fg.addColorStop(1, V.hull[2]);
+  ctx.fillStyle = fg;
+  ctx.beginPath();
+  ctx.moveTo(-V.hullW * 0.7, V.noseY);
+  ctx.quadraticCurveTo(-V.hullW, V.noseY + 8, -V.hullW, 2);
+  ctx.lineTo(-V.hullW * 0.9, 22);
+  ctx.lineTo(V.hullW * 0.9, 22);
+  ctx.lineTo(V.hullW, 2);
+  ctx.quadraticCurveTo(V.hullW, V.noseY + 8, V.hullW * 0.7, V.noseY);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,200,140,0.22)'; ctx.lineWidth = 1; ctx.stroke();
+
+  // 中央双联炮管
+  ctx.fillStyle = V.hull[2];
+  for (const dx of [-2.5, 2.5]) {
+    ctx.fillRect(dx - 1.2, V.noseY - 3, 2.4, 10);
+  }
+  ctx.fillStyle = V.accent;
+  ctx.globalAlpha = 0.8;
+  ctx.fillRect(-3, V.noseY - 4, 6, 1.6);
+  ctx.globalAlpha = 1;
+
+  // 座舱（宽扁）
+  ctx.fillStyle = '#101a22';
+  ctx.beginPath(); ctx.ellipse(0, -6, 5.5, 7, 0, 0, Math.PI * 2); ctx.fill();
+  const cg = ctx.createLinearGradient(-5, -12, 5, 0);
+  cg.addColorStop(0, 'rgba(255,190,110,0.5)');
+  cg.addColorStop(0.5, 'rgba(140,200,255,0.35)');
+  cg.addColorStop(1, 'rgba(10,20,30,0.1)');
+  ctx.fillStyle = cg;
+  ctx.beginPath(); ctx.ellipse(0, -6, 5.5, 7, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,210,150,0.35)'; ctx.lineWidth = 0.9; ctx.stroke();
+
+  // 装甲分缝
+  ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(-V.hullW + 1, 4); ctx.lineTo(V.hullW - 1, 4); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-V.span * 0.5, 12); ctx.lineTo(-V.span * 0.28, 14); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(V.span * 0.5, 12); ctx.lineTo(V.span * 0.28, 14); ctx.stroke();
+}
+
+/* ---- 游隼：细长高速截击机（大后掠三角翼 + 尖锐机鼻）---- */
+function drawHullFalcon(V) {
+  const t = game.time;
+  // 引擎尾焰（细长）
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const ex of V.engines) {
+    const fl = 0.8 + 0.2 * Math.sin(t * 26 + ex * 2);
+    const g = ctx.createLinearGradient(ex, 16, ex, 92);
+    g.addColorStop(0, `rgba(160,255,205,${0.62 * fl})`);
+    g.addColorStop(0.45, 'rgba(80,240,160,0.2)');
+    g.addColorStop(1, 'rgba(60,220,140,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(ex - 2.6, 16); ctx.lineTo(ex + 2.6, 16);
+    ctx.lineTo(ex + 1.4, 48 + 18 * fl); ctx.lineTo(ex - 1.4, 48 + 18 * fl);
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+
+  // 大后掠主翼
+  const wg = ctx.createLinearGradient(0, -12, 0, 20);
+  wg.addColorStop(0, V.wing[0]); wg.addColorStop(0.55, V.wing[1]); wg.addColorStop(1, V.wing[2]);
+  ctx.fillStyle = wg;
+  ctx.beginPath();
+  ctx.moveTo(-4, -16);
+  ctx.lineTo(-V.span, V.back);
+  ctx.lineTo(-V.span + 4, V.back);
+  ctx.lineTo(-V.notch, 20);
+  ctx.lineTo(V.notch, 20);
+  ctx.lineTo(V.span - 4, V.back);
+  ctx.lineTo(V.span, V.back);
+  ctx.lineTo(4, -16);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(126,240,160,0.4)'; ctx.lineWidth = 1.1; ctx.stroke();
+
+  // 翼端小翼（向上折）
+  for (const side of [-1, 1]) {
+    ctx.fillStyle = V.wing[2];
+    ctx.beginPath();
+    ctx.moveTo(side * V.span, V.back);
+    ctx.lineTo(side * (V.span - 5), V.back - 10);
+    ctx.lineTo(side * (V.span - 9), V.back - 8);
+    ctx.lineTo(side * (V.span - 4), V.back);
+    ctx.closePath(); ctx.fill();
+  }
+
+  // 机身：细长、尖锐机鼻
+  const fg = ctx.createLinearGradient(-V.hullW, 0, V.hullW, 0);
+  fg.addColorStop(0, V.hull[3]); fg.addColorStop(0.35, V.hull[1]);
+  fg.addColorStop(0.7, V.hull[0]); fg.addColorStop(1, V.hull[2]);
+  ctx.fillStyle = fg;
+  ctx.beginPath();
+  ctx.moveTo(0, V.noseY);
+  ctx.quadraticCurveTo(V.hullW * 1.05, V.noseY + 16, V.hullW, -8);
+  ctx.lineTo(V.hullW * 0.72, 20);
+  ctx.lineTo(-V.hullW * 0.72, 20);
+  ctx.lineTo(-V.hullW, -8);
+  ctx.quadraticCurveTo(-V.hullW * 1.05, V.noseY + 16, 0, V.noseY);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(150,255,190,0.25)'; ctx.lineWidth = 1; ctx.stroke();
+
+  // 脊线高光
+  ctx.strokeStyle = 'rgba(200,255,225,0.5)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, V.noseY + 2); ctx.lineTo(0, 18); ctx.stroke();
+
+  // 座舱（窄长）
+  ctx.fillStyle = '#0d1a14';
+  ctx.beginPath(); ctx.ellipse(0, -10, 3.6, 7.5, 0, 0, Math.PI * 2); ctx.fill();
+  const cg = ctx.createLinearGradient(-3, -16, 3, -3);
+  cg.addColorStop(0, 'rgba(150,255,200,0.55)');
+  cg.addColorStop(0.5, 'rgba(120,200,255,0.3)');
+  cg.addColorStop(1, 'rgba(8,20,14,0.05)');
+  ctx.fillStyle = cg;
+  ctx.beginPath(); ctx.ellipse(0, -10, 3.6, 7.5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = 'rgba(170,255,205,0.3)'; ctx.lineWidth = 0.8; ctx.stroke();
+
+  // 机鼻空速管
+  ctx.strokeStyle = '#9fdcb8'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, V.noseY); ctx.lineTo(0, V.noseY - 6); ctx.stroke();
+  ctx.fillStyle = V.accent;
+  ctx.beginPath(); ctx.arc(0, V.noseY - 6, 1.1, 0, Math.PI * 2); ctx.fill();
+}
+
 function drawPlayer() {
   if (player.invuln > 0 && Math.floor(player.invuln * 12) % 2) return;
   const x = player.x, y = player.y;
   const tilt = renderTilt * GAME_CONFIG.playerTilt.maxAngle;
   drawPlayerGhosts(x, y, renderTilt);
+  const shipKey = player.ship || 'balanced';
+  const SV = getShip(shipKey).visual;
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(tilt);
-  ctx.scale(1.08, 1.08);
+  ctx.scale(1.08 * SV.scale, 1.08 * SV.scale);
 
   // ---- 磁极立场（相位关卡）：机体外圈极色光环，切换瞬间爆发 ----
   if (levelPhaseMode()) {
@@ -3482,6 +3781,12 @@ function drawPlayer() {
     ctx.restore();
   }
 
+  // ---- 机体外观：按机库选择分派 ----
+  if (shipKey === 'fortress') {
+    drawHullFortress(SV);
+  } else if (shipKey === 'falcon') {
+    drawHullFalcon(SV);
+  } else {
   // ---- 引擎长尾迹（加色渐变，向屏幕下方拖曳）----
   const trailPulse = 0.82 + 0.18 * Math.sin(game.time * 16);
   ctx.save();
@@ -3684,6 +3989,7 @@ function drawPlayer() {
   ctx.beginPath(); ctx.moveTo(0,-30); ctx.lineTo(0,-34); ctx.stroke();
   ctx.fillStyle = '#7788aa';
   ctx.beginPath(); ctx.arc(0,-34,1,0,Math.PI*2); ctx.fill();
+  }
 
   // 枪口锥形闪光（读 player.fireCD，不写状态）
   if (GAME_ART_CONFIG.fx.muzzleFlash && player.fireCD > 0) {
@@ -3692,19 +3998,20 @@ function drawPlayer() {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
       const mc = { laser:'#88ddff', shotgun:'#ffd23f', rocket:'#ff8833', normal:'#ffffff' }[player.weapon] || '#ffffff';
+      const MZ = SV.noseY + (shipKey === 'balanced' ? 0 : -4);
       // 外锥光晕
-      const mg = ctx.createRadialGradient(0, -30, 1, 0, -30, 18 * mfI);
+      const mg = ctx.createRadialGradient(0, MZ, 1, 0, MZ, 18 * mfI);
       mg.addColorStop(0, hexToRgba(mc, 0.8 * mfI));
       mg.addColorStop(0.5, hexToRgba(mc, 0.3 * mfI));
       mg.addColorStop(1, hexToRgba(mc, 0));
       ctx.fillStyle = mg;
-      ctx.beginPath(); ctx.arc(0, -30, 18 * mfI, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(0, MZ, 18 * mfI, 0, Math.PI * 2); ctx.fill();
       // 锥形核心
       ctx.fillStyle = `rgba(255,255,255,${0.9 * mfI})`;
       ctx.beginPath();
-      ctx.moveTo(0, -30 - 14 * mfI);
-      ctx.lineTo(-5 * mfI, -30);
-      ctx.lineTo(5 * mfI, -30);
+      ctx.moveTo(0, MZ - 14 * mfI);
+      ctx.lineTo(-5 * mfI, MZ);
+      ctx.lineTo(5 * mfI, MZ);
       ctx.closePath(); ctx.fill();
       ctx.restore();
     }
@@ -3732,17 +4039,18 @@ function drawPlayer() {
   ctx.fillStyle = cgB;
   ctx.beginPath(); ctx.arc(0, -14, 12, 0, Math.PI * 2); ctx.fill();
   // 左翼尖
-  const wl = ctx.createRadialGradient(-36, 14, 1, -36, 14, 10);
+  const WT = SV.span - 2;
+  const wl = ctx.createRadialGradient(-WT, 14, 1, -WT, 14, 10);
   wl.addColorStop(0, `rgba(0,200,255,${0.35 * breath2})`);
   wl.addColorStop(1, 'rgba(0,200,255,0)');
   ctx.fillStyle = wl;
-  ctx.beginPath(); ctx.arc(-36, 14, 10, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(-WT, 14, 10, 0, Math.PI * 2); ctx.fill();
   // 右翼尖
-  const wr = ctx.createRadialGradient(36, 14, 1, 36, 14, 10);
+  const wr = ctx.createRadialGradient(WT, 14, 1, WT, 14, 10);
   wr.addColorStop(0, `rgba(0,200,255,${0.35 * breath2})`);
   wr.addColorStop(1, 'rgba(0,200,255,0)');
   ctx.fillStyle = wr;
-  ctx.beginPath(); ctx.arc(36, 14, 10, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(WT, 14, 10, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 
   // 六边形能量护盾（双层旋转 + 顶点脉冲，残盾时加速闪烁）
@@ -8303,30 +8611,58 @@ function fireBullet() {
   const w = player.weapon;
   const cdScale = fireIntervalScale();
   if (w === 'normal') {
-    setFireCooldown(CFG.fireInterval * cdScale);
-    game.bullets.push({ x: player.x, y: player.y - 24, vx: 0, vy: -CFG.bulletSpeed, dmg: 1 * player.dmgMult, type: 'normal' });
-    countShot(1);
-    sfx('shoot');
+    const shipKey = player.ship || 'balanced';
+    if (shipKey === 'fortress') {
+      // 壁垒：三向重炮，覆盖宽但单发较轻
+      setFireCooldown(CFG.fireInterval * cdScale);
+      for (const off of [-0.16, 0, 0.16]) {
+        const ang = -Math.PI / 2 + off;
+        game.bullets.push({
+          x: player.x + off * 46, y: player.y - 22,
+          vx: Math.cos(ang) * CFG.bulletSpeed, vy: Math.sin(ang) * CFG.bulletSpeed,
+          dmg: 0.52 * player.dmgMult, type: 'normal', heavy: true,
+        });
+      }
+      countShot(3);
+      sfx('shoot');
+    } else if (shipKey === 'falcon') {
+      // 游隼：双联针弹，弹道窄、速度快
+      setFireCooldown(CFG.fireInterval * cdScale);
+      for (const dx of [-6, 6]) {
+        game.bullets.push({
+          x: player.x + dx, y: player.y - 28,
+          vx: 0, vy: -CFG.bulletSpeed * 1.15,
+          dmg: 0.40 * player.dmgMult, type: 'normal', needle: true,
+        });
+      }
+      countShot(2);
+      sfx('shoot');
+    } else {
+      setFireCooldown(CFG.fireInterval * cdScale);
+      game.bullets.push({ x: player.x, y: player.y - 24, vx: 0, vy: -CFG.bulletSpeed, dmg: 1 * player.dmgMult, type: 'normal' });
+      countShot(1);
+      sfx('shoot');
+    }
   } else if (w === 'laser') {
     // 激光: 穿透, 高伤害, 宽弹
-    setFireCooldown(0.08 * cdScale);
-    game.bullets.push({ x: player.x, y: player.y - 24, vx: 0, vy: -CFG.bulletSpeed * 1.4, dmg: 2 * player.dmgMult, type: 'laser', pierce: true });
+    setFireCooldown(0.08 * cdScale / (player.pickupRate || 1));
+    game.bullets.push({ x: player.x, y: player.y - 24, vx: 0, vy: -CFG.bulletSpeed * 1.4, dmg: 2 * player.dmgMult * (player.pickupDmg || 1), type: 'laser', pierce: true });
     countShot(1);
     sfx('laser');
   } else if (w === 'shotgun') {
     // 霰弹: 5 发扇形散射
-    setFireCooldown(0.28 * cdScale);
+    setFireCooldown(0.28 * cdScale / (player.pickupRate || 1));
     for (let i = -2; i <= 2; i++) {
       const ang = -Math.PI / 2 + i * 0.18;
-      game.bullets.push({ x: player.x, y: player.y - 20, vx: Math.cos(ang) * CFG.bulletSpeed, vy: Math.sin(ang) * CFG.bulletSpeed, dmg: 1 * player.dmgMult, type: 'shotgun' });
+      game.bullets.push({ x: player.x, y: player.y - 20, vx: Math.cos(ang) * CFG.bulletSpeed, vy: Math.sin(ang) * CFG.bulletSpeed, dmg: 1 * player.dmgMult * (player.pickupDmg || 1), type: 'shotgun' });
     }
     countShot(5);
     sfx('shotgun');
   } else if (w === 'rocket') {
     // 三连发火箭: 追踪, 爆炸伤害
-    setFireCooldown(0.35 * cdScale);
+    setFireCooldown(0.35 * cdScale / (player.pickupRate || 1));
     for (let i = -1; i <= 1; i++) {
-      game.bullets.push({ x: player.x + i * 12, y: player.y - 20, vx: i * 60, vy: -CFG.bulletSpeed * 0.9, dmg: 3 * player.dmgMult, type: 'rocket', track: true });
+      game.bullets.push({ x: player.x + i * 12, y: player.y - 20, vx: i * 60, vy: -CFG.bulletSpeed * 0.9, dmg: 3 * player.dmgMult * (player.pickupDmg || 1), type: 'rocket', track: true });
     }
     countShot(3);
     sfx('rocket');
@@ -8540,40 +8876,43 @@ function drawBullets() {
       ctx.beginPath(); ctx.arc(b.x, b.y - 1, 1.6, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     } else {
-      // 普通弹：冷白/冰蓝能量弹
-      const col = bc.normal;
+      // 普通弹：冷白/冰蓝能量弹；重炮更宽、针弹更细长
+      const heavy = !!b.heavy, needle = !!b.needle;
+      const col = heavy ? '#ffd9a0' : needle ? '#a8ffd6' : bc.normal;
+      const wS = heavy ? 1.7 : needle ? 0.6 : 1;
+      const hS = heavy ? 1.0 : needle ? 1.5 : 1;
       ctx.save();
       if (tl) {
         ctx.shadowColor = col;
         ctx.shadowBlur = glowBlur * 0.7;
         // 光晕
-        ctx.fillStyle = 'rgba(180,230,255,0.3)';
+        ctx.fillStyle = heavy ? 'rgba(255,200,120,0.32)' : needle ? 'rgba(150,255,205,0.28)' : 'rgba(180,230,255,0.3)';
         ctx.beginPath();
-        ctx.ellipse(b.x, b.y, 5, 12, 0, 0, Math.PI * 2);
+        ctx.ellipse(b.x, b.y, 5 * wS, 12 * hS, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.shadowBlur = 0;
         // 深色内圈
-        ctx.fillStyle = '#2a4a66';
+        ctx.fillStyle = heavy ? '#6a4520' : needle ? '#1f5a45' : '#2a4a66';
         ctx.beginPath();
-        ctx.ellipse(b.x, b.y, 3, 10, 0, 0, Math.PI * 2);
+        ctx.ellipse(b.x, b.y, 3 * wS, 10 * hS, 0, 0, Math.PI * 2);
         ctx.fill();
         // 高亮核心
         ctx.fillStyle = col;
         ctx.beginPath();
-        ctx.ellipse(b.x, b.y, 1.6, 7, 0, 0, Math.PI * 2);
+        ctx.ellipse(b.x, b.y, 1.6 * wS, 7 * hS, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = '#ffffff';
-        ctx.fillRect(b.x - 0.8, b.y - 5, 1.6, 10);
+        ctx.fillRect(b.x - 0.8 * wS, b.y - 5 * hS, 1.6 * wS, 10 * hS);
       } else {
         ctx.fillStyle = col;
         ctx.shadowColor = col;
         ctx.shadowBlur = 8;
         ctx.beginPath();
-        ctx.ellipse(b.x, b.y, 3, 10, 0, 0, Math.PI * 2);
+        ctx.ellipse(b.x, b.y, 3 * wS, 10 * hS, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.shadowBlur = 0;
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.fillRect(b.x - 1, b.y, 2, 8);
+        ctx.fillRect(b.x - 1 * wS, b.y, 2 * wS, 8 * hS);
       }
       ctx.restore();
     }
@@ -10204,7 +10543,7 @@ function applyPowerup(type) {
   }
   if (type === 'wingman') { acquireWingman(); return; }
   player.weapon = type;
-  player.weaponTime = 10; // 持续 10 秒
+  player.weaponTime = 10 + (currentShip().pickupBonus || 0); // 持续 10 秒（天狼 +2）
   flashWeapon();
 }
 
@@ -10509,7 +10848,7 @@ function playerHit() {
     sfx('hurt');
     vibrateGamepad(0.45, 150); // 中弹中等震动
   }
-  player.invuln = CFG.invulnTime;
+  player.invuln = CFG.invulnTime + (player.invulnBonus || 0);
   updateHUD();
   if (player.hp <= 0) endLevel(false);
 }
@@ -16124,11 +16463,12 @@ function updateHUD() {
   }
 
   // 血条进度
-  const hpPct = Math.max(0, player.hp / CFG.maxHP) * 100;
+  const hpMax = player.maxHp || CFG.maxHP;
+  const hpPct = Math.max(0, player.hp / hpMax) * 100;
   const hpFill = hudEl('hpFill');
   hpFill.style.width = hpPct + '%';
   const hpWrap = hudEl('hpWrap');
-  if (player.hp / CFG.maxHP <= GAME_CONFIG.ui.hpLowThreshold) {
+  if (player.hp / hpMax <= GAME_CONFIG.ui.hpLowThreshold) {
     hpWrap.classList.add('low');
   } else {
     hpWrap.classList.remove('low');
@@ -16361,7 +16701,21 @@ function startGame(level, opts) {
   player.rateLv = upgradeLv('fireRate');
   player.maxShield = GAME_CONFIG.maxShield + upgradeLv('shield') * 0.3 + (game.module === 1 ? 1 : 0);
   player.shield = player.maxShield;
+  // ---- 战机特性（机库选择）----
+  const ship = currentShip();
+  player.ship = ship.key;
+  player.maxHp = ship.hp;
+  player.hp = ship.hp;
+  player.pickupDmg = ship.pickupDmg;
+  player.pickupRate = ship.pickupRate;
+  player.invulnBonus = ship.invulnBonus;
+  player.speedMult *= ship.speed;
+  player.fireRateMult *= ship.cdMult;
+  player.dashCDMult *= ship.dashMult;
+  player.maxShield += ship.shieldBonus;
+  player.shield = player.maxShield;
   if (!keepWingmen && game.module === 0) { acquireWingman(); acquireWingman(); }
+  if (!keepWingmen && ship.extraWingman) acquireWingman();
   if (game.module === 2) player.bombs = Math.min(bombCap(), player.bombs + 1);
   if (bgmOn) bgmStep = 0;
   initStars(level);
@@ -16393,7 +16747,7 @@ function resumeGame(snap) {
   game.waveIdx = clamp(snap.waveIdx | 0, 0, lv.waves.length);
   // 还原玩家状态
   player.maxShield = GAME_CONFIG.maxShield;
-  player.hp = clamp(+snap.hp || CFG.maxHP, 1, CFG.maxHP);
+  player.hp = clamp(+snap.hp || (player.maxHp || CFG.maxHP), 1, player.maxHp || CFG.maxHP);
   player.shield = clamp(+snap.shield || 0, 0, player.maxShield);
   player.shieldRegenTimer = GAME_CONFIG.shieldRegenDelay;
   player.invuln = 1.5; // 续玩后短暂无敌，避免加载即受击
@@ -16508,7 +16862,7 @@ function retryBoss() {
   renderTilt = 0;
   game.bossRetry = false;
   player.x = W / 2; player.y = H - 100;
-  player.hp = CFG.maxHP; player.maxShield = GAME_CONFIG.maxShield; player.shield = GAME_CONFIG.maxShield; player.shieldRegenTimer = 0; player.invuln = 1.5; player.fireCD = 0;
+  player.hp = player.maxHp || CFG.maxHP; player.maxShield = GAME_CONFIG.maxShield; player.shield = GAME_CONFIG.maxShield; player.shieldRegenTimer = 0; player.invuln = 1.5; player.fireCD = 0;
   player.weapon = 'normal'; player.weaponTime = 0;
   player.dashTime = 0; player.dashCD = 0; player.dashVX = 0; player.dashVY = 0;
   player.lastDX = 0; player.lastDY = 0;
@@ -16589,7 +16943,7 @@ function endLevel(win) {
 }
 
 function hideAllOverlays() {
-  ['ovTitle','ovLevel','ovBrief','ovPause','ovOver','ovBossIntro','ovSettings','ovResume','ovHangar'].forEach(id => document.getElementById(id).classList.add('hidden'));
+  ['ovTitle','ovLevel','ovBrief','ovPause','ovOver','ovBossIntro','ovSettings','ovResume','ovHangar','ovShips'].forEach(id => document.getElementById(id).classList.add('hidden'));
 }
 
 function togglePause() {
@@ -17254,6 +17608,73 @@ function openHangar() {
   renderHangar();
   document.getElementById('ovHangar').classList.remove('hidden');
 }
+
+/* ==================== 选择战机 ==================== */
+function shipThumb(key) {
+  const c = getShip(key).color;
+  if (key === 'fortress') {
+    return `<svg viewBox="0 0 64 64" aria-hidden="true"><g stroke="${c}" stroke-width="1.3" stroke-linejoin="round">
+      <path d="M8 44 L8 33 L22 26 L42 26 L56 33 L56 44 L42 50 L22 50 Z" fill="rgba(255,179,71,0.16)"/>
+      <path d="M27 20 L37 20 L40 50 L24 50 Z" fill="rgba(255,179,71,0.34)"/>
+      <rect x="11" y="50" width="7" height="7" rx="1.6" fill="${c}" opacity=".65"/>
+      <rect x="25" y="50" width="7" height="7" rx="1.6" fill="${c}" opacity=".65"/>
+      <rect x="39" y="50" width="7" height="7" rx="1.6" fill="${c}" opacity=".65"/>
+      <path d="M32 20 L32 13" stroke-width="2.2"/>
+    </g></svg>`;
+  }
+  if (key === 'falcon') {
+    return `<svg viewBox="0 0 64 64" aria-hidden="true"><g stroke="${c}" stroke-width="1.3" stroke-linejoin="round">
+      <path d="M32 3 L36 22 L58 52 L52 54 L34 45 L30 45 L12 54 L6 52 L28 22 Z" fill="rgba(126,240,160,0.15)"/>
+      <path d="M32 8 L34.5 27 L33 46 L31 46 L29.5 27 Z" fill="rgba(126,240,160,0.36)"/>
+      <circle cx="32" cy="25" r="2.2" fill="${c}"/>
+      <path d="M32 3 L32 -1" stroke-width="1.8"/>
+    </g></svg>`;
+  }
+  return `<svg viewBox="0 0 64 64" aria-hidden="true"><g stroke="${c}" stroke-width="1.3" stroke-linejoin="round">
+    <path d="M32 5 L40 26 L58 49 L51 52 L36 44 L32 47 L28 44 L13 52 L6 49 L24 26 Z" fill="rgba(0,229,255,0.14)"/>
+    <path d="M32 11 L36 27 L34 44 L30 44 L28 27 Z" fill="rgba(0,229,255,0.34)"/>
+    <circle cx="32" cy="24" r="2.6" fill="${c}"/>
+  </g></svg>`;
+}
+function renderShipSelect() {
+  const grid = document.getElementById('shipGrid');
+  if (!grid) return;
+  const cur = currentShip().key;
+  const bar = (label, v) => `<div class="ship-stat"><b>${label}</b><div class="ship-bar"><i style="width:${v}%"></i></div></div>`;
+  grid.innerHTML = SHIP_TYPES.map(s => `
+    <div class="ship-item ${s.key === cur ? 'on' : ''}" data-ship="${s.key}" style="--sc:${s.color}">
+      <div class="picked">已选</div>
+      <div class="ship-thumb">${shipThumb(s.key)}</div>
+      <div class="ship-body">
+        <div class="ship-name">${s.name}<em>${s.en}</em><span class="ship-tag">${s.tag}</span></div>
+        <div class="ship-desc">${s.desc}</div>
+        <div class="ship-stats">
+          ${bar('火力', s.stat.fire)}${bar('机动', s.stat.speed)}${bar('装甲', s.stat.armor)}
+        </div>
+        <div class="ship-perk">${s.perk}</div>
+      </div>
+    </div>`).join('');
+  grid.querySelectorAll('.ship-item').forEach(el => {
+    el.addEventListener('click', () => {
+      if (currentShip().key === el.dataset.ship) return;
+      setShip(el.dataset.ship);
+      sfx('powerup');
+      renderShipSelect();
+      updateTitleShip();
+    });
+  });
+}
+function updateTitleShip() {
+  const el = document.getElementById('titleShip');
+  if (!el) return;
+  const s = currentShip();
+  el.innerHTML = `当前战机：<b style="color:${s.color}">${s.name}</b> · ${s.tag}`;
+}
+function openShipSelect() {
+  hideAllOverlays();
+  renderShipSelect();
+  document.getElementById('ovShips').classList.remove('hidden');
+}
 function updateModuleSelect() {
   const cur = clamp(save.module | 0, 0, MODULES.length - 1);
   document.querySelectorAll('#moduleSelect .opt-btn').forEach(btn => {
@@ -17371,6 +17792,12 @@ function deployFromBriefing() {
 
 /* ==================== 事件绑定 ==================== */
 document.getElementById('btnHangar').addEventListener('click', openHangar);
+document.getElementById('btnShips').addEventListener('click', () => { initAudio(); openShipSelect(); });
+document.getElementById('btnShipsBack').addEventListener('click', () => {
+  hideAllOverlays();
+  document.getElementById('ovTitle').classList.remove('hidden');
+});
+updateTitleShip();
 document.getElementById('btnHangarBack').addEventListener('click', () => {
   hideAllOverlays();
   document.getElementById('ovTitle').classList.remove('hidden');
@@ -17451,6 +17878,7 @@ function wipeAllData() {
   game.state = 'title';
   buildLevelGrid();
   updateHUD();
+  updateTitleShip();
   const desc = document.getElementById('wipeDesc');
   if (desc) desc.textContent = '已清除：合金、永久改装、关卡解锁、勋章与排行榜全部归零';
 }
