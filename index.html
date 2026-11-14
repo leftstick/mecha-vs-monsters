@@ -257,11 +257,14 @@
   /* 战机选择 */
   .ship-current{margin-top:12px;font-size:11px;letter-spacing:2px;color:#6fa6c4;}
   .ship-current b{font-size:13px;}
-  .ship-card{width:min(96vw,640px);max-height:92vh;overflow:auto;}
-  .ship-sub{font-size:10px;color:#5a7a9a;letter-spacing:1px;margin:-8px 0 14px;text-align:center;}
-  .ship-grid{display:flex;flex-direction:column;gap:12px;margin-bottom:16px;}
-  .ship-item{position:relative;display:flex;gap:14px;padding:14px;border-radius:14px;cursor:pointer;overflow:hidden;
-    border:1px solid rgba(0,229,255,0.14);text-align:left;
+  .ship-card{width:min(94vw,600px);max-height:88vh;overflow:hidden;display:flex;flex-direction:column;
+    padding:16px 14px 12px;}
+  .ship-card .panel-title{font-size:17px;margin-bottom:2px;letter-spacing:2px;}
+  .ship-sub{font-size:9.5px;color:#5a7a9a;letter-spacing:1px;margin:0 0 9px;text-align:center;}
+  .ship-grid{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;flex:1;min-height:0;
+    overflow-y:auto;padding-right:2px;-webkit-overflow-scrolling:touch;}
+  .ship-item{position:relative;display:flex;gap:10px;padding:9px 10px;border-radius:11px;cursor:pointer;
+    overflow:hidden;align-items:center;border:1px solid rgba(0,229,255,0.14);text-align:left;
     background:linear-gradient(120deg,rgba(12,22,34,0.95),rgba(4,9,16,0.95));
     transition:border-color .18s,box-shadow .18s,transform .12s;}
   .ship-item::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--sc,#00e5ff);
@@ -270,28 +273,29 @@
   .ship-item.on{border-color:var(--sc,#00e5ff);
     box-shadow:inset 0 0 0 1px var(--sc,#00e5ff),0 8px 26px rgba(0,0,0,0.5);}
   .ship-item.on::before{opacity:1;box-shadow:0 0 16px var(--sc,#00e5ff);}
-  .ship-item .picked{position:absolute;top:10px;right:12px;font-size:9px;letter-spacing:2px;font-weight:900;
-    padding:2px 8px;border-radius:20px;color:#050a10;background:var(--sc,#00e5ff);opacity:0;transition:opacity .18s;}
+  .ship-item .picked{position:absolute;top:6px;right:8px;font-size:8px;letter-spacing:1px;font-weight:900;
+    padding:1px 7px;border-radius:20px;color:#050a10;background:var(--sc,#00e5ff);opacity:0;transition:opacity .18s;}
   .ship-item.on .picked{opacity:1;}
-  .ship-thumb{width:96px;flex:0 0 96px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+  .ship-thumb{width:58px;height:58px;flex:0 0 58px;border-radius:9px;display:flex;align-items:center;justify-content:center;
     background:radial-gradient(circle at 50% 45%,var(--scA,rgba(0,229,255,0.22)),rgba(0,0,0,0.55) 72%);
     border:1px solid var(--scA,rgba(0,229,255,0.3));}
-  .ship-thumb svg{width:84px;height:84px;filter:drop-shadow(0 0 8px var(--sc,#00e5ff));}
+  .ship-thumb svg{width:50px;height:50px;filter:drop-shadow(0 0 7px var(--sc,#00e5ff));}
   .ship-body{flex:1;min-width:0;}
-  .ship-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-right:54px;}
-  .ship-name{font-size:19px;font-weight:900;letter-spacing:3px;color:#e6faff;text-shadow:0 0 12px var(--scA,rgba(0,229,255,0.4));}
-  .ship-name em{font-style:normal;font-size:9px;font-weight:400;letter-spacing:2px;color:#54748e;}
-  .ship-tag{margin-left:auto;padding:2px 9px;border-radius:20px;font-size:10px;letter-spacing:1px;
+  .ship-head{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding-right:44px;}
+  .ship-name{font-size:15px;font-weight:900;letter-spacing:2px;color:#e6faff;text-shadow:0 0 12px var(--scA,rgba(0,229,255,0.4));}
+  .ship-name em{font-style:normal;font-size:8px;font-weight:400;letter-spacing:1px;color:#54748e;}
+  .ship-tag{margin-left:auto;padding:1px 6px;border-radius:20px;font-size:8.5px;letter-spacing:1px;
     color:var(--sc,#00e5ff);border:1px solid var(--sc,#00e5ff);}
-  .ship-desc{font-size:11.5px;line-height:1.5;color:#8aa9bf;margin:6px 0 9px;}
-  .ship-stats{display:flex;flex-direction:column;gap:5px;}
-  .ship-stat{display:grid;grid-template-columns:30px 1fr 24px;align-items:center;gap:8px;
-    font-size:9px;letter-spacing:1px;color:#6c8ca3;}
-  .ship-stat b{text-align:right;font-size:10px;color:var(--sc,#00e5ff);font-weight:700;}
-  .ship-bar{height:5px;border-radius:3px;background:#0f1e2c;overflow:hidden;box-shadow:inset 0 1px 2px rgba(0,0,0,0.6);}
+  .ship-desc{font-size:9.5px;line-height:1.4;color:#8aa9bf;margin:2px 0 4px;}
+  .ship-stats{display:flex;flex-direction:column;gap:3px;}
+  .ship-stat{display:grid;grid-template-columns:23px 1fr 19px;align-items:center;gap:6px;
+    font-size:8px;letter-spacing:1px;color:#6c8ca3;}
+  .ship-stat b{text-align:right;font-size:9px;color:var(--sc,#00e5ff);font-weight:700;}
+  .ship-bar{height:4px;border-radius:3px;background:#0f1e2c;overflow:hidden;box-shadow:inset 0 1px 2px rgba(0,0,0,0.6);}
   .ship-bar i{display:block;height:100%;border-radius:3px;box-shadow:0 0 8px var(--sc,#00e5ff);
     background:linear-gradient(90deg,var(--sc,#00e5ff),rgba(255,255,255,0.85));}
-  .ship-perk{margin-top:9px;font-size:10px;line-height:1.45;color:#8ff7c9;}
+  .ship-perk{margin-top:4px;font-size:8.5px;line-height:1.3;color:#8ff7c9;}
+  #btnShipsBack{flex:0 0 auto;width:100%;padding:9px 0;font-size:12px;letter-spacing:3px;}
 
   /* 任务简报：三选一模块 */
   .module-select{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:4px 0;}
@@ -1730,7 +1734,7 @@ let player = {
   shieldPulse: 0,      // 护盾受击冲击环（0-1，衰减）
   shieldHitT: 0,       // 护盾蜂窝受击反馈（0-1，衰减）
   shieldHitSeed: 0,    // 受击网格方位
-  deployT: 0.6,        // 出击部署进度（秒），0.6 表示完成
+  deployT: 1.5,        // 出击部署进度（秒），1.5 表示完成
   invuln: 0,
   fireCD: 0,
   tilt: 0,
@@ -4191,42 +4195,65 @@ function drawHullFalcon(V) {
   hullFlare(V, 0, 31, 3.2, t, 15);
 }
 
-/* 出击部署特效：能量光柱 + 展开冲击环 + 横向翼展光 */
+/* 出击部署特效：上升光柱 + 速度线 + 展开冲击环 + 抵达闪光 */
 function drawDeployFx(SV, dep, de) {
   const a = 1 - de;
-  if (a <= 0.01) return;
+  if (a <= 0.005) return;
   const R = SV.shieldR || 44;
+  const ac = SV.accent;
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  // 垂直降落光柱
-  const cg = ctx.createLinearGradient(0, -R * 2.6, 0, R * 1.4);
-  cg.addColorStop(0, hexToRgba(SV.accent, 0));
-  cg.addColorStop(0.55, hexToRgba(SV.accent, 0.3 * a));
-  cg.addColorStop(1, hexToRgba(SV.accent, 0));
+  // 贯穿屏幕的上升光柱
+  const cg = ctx.createLinearGradient(0, -H * 0.9, 0, R * 1.2);
+  cg.addColorStop(0, hexToRgba(ac, 0));
+  cg.addColorStop(0.55, hexToRgba(ac, 0.22 * a));
+  cg.addColorStop(1, hexToRgba(ac, 0.5 * a));
   ctx.fillStyle = cg;
-  ctx.fillRect(-9 * a - 2, -R * 2.6, 18 * a + 4, R * 4);
+  const cw = 10 + 26 * a;
+  ctx.fillRect(-cw / 2, -H * 0.9, cw, H * 0.9 + R * 1.2);
+  // 核心白柱
+  ctx.fillStyle = 'rgba(255,255,255,' + (0.3 * a) + ')';
+  ctx.fillRect(-2, -H * 0.9, 4, H * 0.9 + R);
+  // 上升速度线
+  for (let i = 0; i < 8; i++) {
+    const lx = (i - 3.5) * 11 + Math.sin(i * 2.1) * 4;
+    const ly = -40 - ((game.time * 900 + i * 137) % 220);
+    ctx.strokeStyle = hexToRgba(ac, (0.16 + 0.2 * (i % 3) / 2) * a);
+    ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx, ly + 30 + (i % 4) * 10); ctx.stroke();
+  }
   // 展开冲击环
-  for (let i = 0; i < 3; i++) {
-    const rr = R * (0.35 + 1.15 * ((1 - a) * 1.4 + i * 0.18));
-    ctx.strokeStyle = hexToRgba(SV.accent, 0.5 * a * (1 - i * 0.25));
-    ctx.lineWidth = 2.2 - i * 0.5;
-    ctx.beginPath(); ctx.ellipse(0, 4, rr, rr * 0.42, 0, 0, Math.PI * 2); ctx.stroke();
+  for (let i = 0; i < 4; i++) {
+    const rr = R * (0.3 + (1 - a) * 1.6 + i * 0.16);
+    ctx.strokeStyle = hexToRgba(ac, 0.5 * a * (1 - i * 0.2));
+    ctx.lineWidth = 2.6 - i * 0.45;
+    ctx.beginPath(); ctx.ellipse(0, 6, rr, rr * 0.34, 0, 0, Math.PI * 2); ctx.stroke();
   }
   // 翼展光带
-  const wl = R * 1.25 * de;
+  const wl = R * 1.45 * de;
   const lg = ctx.createLinearGradient(-wl, 8, wl, 8);
-  lg.addColorStop(0, hexToRgba(SV.accent, 0));
-  lg.addColorStop(0.5, 'rgba(235,255,255,0.85)');
-  lg.addColorStop(1, hexToRgba(SV.accent, 0));
-  ctx.strokeStyle = lg; ctx.lineWidth = 2.4;
+  lg.addColorStop(0, hexToRgba(ac, 0));
+  lg.addColorStop(0.5, 'rgba(240,255,255,0.9)');
+  lg.addColorStop(1, hexToRgba(ac, 0));
+  ctx.strokeStyle = lg; ctx.lineWidth = 3;
   ctx.beginPath(); ctx.moveTo(-wl, 8); ctx.lineTo(wl, 8); ctx.stroke();
   // 中心高光
-  const fg = ctx.createRadialGradient(0, 0, 1, 0, 0, R * 1.1);
-  fg.addColorStop(0, 'rgba(255,255,255,' + (0.5 * a) + ')');
-  fg.addColorStop(0.4, hexToRgba(SV.accent, 0.28 * a));
-  fg.addColorStop(1, hexToRgba(SV.accent, 0));
+  const fg = ctx.createRadialGradient(0, 2, 1, 0, 2, R * 1.4);
+  fg.addColorStop(0, 'rgba(255,255,255,' + (0.75 * a) + ')');
+  fg.addColorStop(0.35, hexToRgba(ac, 0.4 * a));
+  fg.addColorStop(1, hexToRgba(ac, 0));
   ctx.fillStyle = fg;
-  ctx.beginPath(); ctx.ellipse(0, 2, R * 1.1, R * 0.8, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, 2, R * 1.4, R * 0.95, 0, 0, Math.PI * 2); ctx.fill();
+  // 抵达闪光（部署完成后 0.25s 内）
+  if (dep > 0.82) {
+    const k = (dep - 0.82) / 0.18;
+    const fl = Math.sin(k * Math.PI);
+    ctx.fillStyle = 'rgba(255,255,255,' + (0.35 * fl) + ')';
+    ctx.beginPath(); ctx.ellipse(0, 4, R * 1.7, R * 1.1, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,' + (0.8 * fl) + ')';
+    ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.ellipse(0, 6, R * (1.2 + k * 0.9), R * (0.4 + k * 0.3), 0, 0, Math.PI * 2); ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -4283,13 +4310,14 @@ function drawPlayer() {
   drawPlayerGhosts(x, y, renderTilt);
   const shipKey = player.ship || 'balanced';
   const SV = getShip(shipKey).visual;
-  // 出击部署：机体自下而上浮出，双翼横向展开，能量环点亮
-  const dep = clamp((player.deployT || 0) / 0.6, 0, 1);
+  // 出击部署：从屏幕下方升起，双翼横向展开，能量环点亮
+  const dep = clamp((player.deployT || 0) / 1.5, 0, 1);
   const de = 1 - Math.pow(1 - dep, 3);
+  const rising = de < 0.999;
   ctx.save();
-  ctx.translate(x, y + (1 - de) * 34);
+  ctx.translate(x, y + (1 - de) * 190);
   ctx.rotate(tilt);
-  ctx.scale(1.08 * SV.scale * (0.4 + 0.6 * de), 1.08 * SV.scale * (0.84 + 0.16 * de));
+  ctx.scale(1.08 * SV.scale * (0.26 + 0.74 * de), 1.08 * SV.scale * (0.76 + 0.24 * de));
 
   // ---- 磁极立场（相位关卡）：机体外圈极色光环，切换瞬间爆发 ----
   if (levelPhaseMode()) {
@@ -17011,7 +17039,7 @@ function startGame(level, opts) {
   renderTilt = 0;
   player.x = W / 2; player.y = H - 100;
   player.hp = CFG.maxHP; player.maxShield = GAME_CONFIG.maxShield; player.shield = GAME_CONFIG.maxShield; player.shieldRegenTimer = 0; player.invuln = 0; player.fireCD = 0;
-  player.deployT = 0; player.shieldHitT = 0;
+  player.deployT = 0; player.shieldHitT = 0; player.invuln = Math.max(player.invuln, 1.0);
   player.weapon = 'normal'; player.weaponTime = 0;
   player.dashTime = 0; player.dashCD = 0; player.dashVX = 0; player.dashVY = 0;
   player.lastDX = 0; player.lastDY = 0;
@@ -17089,7 +17117,7 @@ function resumeGame(snap) {
   player.shield = clamp(+snap.shield || 0, 0, player.maxShield);
   player.shieldRegenTimer = GAME_CONFIG.shieldRegenDelay;
   player.invuln = 1.5; // 续玩后短暂无敌，避免加载即受击
-  player.deployT = 0.6; // 续玩不重播部署动画
+  player.deployT = 0; // 续玩同样播放部署动画，进入战斗有明确的开始感
   const wpn = ['normal', 'laser', 'shotgun', 'rocket'].includes(snap.weapon) ? snap.weapon : 'normal';
   if (wpn !== 'normal' && (+snap.weaponTime || 0) > 0) {
     player.weapon = wpn;
@@ -17638,7 +17666,7 @@ function update(dt) {
   // 护盾冲击环衰减
   if (player.shieldPulse > 0) player.shieldPulse = Math.max(0, player.shieldPulse - dt * 2.5);
   if (player.shieldHitT > 0) player.shieldHitT = Math.max(0, player.shieldHitT - dt * 2.6);
-  if (player.deployT < 0.6) player.deployT = Math.min(0.6, player.deployT + dt);
+  if (player.deployT < 1.5) player.deployT = Math.min(1.5, player.deployT + dt);
   player.fireCD -= dt;
   // 武器持续时间
   if (player.weaponTime > 0) {
