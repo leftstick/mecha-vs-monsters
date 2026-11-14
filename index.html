@@ -44,6 +44,19 @@
   .hud-right{grid-row:1;grid-column:3;justify-self:end;text-align:right;}
   .hud-row{display:flex;align-items:baseline;gap:8px;line-height:1.3;}
   .hud-label{font-size:10px;letter-spacing:2px;color:#5a7a9a;text-transform:uppercase;}
+  /* 关卡身份：战机主题色圆点 + 关卡名 + 波次节点 */
+  .hud-level-row{display:flex;align-items:center;gap:6px;margin-top:3px;min-width:0;}
+  .hud-dot{width:6px;height:6px;border-radius:50%;flex:0 0 6px;background:var(--ship-accent,#00e5ff);
+    box-shadow:0 0 8px var(--ship-accent,#00e5ff);transition:background .2s,box-shadow .2s;}
+  .hud-level{font-size:9px;letter-spacing:1.4px;color:#7fb4d4;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;max-width:clamp(78px,20vw,132px);text-shadow:0 0 6px rgba(0,160,220,.35);}
+  .wave-pips{display:flex;gap:3px;margin-top:4px;}
+  .wave-pips i{display:block;width:9px;height:3px;border-radius:2px;background:#152d40;
+    border:1px solid rgba(0,229,255,.16);transition:background .2s,box-shadow .2s;}
+  .wave-pips i.on{background:linear-gradient(90deg,var(--ship-accent,#00e5ff),#bff8ff);
+    border-color:transparent;box-shadow:0 0 6px var(--ship-accent,#00e5ff);}
+  .wave-pips i.boss{background:linear-gradient(90deg,#ff5533,#ffd23f);border-color:transparent;
+    box-shadow:0 0 7px rgba(255,120,40,.9);}
   .hud-val{font-size:clamp(14px,4vw,20px);font-weight:900;color:#00e5ff;text-shadow:0 0 8px rgba(0,229,255,0.5);
     display:inline-block;transition:transform .15s ease;}
   .score-val{font-size:clamp(16px,4.5vw,22px);}
@@ -410,6 +423,11 @@
       <span class="hud-label">WAVE</span>
       <span class="hud-val" id="hLv">01</span>
     </div>
+    <div class="hud-level-row">
+      <span class="hud-dot" id="hudShipDot"></span>
+      <span class="hud-level" id="hLvName">轨道坟场</span>
+    </div>
+    <div class="wave-pips" id="wavePips"></div>
     <div class="hud-row weapon-row" id="weaponRow" style="opacity:0">
       <span class="hud-label">WPN</span>
       <span class="hud-val" id="hWp">普通</span>
@@ -1315,13 +1333,19 @@ const MODULES = [
 const SHIP_TYPES = [
   {
     key: 'balanced', name: '天狼', en: 'SIRIUS', tag: '均衡',
-    desc: '标准机炮，攻守平衡，适合熟悉关卡。',
+    desc: '单发重弹，攻守平衡；重弹对护盾额外破坏。',
     perk: '开局多 1 架僚机 · 武器拾取 +2 秒',
     color: '#00e5ff',
     stat: { fire: 60, speed: 62, armor: 60 },
     hp: 6, speed: 1.00, cdMult: 1.00, dashMult: 1.00,
     pickupDmg: 1.00, pickupRate: 1.00,
     invulnBonus: 0, shieldBonus: 0, extraWingman: true, pickupBonus: 2,
+    aura: 'reticle', muzzleScale: 1.00,
+    weaponMods: {
+      laser:   { cd: 1.00, dmg: 1.00, count: 1, width: 1.00 },
+      shotgun: { cd: 1.00, dmg: 1.00, count: 5, spread: 0.18 },
+      rocket:  { cd: 1.00, dmg: 1.00, count: 3, spread: 12 },
+    },
     visual: {
       scale: 1.00, span: 45, tipY: -6, rootY: -10, back: 16, notch: 16, hullW: 11, noseY: -46,
       engines: [-7, 7], engineY: 30, accent: '#00e5ff', trail: [170, 245, 255], cockpitY: -24,
@@ -1332,34 +1356,46 @@ const SHIP_TYPES = [
   },
   {
     key: 'fortress', name: '壁垒', en: 'BASTION', tag: '重装',
-    desc: '三向重炮，射速偏慢，但装甲厚重、容错最高。',
-    perk: '装甲 9 点 · 受击无敌 +0.25 秒 · 护盾 +0.5',
+    desc: '三向重炮，射速偏慢；重弹撕盾，装甲厚重、容错最高。',
+    perk: '重炮对护盾 ×1.8 · 装甲 9 点 · 受击无敌 +0.25 秒',
     color: '#ffb347',
     stat: { fire: 82, speed: 40, armor: 96 },
     hp: 9, speed: 0.86, cdMult: 1.12, dashMult: 1.15,
     pickupDmg: 1.16, pickupRate: 1.00,
     invulnBonus: 0.25, shieldBonus: 0.5, extraWingman: false, pickupBonus: 0,
+    aura: 'hex', muzzleScale: 1.35,
+    weaponMods: {
+      laser:   { cd: 1.25, dmg: 1.18, count: 1, width: 1.70 },
+      shotgun: { cd: 1.25, dmg: 1.05, count: 7, spread: 0.155 },
+      rocket:  { cd: 1.20, dmg: 1.15, count: 3, spread: 24 },
+    },
     visual: {
-      scale: 1.10, span: 46, tipY: 3, rootY: -2, back: 22, notch: 22, hullW: 17, noseY: -58,
+      scale: 1.18, span: 46, tipY: 3, rootY: -2, back: 22, notch: 22, hullW: 17, noseY: -58,
       engines: [-31.5, 31.5], engineY: 41, accent: '#ffb347', trail: [255, 196, 120], cockpitY: -19,
-      tipX: 46, tipY2: 3, shieldR: 56,
+      tipX: 46, tipY2: 3, shieldR: 62,
       hull: ['#6b5642', '#4f4132', '#332a21', '#1d1712'],
       wing: ['#5a4a39', '#40342a', '#241d17'],
     },
   },
   {
     key: 'falcon', name: '游隼', en: 'FALCON', tag: '高速',
-    desc: '双联针弹，机动与射速极佳，但装甲薄弱。',
-    perk: '移速 +16% · 冲刺冷却 -35% · 弹药更密集',
+    desc: '双联针弹可穿透护盾，机动与射速极佳，但装甲薄弱。',
+    perk: '针弹无视护盾 · 移速 +16% · 冲刺冷却 -35%',
     color: '#7ef0a0',
     stat: { fire: 74, speed: 96, armor: 30 },
     hp: 4, speed: 1.16, cdMult: 0.84, dashMult: 0.65,
     pickupDmg: 0.92, pickupRate: 1.12,
     invulnBonus: 0, shieldBonus: 0, extraWingman: false, pickupBonus: 0,
+    aura: 'streak', muzzleScale: 0.72,
+    weaponMods: {
+      laser:   { cd: 0.55, dmg: 0.72, count: 2, width: 0.68, offset: 7 },
+      shotgun: { cd: 0.70, dmg: 0.90, count: 3, spread: 0.09 },
+      rocket:  { cd: 0.85, dmg: 0.95, count: 2, spread: 10 },
+    },
     visual: {
-      scale: 0.94, span: 30, tipY: -18, rootY: -14, back: 22, notch: 9, hullW: 7, noseY: -62,
+      scale: 0.88, span: 30, tipY: -18, rootY: -14, back: 22, notch: 9, hullW: 7, noseY: -62,
       engines: [0], engineY: 30, accent: '#7ef0a0', trail: [150, 255, 205], cockpitY: -34,
-      tipX: 30, tipY2: -15, shieldR: 42,
+      tipX: 30, tipY2: -15, shieldR: 40,
       hull: ['#3f5a4c', '#2e4539', '#1f3028', '#101c17'],
       wing: ['#35513f', '#26402f', '#16261c'],
     },
@@ -1376,10 +1412,16 @@ function shipNoseY() {
   const v = getShip(player.ship || 'balanced').visual;
   return (v.noseY || -30) * 0.9;
 }
+// 同一件武器拾取物在三架机体上的数值/形态修正（缺省即标准形态）
+function shipWeaponMod(w) {
+  const ship = getShip(player.ship || 'balanced');
+  return (ship.weaponMods && ship.weaponMods[w]) || {};
+}
 function setShip(key) {
   if (!SHIP_TYPES.some(s => s.key === key)) return;
   save.ship = key;
   saveSave(save);
+  applyShipTheme(getShip(key));
 }
 
 function upgradeLv(key) {
@@ -4303,6 +4345,71 @@ function drawShieldHitFx(SV, hh, seed) {
   ctx.restore();
 }
 
+// 三架战机的识别光环：不靠数值，靠轮廓语言让玩家一眼分清机型。
+// 天狼=瞄准环；壁垒=重装六边护环；游隼=速度残影。
+function drawShipAura(shipKey, SV) {
+  const t = game.time;
+  const col = SV.accent;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  if (shipKey === 'fortress') {
+    // 壁垒：六片缓慢公转的装甲环 + 舱体警示脉冲
+    ctx.strokeStyle = hexToRgba(col, 0.24 + 0.08 * Math.sin(t * 2.4));
+    ctx.lineWidth = 1.7;
+    for (let i = 0; i < 6; i++) {
+      const a = t * 0.42 + i * Math.PI / 3;
+      const r = 57 + Math.sin(t * 2.8 + i) * 2.2;
+      ctx.beginPath(); ctx.arc(0, 2, r, a, a + 0.40); ctx.stroke();
+    }
+    // 底部厚重反重力光晕
+    const g = ctx.createRadialGradient(0, 22, 4, 0, 22, 46);
+    g.addColorStop(0, hexToRgba(col, 0.16));
+    g.addColorStop(1, hexToRgba(col, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.ellipse(0, 22, 46, 22, 0, 0, Math.PI * 2); ctx.fill();
+  } else if (shipKey === 'falcon') {
+    // 游隼：四道后掠速度残影 + 前向双箭头
+    for (let i = 0; i < 4; i++) {
+      const side = i % 2 ? 1 : -1;
+      const k = Math.floor(i / 2);
+      const a = 0.20 + 0.10 * Math.sin(t * 7 + i);
+      const g = ctx.createLinearGradient(side * (10 + k * 4), 16, side * (26 + k * 8), 74 + k * 18);
+      g.addColorStop(0, hexToRgba(col, a));
+      g.addColorStop(1, hexToRgba(col, 0));
+      ctx.strokeStyle = g; ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(side * (10 + k * 4), 16);
+      ctx.lineTo(side * (26 + k * 8), 74 + k * 18);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = hexToRgba(col, 0.34);
+    ctx.lineWidth = 1;
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(side * 8, -30); ctx.lineTo(side * 17, -22); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(side * 7, -24); ctx.lineTo(side * 14, -18); ctx.stroke();
+    }
+  } else {
+    // 天狼：旋转瞄准环 + 四向刻度
+    ctx.strokeStyle = hexToRgba(col, 0.20 + 0.06 * Math.sin(t * 3));
+    ctx.lineWidth = 1.1;
+    ctx.setLineDash([4, 8]);
+    ctx.lineDashOffset = -t * 18;
+    ctx.beginPath(); ctx.arc(0, 0, 50, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = hexToRgba(col, 0.42);
+    for (let i = 0; i < 4; i++) {
+      const a = i * Math.PI / 2 + Math.PI / 4;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * 46, Math.sin(a) * 46);
+      ctx.lineTo(Math.cos(a) * 53, Math.sin(a) * 53);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
 function drawPlayer() {
   if (player.invuln > 0 && Math.floor(player.invuln * 12) % 2) return;
   const x = player.x, y = player.y;
@@ -4342,6 +4449,9 @@ function drawPlayer() {
     ctx.restore();
   }
 
+  // ---- 机体识别光环（先于机体绘制，形成外轮廓差异）----
+  drawShipAura(shipKey, SV);
+
   // ---- 机体外观：按机库选择分派 ----
   if (shipKey === 'fortress') drawHullBastion(SV);
   else if (shipKey === 'falcon') drawHullFalcon(SV);
@@ -4357,19 +4467,20 @@ function drawPlayer() {
       ctx.globalCompositeOperation = 'lighter';
       const mc = { laser:'#88ddff', shotgun:'#ffd23f', rocket:'#ff8833', normal:'#ffffff' }[player.weapon] || '#ffffff';
       const MZ = SV.noseY;
-      // 外锥光晕
-      const mg = ctx.createRadialGradient(0, MZ, 1, 0, MZ, 18 * mfI);
+      const mfScale = SV.muzzleScale || 1;
+      // 外锥光晕（壁垒更粗壮，游隼更细锐）
+      const mg = ctx.createRadialGradient(0, MZ, 1, 0, MZ, 18 * mfI * mfScale);
       mg.addColorStop(0, hexToRgba(mc, 0.8 * mfI));
       mg.addColorStop(0.5, hexToRgba(mc, 0.3 * mfI));
       mg.addColorStop(1, hexToRgba(mc, 0));
       ctx.fillStyle = mg;
-      ctx.beginPath(); ctx.arc(0, MZ, 18 * mfI, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(0, MZ, 18 * mfI * mfScale, 0, Math.PI * 2); ctx.fill();
       // 锥形核心
       ctx.fillStyle = `rgba(255,255,255,${0.9 * mfI})`;
       ctx.beginPath();
-      ctx.moveTo(0, MZ - 14 * mfI);
-      ctx.lineTo(-5 * mfI, MZ);
-      ctx.lineTo(5 * mfI, MZ);
+      ctx.moveTo(0, MZ - 14 * mfI * mfScale);
+      ctx.lineTo(-5 * mfI * mfScale, MZ);
+      ctx.lineTo(5 * mfI * mfScale, MZ);
       ctx.closePath(); ctx.fill();
       ctx.restore();
     }
@@ -9007,27 +9118,61 @@ function fireBullet() {
       sfx('shoot');
     }
   } else if (w === 'laser') {
-    // 激光: 穿透, 高伤害, 宽弹
-    setFireCooldown(0.08 * cdScale / (player.pickupRate || 1));
-    game.bullets.push({ x: player.x, y: player.y + shipNoseY(), vx: 0, vy: -CFG.bulletSpeed * 1.4, dmg: 2 * player.dmgMult * (player.pickupDmg || 1), type: 'laser', pierce: true });
-    countShot(1);
+    // 激光：同一件拾取物在三架机体上形态不同
+    //   天狼=标准穿透光柱；壁垒=更宽更慢的重型光矛；游隼=高速双联细针
+    const mod = shipWeaponMod('laser');
+    const cnt = Math.max(1, mod.count || 1);
+    const col = (player.ship === 'falcon') ? '#7ef0a0' : (player.ship === 'fortress' ? '#ffd9a0' : null);
+    setFireCooldown(0.08 * cdScale * mod.cd / (player.pickupRate || 1));
+    for (let i = 0; i < cnt; i++) {
+      const dx = cnt === 1 ? 0 : (i - (cnt - 1) / 2) * (mod.offset || 8);
+      const b = {
+        x: player.x + dx, y: player.y + shipNoseY(),
+        vx: 0, vy: -CFG.bulletSpeed * 1.4,
+        dmg: 2 * player.dmgMult * (player.pickupDmg || 1) * mod.dmg,
+        type: 'laser', pierce: true, width: mod.width || 1,
+      };
+      if (col) b.color = col;
+      game.bullets.push(b);
+    }
+    countShot(cnt);
     sfx('laser');
   } else if (w === 'shotgun') {
-    // 霰弹: 5 发扇形散射
-    setFireCooldown(0.28 * cdScale / (player.pickupRate || 1));
-    for (let i = -2; i <= 2; i++) {
-      const ang = -Math.PI / 2 + i * 0.18;
-      game.bullets.push({ x: player.x, y: player.y - 20, vx: Math.cos(ang) * CFG.bulletSpeed, vy: Math.sin(ang) * CFG.bulletSpeed, dmg: 1 * player.dmgMult * (player.pickupDmg || 1), type: 'shotgun' });
+    // 霰弹：天狼 5 发标准扇；壁垒 7 发更宽重；游隼 3 发高速窄扇
+    const mod = shipWeaponMod('shotgun');
+    const cnt = Math.max(1, mod.count || 5);
+    const spread = mod.spread != null ? mod.spread : 0.18;
+    const center = (cnt - 1) / 2;
+    setFireCooldown(0.28 * cdScale * mod.cd / (player.pickupRate || 1));
+    for (let i = 0; i < cnt; i++) {
+      const ang = -Math.PI / 2 + (i - center) * spread;
+      game.bullets.push({
+        x: player.x, y: player.y - 20,
+        vx: Math.cos(ang) * CFG.bulletSpeed, vy: Math.sin(ang) * CFG.bulletSpeed,
+        dmg: 1 * player.dmgMult * (player.pickupDmg || 1) * mod.dmg,
+        type: 'shotgun', radius: player.ship === 'fortress' ? 4.8 : (player.ship === 'falcon' ? 3.2 : 4),
+      });
     }
-    countShot(5);
+    countShot(cnt);
     sfx('shotgun');
   } else if (w === 'rocket') {
-    // 三连发火箭: 追踪, 爆炸伤害
-    setFireCooldown(0.35 * cdScale / (player.pickupRate || 1));
-    for (let i = -1; i <= 1; i++) {
-      game.bullets.push({ x: player.x + i * 12, y: player.y - 20, vx: i * 60, vy: -CFG.bulletSpeed * 0.9, dmg: 3 * player.dmgMult * (player.pickupDmg || 1), type: 'rocket', track: true });
+    // 火箭：天狼三连追踪；壁垒三发重弹；游隼双发快弹
+    const mod = shipWeaponMod('rocket');
+    const cnt = Math.max(1, mod.count || 3);
+    const gap = mod.spread != null ? mod.spread : 12;
+    const center = (cnt - 1) / 2;
+    setFireCooldown(0.35 * cdScale * mod.cd / (player.pickupRate || 1));
+    for (let i = 0; i < cnt; i++) {
+      const off = i - center;
+      game.bullets.push({
+        x: player.x + off * gap, y: player.y - 20,
+        vx: off * (player.ship === 'fortress' ? 42 : 60),
+        vy: -CFG.bulletSpeed * (player.ship === 'falcon' ? 1.05 : 0.9),
+        dmg: 3 * player.dmgMult * (player.pickupDmg || 1) * mod.dmg,
+        type: 'rocket', track: true,
+      });
     }
-    countShot(3);
+    countShot(cnt);
     sfx('rocket');
   }
   // 炮口闪光（按武器着色，与子弹外观匹配 + 亮白核）；射速等级越高，炮口越亮越密
@@ -9166,6 +9311,95 @@ function updateBullets(dt) {
   }
 }
 
+// 敌方弹型轮廓：不同 Boss 使用不同几何，玩家可凭形状/配色快速识别威胁来源。
+// 所有形状都以速度方向为主轴，面积与圆形弹接近，保证命中判定与视觉一致。
+function traceEnemyBulletShape(shape, x, y, r, ang) {
+  ctx.beginPath();
+  if (shape === 'diamond') {
+    const fx = Math.cos(ang), fy = Math.sin(ang);
+    const px = Math.cos(ang + Math.PI / 2), py = Math.sin(ang + Math.PI / 2);
+    ctx.moveTo(x + fx * r * 1.25, y + fy * r * 1.25);
+    ctx.lineTo(x + px * r * 0.82, y + py * r * 0.82);
+    ctx.lineTo(x - fx * r * 0.95, y - fy * r * 0.95);
+    ctx.lineTo(x - px * r * 0.82, y - py * r * 0.82);
+    ctx.closePath();
+  } else if (shape === 'shard') {
+    const fx = Math.cos(ang), fy = Math.sin(ang);
+    const a1 = ang + 0.92, a2 = ang - 0.92;
+    ctx.moveTo(x + fx * r * 1.55, y + fy * r * 1.55);
+    ctx.lineTo(x + Math.cos(a1) * r * 0.72, y + Math.sin(a1) * r * 0.72);
+    ctx.lineTo(x - fx * r * 0.62, y - fy * r * 0.62);
+    ctx.lineTo(x + Math.cos(a2) * r * 0.72, y + Math.sin(a2) * r * 0.72);
+    ctx.closePath();
+  } else if (shape === 'needle') {
+    const fx = Math.cos(ang), fy = Math.sin(ang);
+    const px = Math.cos(ang + Math.PI / 2), py = Math.sin(ang + Math.PI / 2);
+    ctx.moveTo(x + fx * r * 1.85, y + fy * r * 1.85);
+    ctx.lineTo(x + px * r * 0.46, y + py * r * 0.46);
+    ctx.lineTo(x - fx * r * 1.05, y - fy * r * 1.05);
+    ctx.lineTo(x - px * r * 0.46, y - py * r * 0.46);
+    ctx.closePath();
+  } else if (shape === 'fang') {
+    const fx = Math.cos(ang), fy = Math.sin(ang);
+    const a1 = ang + 1.05, a2 = ang - 1.05;
+    ctx.moveTo(x + fx * r * 1.5, y + fy * r * 1.5);
+    ctx.lineTo(x + Math.cos(a1) * r * 0.95, y + Math.sin(a1) * r * 0.95);
+    ctx.quadraticCurveTo(x - fx * r * 0.15, y - fy * r * 0.15, x - fx * r * 0.42, y - fy * r * 0.42);
+    ctx.lineTo(x + Math.cos(a2) * r * 0.95, y + Math.sin(a2) * r * 0.95);
+    ctx.closePath();
+  } else if (shape === 'seed') {
+    const fx = Math.cos(ang), fy = Math.sin(ang);
+    const a1 = ang + 1.45, a2 = ang - 1.45;
+    ctx.moveTo(x + fx * r * 1.42, y + fy * r * 1.42);
+    ctx.quadraticCurveTo(
+      x + Math.cos(a1) * r * 1.05, y + Math.sin(a1) * r * 1.05,
+      x - fx * r * 0.85, y - fy * r * 0.85);
+    ctx.quadraticCurveTo(
+      x + Math.cos(a2) * r * 1.05, y + Math.sin(a2) * r * 1.05,
+      x + fx * r * 1.42, y + fy * r * 1.42);
+    ctx.closePath();
+  } else if (shape === 'rock') {
+    for (let i = 0; i < 7; i++) {
+      const a = ang + i * Math.PI * 2 / 7;
+      const rr = r * (0.80 + 0.24 * Math.sin(i * 2.3 + 1.1));
+      const px = x + Math.cos(a) * rr, py = y + Math.sin(a) * rr;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+  } else if (shape === 'hex') {
+    for (let i = 0; i < 6; i++) {
+      const a = ang + i * Math.PI / 3;
+      const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+  } else if (shape === 'tentacle') {
+    // 带倒钩的触须截面：三节交替收放，形成辨识度很高的锯齿轮廓
+    const rads = [1.35, 0.52, 1.05, 0.55, 1.35, 0.52, 1.05, 0.55];
+    for (let i = 0; i < rads.length; i++) {
+      const a = ang + i * Math.PI / 4;
+      const px = x + Math.cos(a) * r * rads[i];
+      const py = y + Math.sin(a) * r * rads[i];
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+  } else if (shape === 'void') {
+    // 八芒虚空星：长短半径交替，中心留暗核
+    for (let i = 0; i < 16; i++) {
+      const a = ang + i * Math.PI / 8;
+      const rr = r * (i % 2 === 0 ? 1.28 : 0.62);
+      const px = x + Math.cos(a) * rr, py = y + Math.sin(a) * rr;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+  } else if (shape === 'bubble') {
+    const wob = 1 + 0.06 * Math.sin(game.time * 7 + x * 0.07 + y * 0.05);
+    ctx.arc(x, y, r * wob, 0, Math.PI * 2);
+  } else {
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+  }
+}
+
 function drawBullets() {
   const bc = GAME_CONFIG.bulletColors;
   const AC = GAME_ART_CONFIG;
@@ -9175,29 +9409,31 @@ function drawBullets() {
   // ---- 玩家子弹：三层结构（光晕 + 深色内圈 + 高亮核心） ----
   for (const b of game.bullets) {
     if (b.type === 'laser') {
-      // 穿透弹：冰蓝色粗光柱
-      const col = bc.laser;
+      // 穿透弹：冰蓝色粗光柱；壁垒更宽、游隼更细（宽度由武器形态决定）
+      const col = b.color || bc.laser;
+      const lw = b.width || 1;
       ctx.save();
       ctx.shadowColor = col;
       ctx.shadowBlur = glowBlur;
       // 光晕底层
-      ctx.fillStyle = 'rgba(120,220,255,0.35)';
-      ctx.fillRect(b.x - 6, b.y - 14, 12, 24);
-      // 深色内圈
-      ctx.fillStyle = '#1a5a78';
-      ctx.fillRect(b.x - 4, b.y - 14, 8, 24);
+      ctx.fillStyle = hexToRgba(col, 0.32);
+      ctx.fillRect(b.x - 6 * lw, b.y - 14, 12 * lw, 24);
+      // 深色内圈（与机体武器色匹配）
+      ctx.fillStyle = b.color === '#7ef0a0' ? '#0d3a28'
+        : b.color === '#ffd9a0' ? '#5a3a10' : '#1a5a78';
+      ctx.fillRect(b.x - 4 * lw, b.y - 14, 8 * lw, 24);
       // 高亮核心
       ctx.shadowBlur = 0;
       ctx.fillStyle = col;
-      ctx.fillRect(b.x - 3, b.y - 14, 6, 24);
+      ctx.fillRect(b.x - 3 * lw, b.y - 14, 6 * lw, 24);
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(b.x - 1, b.y - 14, 2, 24);
+      ctx.fillRect(b.x - 1 * lw, b.y - 14, 2 * lw, 24);
       ctx.restore();
     } else if (b.type === 'shotgun') {
-      // 霰弹：金黄小球
+      // 霰弹：金黄小球（壁垒弹丸更大，游隼更小更快）
       const col = bc.shotgun;
       ctx.save();
-      const r = 4;
+      const r = b.radius || 4;
       if (tl) {
         ctx.shadowColor = '#ffaa00';
         ctx.shadowBlur = glowBlur * 0.6;
@@ -9334,6 +9570,8 @@ function drawBullets() {
     }
     const col = b.color || '#ff4444';
     const rad = b.radius || 5;
+    const shape = b.shape || 'orb';
+    const ang = Math.atan2(b.vy, b.vx) || Math.PI / 2;
     ctx.save();
     if (tl) {
       const big = rad >= 6;
@@ -9358,27 +9596,23 @@ function drawBullets() {
 
       ctx.shadowColor = col;
       ctx.shadowBlur = (big ? glowBlur : glowBlur * 0.6) * pulse;
-      // 外层光晕
+      // 外层光晕（沿弹型轮廓，保留 Boss 身份）
       ctx.fillStyle = hexToRgba(col, 0.32 * pulse);
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, rad + 2.5, 0, Math.PI * 2);
+      traceEnemyBulletShape(shape, b.x, b.y, rad + 2.5, ang);
       ctx.fill();
       ctx.shadowBlur = 0;
       // 深色内圈
       ctx.fillStyle = '#2a0606';
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, rad + 0.5, 0, Math.PI * 2);
+      traceEnemyBulletShape(shape, b.x, b.y, rad + 0.5, ang);
       ctx.fill();
       // 高亮核心（偏暖橙白）
       ctx.fillStyle = col;
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, rad * 0.62, 0, Math.PI * 2);
+      traceEnemyBulletShape(shape, b.x, b.y, rad * 0.62, ang);
       ctx.fill();
       // 暗色轮廓，保证在亮背景/爆炸中依然可辨
       ctx.strokeStyle = 'rgba(30,4,8,0.75)';
       ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, rad + 1.2, 0, Math.PI * 2);
+      traceEnemyBulletShape(shape, b.x, b.y, rad + 1.2, ang);
       ctx.stroke();
       // 高光点
       ctx.fillStyle = '#fff4e8';
@@ -9421,8 +9655,7 @@ function drawBullets() {
       ctx.fillStyle = col;
       ctx.shadowColor = col;
       ctx.shadowBlur = 8;
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, rad, 0, Math.PI * 2);
+      traceEnemyBulletShape(shape, b.x, b.y, rad, ang);
       ctx.fill();
       ctx.shadowBlur = 0;
     }
@@ -9849,14 +10082,16 @@ function checkCollisions() {
           consumed = true;
           break;
         }
-        // 护盾兵：正下方来袭的子弹先由护盾吸收；从侧上方绕后可直击本体
-        if (m.type === 'shieldbearer' && m.shieldHp > 0 && b.vy < -10 && b.y > m.y - 6) {
-          m.shieldHp = Math.max(0, m.shieldHp - dmg);
+        // 护盾兵：正下方来袭的子弹先由护盾吸收；从侧上方绕后可直击本体。
+        // 机体识别：壁垒重炮对护盾 ×1.8，游隼针弹可直接穿过护盾。
+        if (m.type === 'shieldbearer' && m.shieldHp > 0 && b.vy < -10 && b.y > m.y - 6 && !b.needle) {
+          const shieldDmg = b.heavy ? dmg * 1.8 : dmg;
+          m.shieldHp = Math.max(0, m.shieldHp - shieldDmg);
           m.shieldFlash = 0.2;
           game.hits++;
           hitCount++;
-          addHitSparks(b.x, b.y, '#8fd8ff', 0, 1, m.size);
-          addFloatText(b.x, b.y - 10, Math.round(dmg), isCrit);
+          addHitSparks(b.x, b.y, b.heavy ? '#ffd9a0' : '#8fd8ff', 0, 1, m.size);
+          addFloatText(b.x, b.y - 10, Math.round(shieldDmg), isCrit);
           if (m.shieldHp <= 0) {
             m.shieldBreak = 0.5;
             const sy = m.y + 12 * m.size;
@@ -11224,6 +11459,50 @@ function attackPolarity(o) {
   if (o.polFromBoss && game.boss) return game.boss.polarity;
   return o.pol == null ? null : o.pol;
 }
+/* ==================== Boss 攻击签名 ==================== */
+// 每个 Boss 拥有独立的「走位机制 + 螺旋参数 + 弹体形状」。
+// 不再把同一套 sweepWall / spiralArms 原样塞给 14 个 Boss：
+// 玩家能从弹体形状、安全通道位置和旋转节奏上分辨出「现在打的是谁」。
+const BOSS_SIGNATURES = {
+  voidlord:   { color:'#9fe8ff', shape:'diamond',  move:'sideSweep', gap:0.50, gapSize:0.30, spacing:38, speed:166, station:'center',
+                spiral:{ arms:3, per:4, twist:0.30, speed:142, rotate:Math.PI / 2 } },
+  dragon:     { color:'#ff7a33', shape:'shard',    move:'sweepWall', gap:0.30, gapSize:0.26, rows:3, spacing:36, speed:170, station:'center',
+                spiral:{ arms:2, per:5, twist:0.34, speed:146, rotate:0 } },
+  helios:     { color:'#ffd166', shape:'orb',      move:'sideSweep', gap:0.40, gapSize:0.28, spacing:36, speed:174, station:'center',
+                spiral:{ arms:4, per:3, twist:-0.28, speed:150, rotate:0 } },
+  leviathan:  { color:'#5cf2d8', shape:'bubble',   move:'sweepWall', gap:0.50, gapSize:0.30, rows:2, spacing:40, speed:148, station:'center',
+                spiral:{ arms:3, per:4, twist:-0.30, speed:136, rotate:Math.PI / 2 } },
+  colossus:   { color:'#ffb066', shape:'rock',     move:'sideSweep', gap:0.62, gapSize:0.32, spacing:40, speed:150, station:'center',
+                spiral:{ arms:2, per:5, twist:0.24, speed:132, rotate:0 } },
+  guardian:   { color:'#88bbff', shape:'needle',   move:'sweepWall', gap:0.25, gapSize:0.24, rows:3, spacing:34, speed:180, station:'center',
+                spiral:{ arms:4, per:4, twist:0.32, speed:156, rotate:Math.PI / 4 } },
+  beastking:  { color:'#ffbb44', shape:'fang',     move:'sideSweep', gap:0.70, gapSize:0.28, spacing:38, speed:164, station:'center',
+                spiral:{ arms:3, per:4, twist:-0.26, speed:146, rotate:0 } },
+  vinetitan:  { color:'#99ee55', shape:'seed',     move:'sweepWall', gap:0.60, gapSize:0.28, rows:3, spacing:38, speed:152, station:'center',
+                spiral:{ arms:3, per:5, twist:0.28, speed:138, rotate:Math.PI / 2 } },
+  kraken:     { color:'#ff66cc', shape:'tentacle', move:'sideSweep', gap:0.30, gapSize:0.30, spacing:36, speed:160, station:'center',
+                spiral:{ arms:4, per:4, twist:-0.32, speed:148, rotate:0 } },
+  frostqueen: { color:'#8ff6ff', shape:'shard',    move:'sweepWall', gap:0.42, gapSize:0.26, rows:3, spacing:34, speed:174, station:'center',
+                spiral:{ arms:5, per:3, twist:0.24, speed:142, rotate:0 } },
+  singularity:{ color:'#c58bff', shape:'void',     move:'sideSweep', gap:0.50, gapSize:0.30, spacing:38, speed:156, station:'center',
+                spiral:{ arms:5, per:4, twist:-0.30, speed:140, rotate:Math.PI / 2 } },
+  magnetar:   { color:'#ff8fb3', shape:'hex',      move:'sweepWall', gap:0.70, gapSize:0.26, rows:3, spacing:36, speed:168, station:'center',
+                spiral:{ arms:4, per:4, twist:0.34, speed:150, rotate:Math.PI / 4 } },
+  swarmmother:{ color:'#ffcc44', shape:'hex',      move:'sideSweep', gap:0.35, gapSize:0.28, spacing:36, speed:158, station:'center',
+                spiral:{ arms:3, per:4, twist:-0.28, speed:144, rotate:0 } },
+  duality:    { color:'#c9a0ff', shape:'diamond',  move:'sweepWall', gap:0.50, gapSize:0.24, rows:4, spacing:34, speed:172, station:'center',
+                spiral:{ arms:4, per:4, twist:0.30, speed:152, rotate:Math.PI / 8 } },
+  _default:   { color:'#ffb066', shape:'orb',      move:'sweepWall', gap:0.50, gapSize:0.26, rows:3, spacing:36, speed:160, station:'center',
+                spiral:{ arms:3, per:4, twist:0.28, speed:145, rotate:0 } },
+};
+function bossSignature() {
+  const b = game.boss;
+  return (b && BOSS_SIGNATURES[b.type]) || BOSS_SIGNATURES._default;
+}
+function bossSigShape() {
+  return bossSignature().shape;
+}
+
 const ATTACK_LIB = {
   ring(o) {
     const count = o.count || 16;
@@ -11231,6 +11510,7 @@ const ATTACK_LIB = {
     const gapCount = o.gapCount || 0;
     const speed = (o.speed || 140) * bossAttackSpeedScale();
     const pol = attackPolarity(o);
+    const sig = bossSignature();
     // x/y 省略时以 Boss 当前位置为圆心，剧本招式无需重复写坐标
     const ox = o.x == null ? (game.boss ? game.boss.x : W / 2) : o.x;
     const oy = o.y == null ? (game.boss ? game.boss.y : H * 0.2) : o.y;
@@ -11240,7 +11520,8 @@ const ATTACK_LIB = {
       const b = {
         x: ox, y: oy,
         vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed,
-        color: o.color || '#9fe8ff', radius: o.radius || 5,
+        color: o.color || sig.color, radius: o.radius || 5,
+        shape: o.shape || sig.shape,
         delay: o.delay || 0,
       };
       if (pol != null) { b.pol = pol; b.color = POLAR_COLOR[pol]; }
@@ -11251,13 +11532,15 @@ const ATTACK_LIB = {
     const shots = o.shots || 3;
     const speed = (o.speed || 170) * bossAttackSpeedScale();
     const xs = o.xs || [];
+    const sig = bossSignature();
     for (let i = 0; i < xs.length; i++) {
       if (i === o.gapIndex) continue;
       for (let k = 0; k < shots; k++) {
         const b = {
           x: W * xs[i], y: o.y == null ? -24 : o.y,
           vx: o.drift || 0, vy: speed,
-          color: o.color || '#ffcc66', radius: o.radius || 5,
+          color: o.color || sig.color, radius: o.radius || 5,
+          shape: o.shape || sig.shape,
           delay: (o.delay || 0) * k,
         };
         if (o.frostOnLand) b.frostOnLand = true;
@@ -11271,6 +11554,7 @@ const ATTACK_LIB = {
     const center = (count - 1) / 2;
     const speed = (o.speed || 170) * bossAttackSpeedScale();
     const pol = attackPolarity(o);
+    const sig = bossSignature();
     const ox = o.x == null ? (game.boss ? game.boss.x : W / 2) : o.x;
     const oy = o.y == null ? (game.boss ? game.boss.y : H * 0.2) : o.y;
     for (let i = 0; i < count; i++) {
@@ -11280,7 +11564,8 @@ const ATTACK_LIB = {
         x: ox, y: oy,
         vx: Math.cos(ang) * speed,
         vy: Math.sin(ang) * speed,
-        color: o.color || '#ff8844', radius: o.radius || 5,
+        color: o.color || sig.color, radius: o.radius || 5,
+        shape: o.shape || sig.shape,
         delay: o.delay || 0,
       };
       if (o.homing) b.homing = o.homing;
@@ -11291,6 +11576,7 @@ const ATTACK_LIB = {
   markers(o) {
     const angles = o.angles;
     const mSpeed = (o.speed || 150) * bossAttackSpeedScale();
+    const sig = bossSignature();
     for (const p of (o.points || [])) {
       const x = W * p.fx, y = p.y == null ? -24 : p.y;
       const list = angles || (() => {
@@ -11305,7 +11591,8 @@ const ATTACK_LIB = {
           x, y,
           vx: Math.cos(ang) * mSpeed,
           vy: Math.sin(ang) * mSpeed,
-          color: o.color || '#ffaa44', radius: o.radius || 6,
+          color: o.color || sig.color, radius: o.radius || 6,
+          shape: o.shape || sig.shape,
           delay: (o.delay || 0) + (p.delay || 0),
         };
         if (o.homing) b.homing = o.homing;
@@ -11324,14 +11611,45 @@ const ATTACK_LIB = {
     const rowGap = o.rowGap == null ? 54 : o.rowGap;
     const speed = (o.speed || 155) * bossAttackSpeedScale();
     const startY = o.y == null ? -26 : o.y;
+    const sig = bossSignature();
+    const shape = o.shape || sig.shape;
+    const color = o.color || sig.color;
     for (let r = 0; r < rows; r++) {
       for (let x = spacing * 0.5; x < W + spacing; x += spacing) {
         if (Math.abs(x - gapX) <= gapW * 0.5) continue;
         game.enemyBullets.push({
           x, y: startY - r * rowGap,
           vx: 0, vy: speed,
-          color: o.color || '#9fe8ff', radius: o.radius || 5,
+          color, radius: o.radius || 5, shape,
         });
+      }
+    }
+  },
+  // 侧向弹墙：从左/右边缘推出纵向弹列，只在指定高度留出横向安全走廊。
+  // 与 sweep（纵向压墙 + 横向缺口）互补，迫使玩家做纵向走位，缺口完全可预判。
+  sideSweep(o) {
+    const rows = o.rows || 2;
+    const spacing = o.spacing || 38;
+    const gapH = o.gapH == null ? H * 0.24 : o.gapH;
+    const gapY = H * (o.gapFy == null ? 0.7 : o.gapFy);
+    const colGap = o.colGap == null ? 64 : o.colGap;
+    const speed = (o.speed || 160) * bossAttackSpeedScale();
+    const startX = o.x == null ? -26 : o.x;
+    const sides = o.side === 'left' ? [1] : o.side === 'right' ? [-1] : [1, -1];
+    const sig = bossSignature();
+    const shape = o.shape || sig.shape;
+    const color = o.color || sig.color;
+    for (let r = 0; r < rows; r++) {
+      for (const dir of sides) {
+        const x = dir > 0 ? startX - r * colGap : W - startX + r * colGap;
+        for (let y = spacing * 0.5; y < H + spacing; y += spacing) {
+          if (Math.abs(y - gapY) <= gapH * 0.5) continue;
+          game.enemyBullets.push({
+            x, y,
+            vx: dir * speed, vy: 0,
+            color, radius: o.radius || 5, shape,
+          });
+        }
       }
     }
   },
@@ -11342,6 +11660,7 @@ const ATTACK_LIB = {
     const step = o.step || 0.1;
     const twist = o.twist == null ? 0.26 : o.twist;
     const speed = (o.speed || 145) * bossAttackSpeedScale();
+    const sig = bossSignature();
     const ox = o.x == null ? (game.boss ? game.boss.x : W / 2) : o.x;
     const oy = o.y == null ? (game.boss ? game.boss.y : H * 0.2) : o.y;
     const rot0 = o.rotate || 0;
@@ -11351,7 +11670,8 @@ const ATTACK_LIB = {
         game.enemyBullets.push({
           x: ox, y: oy,
           vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed,
-          color: o.color || '#c79bff', radius: o.radius || 5,
+          color: o.color || sig.color, radius: o.radius || 5,
+          shape: o.shape || sig.shape,
           delay: k * step,
         });
       }
@@ -11455,6 +11775,52 @@ function drawTelegraphs() {
         ctx.textAlign = 'center';
         ctx.fillStyle = '#cfefff';
         ctx.fillText(t.label, W * 0.5, y0 + 16);
+        ctx.textAlign = 'left';
+      }
+    } else if (t.kind === 'hsafe') {
+      // 横向安全走廊：侧向弹墙从左右压来，只有这条横向带子是空的。
+      // 与 lane 的“竖向安全柱”刻意区分，避免玩家读错走位方向。
+      const h = t.h || H * 0.2;
+      const y0 = (t.y == null ? H * 0.7 : t.y) - h / 2;
+      const g = ctx.createLinearGradient(0, y0, 0, y0 + h);
+      g.addColorStop(0, hexToRgba(color, 0));
+      g.addColorStop(0.5, hexToRgba(color, 0.18));
+      g.addColorStop(1, hexToRgba(color, 0));
+      ctx.globalAlpha = 0.4 + 0.36 * k;
+      ctx.fillStyle = g;
+      ctx.fillRect(0, y0, W, h);
+      ctx.globalAlpha = 0.8;
+      ctx.strokeStyle = '#7ef0ff';
+      ctx.lineWidth = 1.7;
+      ctx.setLineDash([14, 12]);
+      ctx.lineDashOffset = now * 70;
+      ctx.beginPath();
+      ctx.moveTo(0, y0); ctx.lineTo(W, y0);
+      ctx.moveTo(0, y0 + h); ctx.lineTo(W, y0 + h);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // 左右两侧的来弹方向指示（朝内的三角箭头）
+      ctx.globalAlpha = 0.45 + 0.4 * pulse;
+      ctx.fillStyle = hexToRgba(color, 0.9);
+      const cy = y0 + h / 2;
+      for (let i = 0; i < 3; i++) {
+        const off = 14 + i * 13;
+        ctx.beginPath();
+        ctx.moveTo(off, cy - 7); ctx.lineTo(off + 10, cy); ctx.lineTo(off, cy + 7);
+        ctx.closePath(); ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(W - off, cy - 7); ctx.lineTo(W - off - 10, cy); ctx.lineTo(W - off, cy + 7);
+        ctx.closePath(); ctx.fill();
+      }
+      if (t.label) {
+        ctx.globalAlpha = 0.92;
+        ctx.font = 'bold 12px sans-serif';
+        ctx.textAlign = 'center';
+        const tw = ctx.measureText(t.label).width;
+        ctx.fillStyle = 'rgba(0,18,28,0.62)';
+        ctx.fillRect(W * 0.5 - tw / 2 - 7, y0 + 6, tw + 14, 20);
+        ctx.fillStyle = '#bff4ff';
+        ctx.fillText(t.label, W * 0.5, y0 + 21);
         ctx.textAlign = 'left';
       }
     } else if (t.kind === 'fan') {
@@ -12455,37 +12821,89 @@ const BOSS_SCRIPTS = {
   },
 };
 
-/* ==================== 通用机制招式 ==================== */
-// 16 个 Boss 共用两种“必须走位”的招式，注入到各自卡组：
-//   sweepWall   横向弹墙 + 单一固定通道（强制横向移动）
-//   spiralArms  旋转螺旋臂（强制绕行，而不是站桩输出）
-// 这样每个 Boss 的循环里都同时存在「弹幕/轨道/扇射/走位机制」，不再是纯弹幕堆叠。
-const COMMON_BOSS_PATTERNS = {
-  sweepWall: {
-    station: 'center', tele: 0.95, recover: 1.05,
-    steps: [{ t: 0, emit: 'sweep', args: { rows: 3, gapFx: 0.30, spacing: 36, rowGap: 58, speed: 158 } }],
-  },
-  sweepWallAlt: {
-    station: 'right', tele: 0.95, recover: 1.05,
-    steps: [{ t: 0, emit: 'sweep', args: { rows: 3, gapFx: 0.70, spacing: 36, rowGap: 58, speed: 158 } }],
-  },
-  spiralArms: {
-    station: 'center', tele: 0.92, recover: 1.0,
-    steps: [{ t: 0, emit: 'spiral', args: { arms: 3, per: 4, step: 0.10, twist: 0.30, speed: 140, rotate: Math.PI / 2 } }],
-  },
-  spiralArmsFast: {
-    station: 'center', tele: 0.82, recover: 0.95,
-    steps: [{ t: 0, emit: 'spiral', args: { arms: 4, per: 4, step: 0.09, twist: -0.34, speed: 152, rotate: 0 } }],
-  },
-};
-for (const key of Object.keys(BOSS_SCRIPTS)) {
+/* ==================== 每 Boss 专属机制招式 ==================== */
+// 不再给所有 Boss 注入同一套 spiralArms / sweepWall：
+// 每个 Boss 依据 BOSS_SIGNATURES 生成「专属旋臂」+「专属走位」两张机制牌。
+// 旋臂数量/转向/速度、缺口位置/宽度、弹型与配色全部随 Boss 变化；
+// 但每张走位牌都保留一条完全可预判、可穿过通道，不靠无序弹幕堆难度。
+const BOSS_KEY_LIST = Object.keys(BOSS_SCRIPTS);
+const MOVE_GAP_FX = [0.24, 0.38, 0.50, 0.62, 0.76];
+const MOVE_GAP_FY = [0.30, 0.42, 0.56, 0.68, 0.50];
+for (let bi = 0; bi < BOSS_KEY_LIST.length; bi++) {
+  const key = BOSS_KEY_LIST[bi];
   const script = BOSS_SCRIPTS[key];
-  Object.assign(script.patterns, COMMON_BOSS_PATTERNS);
+  const sig = BOSS_SIGNATURES[key] || BOSS_SIGNATURES._default;
+  const sp = sig.spiral || {};
+  const gapFx = MOVE_GAP_FX[bi % MOVE_GAP_FX.length];
+  // 与主缺口错开一个纵向位置，保证同一 Boss 的两种走位不会完全重复
+  const gapFy = MOVE_GAP_FY[(bi * 3 + 1) % MOVE_GAP_FY.length];
+  const gapSize = sig.gapSize || 0.28;
+  const spacing = sig.spacing || 36;
+  const speed = sig.speed || 160;
+
+  // 专属旋臂：臂数、旋向、转速、初始角全部取自签名
+  const spiralPat = {
+    station: sig.station || 'center', tele: 0.90, recover: 1.00,
+    steps: [{ t: 0, emit: 'spiral', args: {
+      arms: sp.arms || 3, per: sp.per || 4, step: 0.10,
+      twist: sp.twist == null ? 0.28 : sp.twist,
+      speed: sp.speed || 145, rotate: sp.rotate || 0,
+      shape: sig.shape, color: sig.color,
+    } }],
+  };
+
+  // 主走位牌：按签名选择“横向缺口墙”或“侧向安全走廊”
+  const sweepPat = {
+    station: 'center', tele: 0.95, recover: 1.05,
+    steps: [{ t: 0, emit: 'sweep', args: {
+      rows: sig.rows || 3, spacing, gapW: W * gapSize, gapFx,
+      rowGap: 56, speed, shape: sig.shape, color: sig.color,
+    } }],
+  };
+  const sidePat = {
+    station: 'center', tele: 1.00, recover: 1.05,
+    steps: [{ t: 0, emit: 'sideSweep', args: {
+      rows: 2, spacing: spacing + 4,
+      gapH: H * (0.13 + gapSize * 0.22), gapFy,
+      colGap: 58, speed: speed * 0.96,
+      shape: sig.shape, color: sig.color,
+    } }],
+  };
+
+  // 副走位牌：与主轴互补，缺口位置错开，逼玩家换一种走位方式
+  const sweepAlt = {
+    station: 'center', tele: 0.90, recover: 1.00,
+    steps: [{ t: 0, emit: 'sweep', args: {
+      rows: Math.max(2, (sig.rows || 3) - 1), spacing,
+      gapW: W * gapSize, gapFx: 1 - gapFx, rowGap: 52,
+      speed: speed * 1.04, shape: sig.shape, color: sig.color,
+    } }],
+  };
+  const sideAlt = {
+    station: 'center', tele: 0.92, recover: 1.00,
+    steps: [{ t: 0, emit: 'sideSweep', args: {
+      rows: 2, spacing: spacing + 2,
+      gapH: H * (0.11 + gapSize * 0.20),
+      gapFy: gapFy > 0.5 ? gapFy - 0.30 : gapFy + 0.30,
+      colGap: 54, speed: speed * 1.02,
+      shape: sig.shape, color: sig.color,
+    } }],
+  };
+
+  const isSide = sig.move === 'sideSweep';
+  const primaryMove = isSide ? sidePat : sweepPat;
+  const altMove = isSide ? sweepAlt : sideAlt;
+  Object.assign(script.patterns, { sigSpiral: spiralPat, sigMove: primaryMove, sigMoveAlt: altMove });
+
   const first = script.phases[0];
   const last = script.phases[script.phases.length - 1];
-  // 一阶段至少混入一次螺旋，终阶段混入弹墙；避免同一套招式循环到死
-  if (!first.deck.includes('spiralArms')) first.deck.push('spiralArms');
-  if (!last.deck.includes('sweepWall') && !last.deck.includes('sweepWallAlt')) last.deck.push('sweepWall');
+  // 一阶段在原有招牌招式之后补入专属走位与旋臂：
+  // 不打断作者编排的开场节奏，同时保证每个 Boss 在首阶段就能露出独有机制。
+  if (!first.deck.includes('sigMove')) first.deck.push('sigMove');
+  if (!first.deck.includes('sigSpiral')) first.deck.push('sigSpiral');
+  // 终阶段补齐主轴 + 副轴两种走位，避免循环固定
+  if (!last.deck.includes('sigMove')) last.deck.push('sigMove');
+  if (!last.deck.includes('sigMoveAlt')) last.deck.push('sigMoveAlt');
 }
 
 function showBossPatternTelegraph(b, pat) {
@@ -12535,6 +12953,14 @@ function showBossPatternTelegraph(b, pat) {
     pushTelegraph({
       kind: 'safe', x: W * (a.gapFx == null ? 0.5 : a.gapFx), w: gapW,
       life: pat.tele, color: '#7ef0ff', label: '通道',
+    });
+  } else if (step.emit === 'sideSweep') {
+    // 侧向弹墙：左右边缘压来，只有一条横向走廊是空的；整条走廊提前高亮
+    pushTelegraph({
+      kind: 'hsafe',
+      y: H * (a.gapFy == null ? 0.7 : a.gapFy),
+      h: a.gapH == null ? H * 0.2 : a.gapH,
+      life: pat.tele, color: a.color || '#9fe8ff', label: '安全走廊',
     });
   } else if (step.emit === 'spiral') {
     pushTelegraph({
@@ -14258,6 +14684,389 @@ function drawBackground(dt) {
     ctx.fillRect(0, 0, W, H);
     ctx.restore();
   }
+
+  // 近景生态剪影 + 空气层：补足各关「只有远景没有前景」的层次缺口
+  drawBiomeFrame();
+  drawAmbientOverlay(dt);
+}
+
+/* ============================================================
+   各关近景生态框：贴左右边缘的剪影，只占屏幕外侧 10% 以内，
+   用来制造「镜头从地表/残骸之间穿过」的纵深，不遮挡战斗区。
+   ============================================================ */
+const BIOME_FRAMES = {
+  0:  { type: 'wreck',   col: 'rgba(18,28,54,0.62)',  accent: '#6fa8e8', n: 3 }, // 轨道坟场
+  1:  { type: 'coral',   col: 'rgba(3,26,48,0.62)',   accent: '#3fd0dc', n: 3 }, // 深海遗迹
+  2:  { type: 'dune',    col: 'rgba(64,34,12,0.58)',  accent: '#e7b06a', n: 2 }, // 撒哈拉沙漠
+  3:  { type: 'rock',    col: 'rgba(58,14,8,0.56)',   accent: '#ff7c48', n: 3 }, // 火星
+  4:  { type: 'rock',    col: 'rgba(34,36,50,0.60)',  accent: '#a8c0ee', n: 3 }, // 月球
+  5:  { type: 'organic', col: 'rgba(18,42,14,0.56)',  accent: '#a8e878', n: 3 }, // 非洲大草原
+  6:  { type: 'organic', col: 'rgba(4,34,20,0.64)',   accent: '#5ae894', n: 4 }, // 热带雨林
+  7:  { type: 'crystal', col: 'rgba(6,26,58,0.56)',   accent: '#8fd0ff', n: 3 }, // 海王星
+  8:  { type: 'crystal', col: 'rgba(5,28,40,0.56)',   accent: '#9ffaff', n: 4 }, // 土星极光环
+  9:  { type: 'wreck',   col: 'rgba(22,8,38,0.66)',   accent: '#c092ff', n: 3 }, // 黑洞
+  10: { type: 'crystal', col: 'rgba(32,8,50,0.60)',   accent: '#d99cff', n: 3 }, // 磁暴风暴
+  11: { type: 'hex',     col: 'rgba(54,30,6,0.66)',   accent: '#ffcf4a', n: 3 }, // 蜂巢虫群
+  12: { type: 'rock',    col: 'rgba(64,20,3,0.60)',   accent: '#ffab48', n: 3 }, // 日冕矿带
+  13: { type: 'shard',   col: 'rgba(5,9,30,0.62)',    accent: '#a8bcff', n: 3 }, // 相位回廊
+};
+
+function drawFrameShape(type, x, y, w, h, side, seed, t) {
+  if (type === 'wreck') {
+    // 断裂舰体：斜切装甲板 + 一条发光断面
+    ctx.beginPath();
+    ctx.moveTo(x - w * 0.7, y);
+    ctx.lineTo(x + w * 0.1, y - h * 0.16);
+    ctx.lineTo(x + w * 0.8, y + h * 0.30);
+    ctx.lineTo(x + w * 0.2, y + h * 0.44);
+    ctx.lineTo(x - w * 0.8, y + h * 0.22);
+    ctx.closePath(); ctx.fill();
+    ctx.save();
+    ctx.globalAlpha *= 0.7;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(x - w * 0.1, y + h * 0.02);
+    ctx.lineTo(x + w * 0.55, y + h * 0.30);
+    ctx.stroke();
+    ctx.restore();
+  } else if (type === 'coral') {
+    // 珊瑚/海草：从外侧向内伸展的分叉
+    const baseX = x + side * w * 0.6;
+    const baseY = y + h * 0.5;
+    ctx.beginPath();
+    ctx.moveTo(baseX, baseY);
+    ctx.quadraticCurveTo(baseX - side * w * 0.5, baseY - h * 0.25, baseX - side * w * 0.2, baseY - h * 0.7);
+    ctx.quadraticCurveTo(baseX - side * w * 0.9, baseY - h * 0.4, baseX - side * w * 0.6, baseY + h * 0.05);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(baseX, baseY);
+    ctx.quadraticCurveTo(baseX + side * w * 0.2, baseY - h * 0.35, baseX - side * w * 0.05, baseY - h * 0.55);
+    ctx.quadraticCurveTo(baseX + side * w * 0.5, baseY - h * 0.18, baseX + side * w * 0.45, baseY + h * 0.12);
+    ctx.closePath(); ctx.fill();
+  } else if (type === 'dune') {
+    // 沙丘：贴边的柔和弧面
+    ctx.beginPath();
+    ctx.moveTo(x - side * w * 1.4, y + h);
+    ctx.quadraticCurveTo(x + side * w * 0.2, y + h * 0.28, x + side * w * 1.2, y + h * 0.62);
+    ctx.lineTo(x + side * w * 1.4, y + h);
+    ctx.closePath(); ctx.fill();
+    ctx.save();
+    ctx.globalAlpha *= 0.55;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(x - side * w * 1.4, y + h);
+    ctx.quadraticCurveTo(x + side * w * 0.2, y + h * 0.28, x + side * w * 1.2, y + h * 0.62);
+    ctx.stroke();
+    ctx.restore();
+  } else if (type === 'rock') {
+    // 棱角岩体/残骸
+    ctx.beginPath();
+    ctx.moveTo(x - side * w * 0.9, y + h * 0.5);
+    ctx.lineTo(x - side * w * 0.2, y - h * 0.5);
+    ctx.lineTo(x + side * w * 0.28, y - h * 0.28);
+    ctx.lineTo(x + side * w * 0.9, y + h * 0.12);
+    ctx.lineTo(x + side * w * 0.3, y + h * 0.5);
+    ctx.closePath(); ctx.fill();
+    ctx.save();
+    ctx.globalAlpha *= 0.45;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(x - side * w * 0.2, y - h * 0.5);
+    ctx.lineTo(x + side * w * 0.28, y - h * 0.28);
+    ctx.lineTo(x + side * w * 0.12, y + h * 0.2);
+    ctx.stroke();
+    ctx.restore();
+  } else if (type === 'organic') {
+    // 树冠/巨型叶片：三团重叠椭圆
+    for (let k = 0; k < 3; k++) {
+      const ox = x + side * w * (0.15 - k * 0.1);
+      const oy = y - h * 0.12 + k * h * 0.14;
+      ctx.beginPath();
+      ctx.ellipse(ox, oy, w * (0.75 - k * 0.1), h * (0.2 - k * 0.03), side * 0.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.save();
+    ctx.globalAlpha *= 0.5;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(x, y + h * 0.4);
+    ctx.quadraticCurveTo(x - side * w * 0.25, y, x - side * w * 0.05, y - h * 0.32);
+    ctx.stroke();
+    ctx.restore();
+  } else if (type === 'crystal') {
+    // 冰晶/磁晶：高瘦棱锥，尖端朝内
+    for (let k = 0; k < 2; k++) {
+      const ox = x + side * (k * w * 0.55 - w * 0.15);
+      const hh = h * (1 - k * 0.28);
+      ctx.beginPath();
+      ctx.moveTo(ox - side * w * 0.3, y + h * 0.55);
+      ctx.lineTo(ox, y - hh * 0.62);
+      ctx.lineTo(ox + side * w * 0.28, y + h * 0.4);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.save();
+    ctx.globalAlpha *= 0.5;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(x, y - h * 0.55);
+    ctx.lineTo(x + side * w * 0.1, y + h * 0.2);
+    ctx.stroke();
+    ctx.restore();
+  } else if (type === 'hex') {
+    // 蜂巢：边缘叠放的六边形巢室
+    for (let k = 0; k < 3; k++) {
+      const ox = x + side * (k % 2) * w * 0.5;
+      const oy = y - h * 0.15 + k * h * 0.26;
+      const rr = w * (0.6 - k * 0.12);
+      ctx.beginPath();
+      for (let q = 0; q < 6; q++) {
+        const a = Math.PI / 6 + q * Math.PI / 3;
+        const px = ox + Math.cos(a) * rr, py = oy + Math.sin(a) * rr;
+        if (q === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath(); ctx.fill();
+      ctx.save();
+      ctx.globalAlpha *= 0.55;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      ctx.restore();
+    }
+  } else {
+    // shard：相位碎面，半透明平行四边形
+    ctx.beginPath();
+    ctx.moveTo(x - side * w * 0.4, y - h * 0.5);
+    ctx.lineTo(x + side * w * 0.35, y - h * 0.32);
+    ctx.lineTo(x + side * w * 0.5, y + h * 0.5);
+    ctx.lineTo(x - side * w * 0.3, y + h * 0.36);
+    ctx.closePath(); ctx.fill();
+    ctx.save();
+    ctx.globalAlpha *= 0.5;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawBiomeFrame() {
+  const f = BIOME_FRAMES[game.level];
+  if (!f) return;
+  const pr = (n) => { const x = Math.sin(n * 91.7 + 47.3) * 43758.5453; return x - Math.floor(x); };
+  ctx.save();
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < f.n; i++) {
+      const seed = i * 7.31 + (side > 0 ? 50 : 0) + game.level * 11;
+      const depth = 0.02 + i * 0.032;
+      const x = side < 0
+        ? depth * W + pr(seed) * W * 0.045
+        : W - depth * W - pr(seed) * W * 0.045;
+      const w = W * (0.030 + pr(seed + 1) * 0.045);
+      const h = H * (0.16 + pr(seed + 2) * 0.28);
+      const y = H * (0.10 + pr(seed + 3) * 0.56) + Math.sin(game.time * 0.5 + i + side) * 3;
+      ctx.fillStyle = f.col;
+      ctx.strokeStyle = f.accent;
+      ctx.globalAlpha = 0.55 + 0.25 * pr(seed + 4);
+      drawFrameShape(f.type, x, y, w, h, side, seed, game.time);
+    }
+  }
+  ctx.restore();
+}
+
+/* ============================================================
+   通用空气层：色辉光 + 体积光束 + 浮尘 + 前景速度线 + 暗角。
+   每关用不同色调与附加效果（水下焦散/极光/余烬/电弧/相位缝），
+   让背景不再是「一层渐变 + 几个粒子」。
+   ============================================================ */
+const AMBIENT_PRESETS = [
+  { tint: '96,150,235',  beam: '150,205,255', dust: '200,228,255', dustN: 26, beamN: 3, streak: true,  glow: 0.13 }, // 0 轨道坟场
+  { tint: '46,190,205',  beam: '120,240,235', dust: '190,250,255', dustN: 32, beamN: 3, caustic: true, glow: 0.16 }, // 1 深海
+  { tint: '235,168,90',  beam: '255,224,170', dust: '255,222,150', dustN: 34, beamN: 2, haze: true,  glow: 0.16 }, // 2 沙漠
+  { tint: '240,110,70',  beam: '255,160,105', dust: '255,170,115', dustN: 30, beamN: 2, streak: true, rise: true, glow: 0.18 }, // 3 火星
+  { tint: '160,185,230', beam: '215,232,255', dust: '225,235,255', dustN: 24, beamN: 2, streak: true,  glow: 0.11 }, // 4 月球
+  { tint: '170,225,110', beam: '225,255,175', dust: '215,255,165', dustN: 30, beamN: 2, streak: true, glow: 0.13 }, // 5 草原
+  { tint: '70,215,135',  beam: '160,255,200', dust: '185,255,205', dustN: 34, beamN: 3, glow: 0.16 }, // 6 雨林
+  { tint: '86,180,250',  beam: '165,230,255', dust: '210,242,255', dustN: 30, beamN: 2, streak: true, glow: 0.15 }, // 7 海王星
+  { tint: '70,246,225',  beam: '155,255,242', dust: '222,255,250', dustN: 38, beamN: 4, aurora: true, glow: 0.18 }, // 8 土星极光
+  { tint: '166,108,250', beam: '195,145,255', dust: '222,192,255', dustN: 26, beamN: 2, streak: true, voidPull: true, glow: 0.20 }, // 9 黑洞
+  { tint: '188,120,255', beam: '222,165,255', dust: '232,195,255', dustN: 30, beamN: 2, streak: true, spark: true, glow: 0.19 }, // 10 磁暴
+  { tint: '255,188,74',  beam: '255,222,135', dust: '255,222,135', dustN: 34, beamN: 2, streak: true, glow: 0.17 }, // 11 蜂巢
+  { tint: '255,138,58',  beam: '255,182,95',  dust: '255,182,95',  dustN: 40, beamN: 3, streak: true, rise: true, embers: true, glow: 0.22 }, // 12 日冕
+  { tint: '148,178,255', beam: '195,215,255', dust: '212,222,255', dustN: 30, beamN: 3, streak: true, phase: true, glow: 0.18 }, // 13 相位
+];
+
+function drawAmbientOverlay(dt) {
+  const p = AMBIENT_PRESETS[game.level] || AMBIENT_PRESETS[0];
+  const t = game.time;
+  const pr = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+  const rgb = (a) => `rgba(${p.tint},${a})`;
+  const beamRgb = (a) => `rgba(${p.beam},${a})`;
+  ctx.save();
+
+  // 1) 关卡色调辉光（上冷下暖 / 下冷上暖由 tint 统一决定）
+  const glow = ctx.createLinearGradient(0, 0, 0, H);
+  glow.addColorStop(0, rgb(p.glow * 0.45));
+  glow.addColorStop(0.45, rgb(p.glow * 0.10));
+  glow.addColorStop(1, rgb(p.glow));
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W, H);
+
+  // 2) 体积光束：缓慢横扫的斜向光柱
+  ctx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < (p.beamN || 2); i++) {
+    const drift = ((t * (0.020 + i * 0.006) + i * 0.31) % 1.5) - 0.25;
+    const x0 = drift * W;
+    const w = W * (0.10 + 0.05 * pr(i + 3));
+    const alpha = 0.035 + 0.028 * (0.5 + 0.5 * Math.sin(t * 0.42 + i * 1.7));
+    const bg = ctx.createLinearGradient(x0 - w, 0, x0 + w, H);
+    bg.addColorStop(0, beamRgb(0));
+    bg.addColorStop(0.5, beamRgb(alpha));
+    bg.addColorStop(1, beamRgb(0));
+    ctx.fillStyle = bg;
+    ctx.beginPath();
+    ctx.moveTo(x0 - w, 0);
+    ctx.lineTo(x0 + w * 0.35, 0);
+    ctx.lineTo(x0 + w * 1.35, H);
+    ctx.lineTo(x0 - w * 0.15, H);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.globalCompositeOperation = 'source-over';
+
+  // 3) 水下焦散：横向波动的光带
+  if (p.caustic) {
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 4; i++) {
+      const y = H * (0.08 + i * 0.17) + Math.sin(t * 0.65 + i) * 8;
+      ctx.strokeStyle = beamRgb(0.05 + 0.025 * (0.5 + 0.5 * Math.sin(t * 1.2 + i)));
+      ctx.lineWidth = 2.5 + i * 1.2;
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += 14) {
+        const yy = y + Math.sin(x * 0.021 + t * 0.9 + i * 1.4) * (5 + i * 2);
+        if (x === 0) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
+      }
+      ctx.stroke();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // 4) 极光幕：顶部缓慢流动的丝带
+  if (p.aurora) {
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 3; i++) {
+      const yBase = H * (0.10 + i * 0.09);
+      const g = ctx.createLinearGradient(0, yBase - 30, 0, yBase + 50);
+      g.addColorStop(0, `rgba(${i === 1 ? '170,140,255' : p.beam},0)`);
+      g.addColorStop(0.5, `rgba(${i === 1 ? '170,140,255' : p.beam},${0.07 - i * 0.012})`);
+      g.addColorStop(1, `rgba(${i === 1 ? '170,140,255' : p.beam},0)`);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += 16) {
+        const yy = yBase + Math.sin(x * 0.012 + t * 0.55 + i * 2.1) * 18;
+        if (x === 0) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
+      }
+      for (let x = W; x >= 0; x -= 16) {
+        ctx.lineTo(x, yBase + 46 + Math.sin(x * 0.016 + t * 0.4 + i * 1.3) * 14);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // 5) 磁暴电弧：规律闪烁的短折线，不遮挡战斗区
+  if (p.spark) {
+    const beat = (t * 0.9) % 3.2;
+    if (beat < 0.32) {
+      const flick = 1 - beat / 0.32;
+      ctx.strokeStyle = `rgba(220,170,255,${0.16 * flick})`;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      const sy = H * (0.18 + pr(Math.floor(t * 0.9)) * 0.25);
+      let sx = W * 0.1, yy = sy;
+      ctx.moveTo(sx, yy);
+      for (let k = 0; k < 7; k++) {
+        sx += W * 0.12;
+        yy = sy + (pr(k + Math.floor(t * 0.9) * 7) - 0.5) * 46;
+        ctx.lineTo(sx, yy);
+      }
+      ctx.stroke();
+    }
+  }
+
+  // 6) 相位缝：半透明斜切光带
+  if (p.phase) {
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 3; i++) {
+      const x = W * (0.2 + i * 0.3) + Math.sin(t * 0.3 + i * 2) * 26;
+      const y = H * (0.2 + 0.22 * i);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(0.55 + i * 0.12);
+      ctx.fillStyle = beamRgb(0.035 + 0.015 * Math.sin(t * 0.8 + i));
+      ctx.fillRect(-W * 0.09, -H * 0.22, W * 0.18, H * 0.44);
+      ctx.strokeStyle = beamRgb(0.10);
+      ctx.lineWidth = 1;
+      ctx.strokeRect(-W * 0.09, -H * 0.22, W * 0.18, H * 0.44);
+      ctx.restore();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // 7) 浮尘 / 余烬（rise = 向上飘）
+  for (let i = 0; i < (p.dustN || 24); i++) {
+    const seed = i * 3.77 + game.level * 13.1;
+    const baseX = pr(seed) * W;
+    const baseY = pr(seed + 1) * H;
+    const spd = 14 + pr(seed + 2) * 34;
+    const drift = ((baseY + t * spd) % (H + 40));
+    const y = p.rise ? H + 20 - drift : drift - 20;
+    const x = (baseX + Math.sin(t * 0.5 + i * 1.3) * 10 + W) % W;
+    const size = 0.8 + pr(seed + 3) * 1.8;
+    const alpha = 0.10 + pr(seed + 4) * 0.16;
+    ctx.fillStyle = `rgba(${p.dust},${alpha})`;
+    ctx.beginPath(); ctx.arc(x, y, size, 0, Math.PI * 2); ctx.fill();
+  }
+  // 日冕余烬：少量更大的亮点，带轻微拖尾
+  if (p.embers) {
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 8; i++) {
+      const seed = i * 9.13 + 3.1;
+      const x = (pr(seed) * W + Math.sin(t * 0.7 + i) * 16 + W) % W;
+      const y = H + 20 - ((pr(seed + 1) * H + t * (30 + pr(seed + 2) * 60)) % (H + 40));
+      const a = 0.18 + 0.12 * Math.sin(t * 3 + i);
+      ctx.strokeStyle = `rgba(255,170,80,${a})`;
+      ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 1.5, y + 8 + pr(seed + 3) * 10); ctx.stroke();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // 8) 前景速度线（只贴两侧，避免干扰弹幕判读）
+  if (p.streak) {
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 7; i++) {
+      const seed = i * 5.13 + game.level * 3.7;
+      const edge = i % 2 === 0 ? 0.10 : 0.90;
+      const x = W * (edge + (pr(seed) - 0.5) * 0.11);
+      const len = 36 + pr(seed + 1) * 100;
+      const spd = 210 + pr(seed + 2) * 240;
+      const y = (pr(seed + 3) * H + t * spd) % (H + len) - len;
+      const a = 0.045 + pr(seed + 4) * 0.07;
+      ctx.strokeStyle = beamRgb(a);
+      ctx.lineWidth = 0.9 + pr(seed + 5) * 1.2;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + len); ctx.stroke();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // 9) 暗角：把视觉重心压回战斗区
+  const vg = ctx.createRadialGradient(W / 2, H * 0.52, Math.min(W, H) * 0.30, W / 2, H * 0.52, Math.max(W, H) * 0.78);
+  vg.addColorStop(0, 'rgba(0,0,0,0)');
+  vg.addColorStop(0.68, 'rgba(0,0,0,0.10)');
+  vg.addColorStop(1, 'rgba(0,0,0,0.30)');
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.restore();
 }
 
 // 统一四层机甲末世视差（远景星云→中景城市霓虹→近景建筑废墟→地面杂物）
@@ -16808,7 +17617,20 @@ let _lastHudWave = '';
 let _lastHudRescue = '';
 let _lastHudBomb = '';
 let _lastScoreBounceAt = 0;
+let _lastHudLevelName = '';
+let _lastHudPips = '';
 const _reduceMotion = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+// 把当前战机主题色注入 HUD，让三架机体从界面到机体保持同一套识别色
+function applyShipTheme(ship) {
+  if (!ship) return;
+  const root = document.documentElement;
+  root.style.setProperty('--ship-accent', ship.color);
+  const dot = document.getElementById('hudShipDot');
+  if (dot) {
+    dot.style.background = ship.color;
+    dot.style.boxShadow = '0 0 8px ' + ship.color;
+  }
+}
 // HUD 元素缓存：updateHUD 每帧调用，避免重复查询 DOM 触发样式计算
 const _hudCache = {};
 function hudEl(id) {
@@ -16825,6 +17647,27 @@ function updateHUD() {
   if (waveNum !== _lastHudWave) {
     _lastHudWave = waveNum;
     hudEl('hLv').textContent = waveNum;
+  }
+  // 关卡名 + 波次节点：让每一关在 HUD 上也有身份，而不是只显示数字
+  const lvName = lv ? lv.name : '';
+  if (lvName !== _lastHudLevelName) {
+    _lastHudLevelName = lvName;
+    hudEl('hLvName').textContent = lvName;
+  }
+  const reached = game.bossActive ? totalWaves : Math.min(game.waveIdx, totalWaves);
+  const pipKey = game.level + '|' + reached + '|' + totalWaves + '|' + (game.bossActive ? 1 : 0);
+  if (pipKey !== _lastHudPips) {
+    _lastHudPips = pipKey;
+    const pips = hudEl('wavePips');
+    if (pips) {
+      let html = '';
+      for (let i = 0; i < totalWaves; i++) {
+        if (game.bossActive && i === totalWaves - 1) html += '<i class="boss"></i>';
+        else if (i < reached) html += '<i class="on"></i>';
+        else html += '<i></i>';
+      }
+      pips.innerHTML = html;
+    }
   }
 
   // 血条进度
@@ -17070,6 +17913,7 @@ function startGame(level, opts) {
   // ---- 战机特性（机库选择）----
   const ship = currentShip();
   player.ship = ship.key;
+  applyShipTheme(ship);
   player.maxHp = ship.hp;
   player.hp = ship.hp;
   player.pickupDmg = ship.pickupDmg;
