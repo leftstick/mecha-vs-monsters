@@ -255,35 +255,43 @@
   .hangar-buy:disabled{opacity:0.32;cursor:default;border-color:rgba(0,229,255,0.15);}
 
   /* 战机选择 */
-  .ship-current{margin-top:10px;font-size:11px;letter-spacing:2px;color:#6fa6c4;}
-  .ship-current b{color:#00e5ff;}
-  .ship-card{width:min(94vw,580px);max-height:90vh;overflow:auto;}
+  .ship-current{margin-top:12px;font-size:11px;letter-spacing:2px;color:#6fa6c4;}
+  .ship-current b{font-size:13px;}
+  .ship-card{width:min(96vw,640px);max-height:92vh;overflow:auto;}
   .ship-sub{font-size:10px;color:#5a7a9a;letter-spacing:1px;margin:-8px 0 14px;text-align:center;}
-  .ship-grid{display:flex;flex-direction:column;gap:10px;margin-bottom:16px;}
-  .ship-item{position:relative;display:flex;gap:12px;align-items:stretch;padding:12px;border-radius:12px;cursor:pointer;
-    border:1px solid rgba(0,229,255,0.16);background:linear-gradient(135deg,rgba(10,20,32,0.92),rgba(5,10,18,0.92));
-    transition:border-color .18s, box-shadow .18s, transform .12s;text-align:left;}
+  .ship-grid{display:flex;flex-direction:column;gap:12px;margin-bottom:16px;}
+  .ship-item{position:relative;display:flex;gap:14px;padding:14px;border-radius:14px;cursor:pointer;overflow:hidden;
+    border:1px solid rgba(0,229,255,0.14);text-align:left;
+    background:linear-gradient(120deg,rgba(12,22,34,0.95),rgba(4,9,16,0.95));
+    transition:border-color .18s,box-shadow .18s,transform .12s;}
+  .ship-item::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--sc,#00e5ff);
+    opacity:.5;transition:opacity .18s,box-shadow .18s;}
   .ship-item:active{transform:scale(.995);}
   .ship-item.on{border-color:var(--sc,#00e5ff);
-    box-shadow:inset 0 0 0 1px var(--sc,#00e5ff), 0 0 20px rgba(0,229,255,0.16);}
-  .ship-item .picked{position:absolute;top:8px;right:10px;font-size:9px;letter-spacing:2px;color:var(--sc,#00e5ff);opacity:0;}
+    box-shadow:inset 0 0 0 1px var(--sc,#00e5ff),0 8px 26px rgba(0,0,0,0.5);}
+  .ship-item.on::before{opacity:1;box-shadow:0 0 16px var(--sc,#00e5ff);}
+  .ship-item .picked{position:absolute;top:10px;right:12px;font-size:9px;letter-spacing:2px;font-weight:900;
+    padding:2px 8px;border-radius:20px;color:#050a10;background:var(--sc,#00e5ff);opacity:0;transition:opacity .18s;}
   .ship-item.on .picked{opacity:1;}
-  .ship-thumb{width:76px;flex:0 0 76px;border-radius:10px;display:flex;align-items:center;justify-content:center;
-    background:radial-gradient(circle at 50% 42%,rgba(255,255,255,0.06),rgba(0,0,0,0.45));border:1px solid rgba(255,255,255,0.05);}
-  .ship-thumb svg{width:66px;height:66px;}
+  .ship-thumb{width:96px;flex:0 0 96px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 50% 45%,var(--scA,rgba(0,229,255,0.22)),rgba(0,0,0,0.55) 72%);
+    border:1px solid var(--scA,rgba(0,229,255,0.3));}
+  .ship-thumb svg{width:84px;height:84px;filter:drop-shadow(0 0 8px var(--sc,#00e5ff));}
   .ship-body{flex:1;min-width:0;}
-  .ship-name{font-size:16px;font-weight:900;letter-spacing:2px;color:#dff6ff;display:flex;align-items:baseline;gap:8px;}
+  .ship-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-right:54px;}
+  .ship-name{font-size:19px;font-weight:900;letter-spacing:3px;color:#e6faff;text-shadow:0 0 12px var(--scA,rgba(0,229,255,0.4));}
   .ship-name em{font-style:normal;font-size:9px;font-weight:400;letter-spacing:2px;color:#54748e;}
-  .ship-tag{display:inline-block;margin-left:2px;padding:1px 7px;border-radius:20px;font-size:9px;letter-spacing:1px;
-    color:var(--sc,#00e5ff);border:1px solid var(--sc,#00e5ff);opacity:.85;}
-  .ship-desc{font-size:11px;line-height:1.5;color:#83a3ba;margin:5px 0 8px;}
-  .ship-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:5px 10px;}
-  .ship-stat{font-size:9px;letter-spacing:1px;color:#5f8098;}
-  .ship-stat b{display:block;font-size:9px;font-weight:400;color:#7ea6bf;margin-bottom:3px;}
-  .ship-bar{height:4px;border-radius:2px;background:#122334;overflow:hidden;}
-  .ship-bar i{display:block;height:100%;border-radius:2px;background:var(--sc,#00e5ff);
-    box-shadow:0 0 6px var(--sc,#00e5ff);}
-  .ship-perk{margin-top:8px;font-size:10px;line-height:1.45;color:#8ff7c9;}
+  .ship-tag{margin-left:auto;padding:2px 9px;border-radius:20px;font-size:10px;letter-spacing:1px;
+    color:var(--sc,#00e5ff);border:1px solid var(--sc,#00e5ff);}
+  .ship-desc{font-size:11.5px;line-height:1.5;color:#8aa9bf;margin:6px 0 9px;}
+  .ship-stats{display:flex;flex-direction:column;gap:5px;}
+  .ship-stat{display:grid;grid-template-columns:30px 1fr 24px;align-items:center;gap:8px;
+    font-size:9px;letter-spacing:1px;color:#6c8ca3;}
+  .ship-stat b{text-align:right;font-size:10px;color:var(--sc,#00e5ff);font-weight:700;}
+  .ship-bar{height:5px;border-radius:3px;background:#0f1e2c;overflow:hidden;box-shadow:inset 0 1px 2px rgba(0,0,0,0.6);}
+  .ship-bar i{display:block;height:100%;border-radius:3px;box-shadow:0 0 8px var(--sc,#00e5ff);
+    background:linear-gradient(90deg,var(--sc,#00e5ff),rgba(255,255,255,0.85));}
+  .ship-perk{margin-top:9px;font-size:10px;line-height:1.45;color:#8ff7c9;}
 
   /* 任务简报：三选一模块 */
   .module-select{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:4px 0;}
@@ -1312,7 +1320,7 @@ const SHIP_TYPES = [
     invulnBonus: 0, shieldBonus: 0, extraWingman: true, pickupBonus: 2,
     visual: {
       scale: 1.00, span: 38, tipY: -6, rootY: -10, back: 16, notch: 16, hullW: 11, noseY: -30,
-      engines: [-7, 7], accent: '#00e5ff',
+      engines: [-7, 7], accent: '#00e5ff', trail: [170, 245, 255], cockpitY: -14,
       hull: ['#4d5e70', '#374757', '#23313f', '#121d28'],
       wing: ['#3e5063', '#2b3b4c', '#1a2836'],
     },
@@ -1327,8 +1335,8 @@ const SHIP_TYPES = [
     pickupDmg: 1.16, pickupRate: 1.00,
     invulnBonus: 0.25, shieldBonus: 0.5, extraWingman: false, pickupBonus: 0,
     visual: {
-      scale: 1.12, span: 46, tipY: 2, rootY: -8, back: 20, notch: 20, hullW: 14, noseY: -27,
-      engines: [-12, 0, 12], accent: '#ffb347',
+      scale: 1.10, span: 56, tipY: 4, rootY: -6, back: 24, notch: 22, hullW: 17, noseY: -22,
+      engines: [-15, 0, 15], accent: '#ffb347', trail: [255, 196, 120], cockpitY: -9,
       hull: ['#6b5642', '#4f4132', '#332a21', '#1d1712'],
       wing: ['#5a4a39', '#40342a', '#241d17'],
     },
@@ -1343,8 +1351,8 @@ const SHIP_TYPES = [
     pickupDmg: 0.92, pickupRate: 1.12,
     invulnBonus: 0, shieldBonus: 0, extraWingman: false, pickupBonus: 0,
     visual: {
-      scale: 0.96, span: 31, tipY: -14, rootY: -12, back: 19, notch: 11, hullW: 9, noseY: -38,
-      engines: [-5, 5], accent: '#7ef0a0',
+      scale: 0.86, span: 24, tipY: -18, rootY: -14, back: 22, notch: 9, hullW: 7, noseY: -50,
+      engines: [-4.5, 4.5], accent: '#7ef0a0', trail: [150, 255, 205], cockpitY: -16,
       hull: ['#3f5a4c', '#2e4539', '#1f3028', '#101c17'],
       wing: ['#35513f', '#26402f', '#16261c'],
     },
@@ -3550,13 +3558,14 @@ function drawPlayerGhosts(x, y, tilt) {
     const age = now - g.born;
     if (age > 0.32) { playerGhosts.splice(i, 1); continue; }
     const a = (1 - age / 0.32) * 0.2;
+    const tc = getShip(player.ship || 'balanced').visual.trail;
     ctx.save();
     ctx.translate(g.x, g.y);
     ctx.rotate(g.tilt * GAME_CONFIG.playerTilt.maxAngle);
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = a;
-    ctx.fillStyle = 'rgba(0,190,255,0.55)';
-    ctx.strokeStyle = 'rgba(120,240,255,0.9)';
+    ctx.fillStyle = `rgba(${tc[0]},${tc[1]},${tc[2]},0.5)`;
+    ctx.strokeStyle = `rgba(${tc[0]},${tc[1]},${tc[2]},0.95)`;
     ctx.lineWidth = 1.4;
     ctx.beginPath();
     ctx.moveTo(0, -32); ctx.lineTo(38, 16); ctx.lineTo(0, 11); ctx.lineTo(-38, 16);
@@ -3565,185 +3574,237 @@ function drawPlayerGhosts(x, y, tilt) {
   }
 }
 
-/* ---- 壁垒：宽厚装甲机（双翼挂架 + 三发引擎 + 钝头重炮）---- */
+/* ---- 壁垒：重装炮舰（侧置引擎舱 + 平直宽翼 + 分层装甲 + 旋转雷达）---- */
 function drawHullFortress(V) {
   const t = game.time;
-  // 引擎尾焰（三台）
+  const P = V.span * 0.74; // 侧置引擎舱中心
+  // 三束粗尾焰（左舱 / 中央 / 右舱）
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  for (const ex of V.engines) {
-    const fl = 0.75 + 0.25 * Math.sin(t * 18 + ex);
-    const g = ctx.createLinearGradient(ex, 18, ex, 78);
-    g.addColorStop(0, `rgba(255,190,110,${0.6 * fl})`);
-    g.addColorStop(0.5, 'rgba(255,140,50,0.22)');
-    g.addColorStop(1, 'rgba(255,120,40,0)');
+  for (const ex of [-P, 0, P]) {
+    const fl = 0.78 + 0.22 * Math.sin(t * 14 + ex * 0.3);
+    const g = ctx.createLinearGradient(ex, V.back, ex, V.back + 58);
+    g.addColorStop(0, `rgba(255,205,130,${0.66 * fl})`);
+    g.addColorStop(0.45, 'rgba(255,150,60,0.24)');
+    g.addColorStop(1, 'rgba(255,110,30,0)');
     ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.moveTo(ex - 4, 18); ctx.lineTo(ex + 4, 18);
-    ctx.lineTo(ex + 2, 40 + 16 * fl); ctx.lineTo(ex - 2, 40 + 16 * fl);
+    ctx.moveTo(ex - 6, V.back); ctx.lineTo(ex + 6, V.back);
+    ctx.lineTo(ex + 3, V.back + 34 + 18 * fl); ctx.lineTo(ex - 3, V.back + 34 + 18 * fl);
     ctx.closePath(); ctx.fill();
   }
   ctx.restore();
 
-  // 主翼：平直宽大，翼端方形装甲
-  const wg = ctx.createLinearGradient(0, -14, 0, 22);
-  wg.addColorStop(0, V.wing[0]); wg.addColorStop(0.55, V.wing[1]); wg.addColorStop(1, V.wing[2]);
+  // 侧置引擎舱：最醒目的识别特征
+  for (const side of [-1, 1]) {
+    const px = side * P;
+    const ng = ctx.createLinearGradient(px - 9, 0, px + 9, 0);
+    ng.addColorStop(0, V.hull[2]); ng.addColorStop(0.45, V.hull[0]); ng.addColorStop(1, V.hull[3]);
+    ctx.fillStyle = ng;
+    ctx.beginPath();
+    ctx.moveTo(px - 8, V.noseY + 14);
+    ctx.lineTo(px - 9.5, -4);
+    ctx.lineTo(px - 9.5, V.back);
+    ctx.lineTo(px + 9.5, V.back);
+    ctx.lineTo(px + 9.5, -4);
+    ctx.lineTo(px + 8, V.noseY + 14);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,190,120,0.42)'; ctx.lineWidth = 1.2; ctx.stroke();
+    // 进气口
+    ctx.fillStyle = '#0b1014';
+    ctx.beginPath(); ctx.ellipse(px, V.noseY + 15, 6.5, 3.4, 0, 0, Math.PI * 2); ctx.fill();
+    // 橙色警示条
+    ctx.fillStyle = 'rgba(255,150,40,0.9)';
+    ctx.fillRect(px - 7.5, V.back - 10, 15, 2.6);
+  }
+
+  // 主翼：平直宽大，与引擎舱连成一体
+  const wg = ctx.createLinearGradient(0, -10, 0, V.back);
+  wg.addColorStop(0, V.wing[0]); wg.addColorStop(0.6, V.wing[1]); wg.addColorStop(1, V.wing[2]);
   ctx.fillStyle = wg;
   ctx.beginPath();
-  ctx.moveTo(-V.span, V.back);
-  ctx.lineTo(-V.span, V.back - 12);
-  ctx.lineTo(-V.span * 0.55, V.rootY);
-  ctx.lineTo(V.span * 0.55, V.rootY);
-  ctx.lineTo(V.span, V.back - 12);
-  ctx.lineTo(V.span, V.back);
-  ctx.lineTo(V.notch, 22);
-  ctx.lineTo(-V.notch, 22);
+  ctx.moveTo(-V.hullW * 0.8, V.rootY);
+  ctx.lineTo(-P + 9, V.rootY + 2);
+  ctx.lineTo(-P - 2, V.back - 6);
+  ctx.lineTo(-P - 2, V.back);
+  ctx.lineTo(-V.notch, V.back);
+  ctx.lineTo(V.notch, V.back);
+  ctx.lineTo(P + 2, V.back);
+  ctx.lineTo(P + 2, V.back - 6);
+  ctx.lineTo(P - 9, V.rootY + 2);
+  ctx.lineTo(V.hullW * 0.8, V.rootY);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = 'rgba(255,190,120,0.35)'; ctx.lineWidth = 1.2;
-  ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,190,120,0.32)'; ctx.lineWidth = 1.2; ctx.stroke();
 
-  // 翼下装甲挂架 + 警示灯
-  for (const side of [-1, 1]) {
-    const px = side * V.span * 0.72;
-    ctx.fillStyle = V.hull[1];
-    ctx.beginPath();
-    ctx.moveTo(px - 6, 4); ctx.lineTo(px + 6, 4);
-    ctx.lineTo(px + 4, 18); ctx.lineTo(px - 4, 18);
-    ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 1; ctx.stroke();
-    ctx.fillStyle = side < 0 ? '#ff5a4a' : '#7ef0a0';
-    ctx.beginPath(); ctx.arc(px, 13, 1.5, 0, Math.PI * 2); ctx.fill();
+  // 翼面黄黑警示条
+  for (let i = 0; i < 3; i++) {
+    const y0 = V.rootY + 6 + i * 7;
+    ctx.fillStyle = i % 2 ? 'rgba(18,14,10,0.6)' : 'rgba(255,168,60,0.6)';
+    ctx.fillRect(-P + 5, y0, 11, 3);
+    ctx.fillRect(P - 16, y0, 11, 3);
   }
 
-  // 机身：厚实矩形到钝头
+  // 机身：厚重装甲板
   const fg = ctx.createLinearGradient(-V.hullW, 0, V.hullW, 0);
-  fg.addColorStop(0, V.hull[3]); fg.addColorStop(0.35, V.hull[1]);
-  fg.addColorStop(0.65, V.hull[0]); fg.addColorStop(1, V.hull[2]);
+  fg.addColorStop(0, V.hull[3]); fg.addColorStop(0.3, V.hull[1]);
+  fg.addColorStop(0.62, V.hull[0]); fg.addColorStop(1, V.hull[2]);
   ctx.fillStyle = fg;
   ctx.beginPath();
-  ctx.moveTo(-V.hullW * 0.7, V.noseY);
-  ctx.quadraticCurveTo(-V.hullW, V.noseY + 8, -V.hullW, 2);
-  ctx.lineTo(-V.hullW * 0.9, 22);
-  ctx.lineTo(V.hullW * 0.9, 22);
-  ctx.lineTo(V.hullW, 2);
-  ctx.quadraticCurveTo(V.hullW, V.noseY + 8, V.hullW * 0.7, V.noseY);
+  ctx.moveTo(-V.hullW * 0.55, V.noseY);
+  ctx.lineTo(V.hullW * 0.55, V.noseY);
+  ctx.lineTo(V.hullW, V.noseY + 12);
+  ctx.lineTo(V.hullW, 8);
+  ctx.lineTo(V.hullW * 0.86, V.back);
+  ctx.lineTo(-V.hullW * 0.86, V.back);
+  ctx.lineTo(-V.hullW, 8);
+  ctx.lineTo(-V.hullW, V.noseY + 12);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = 'rgba(255,200,140,0.22)'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,200,140,0.28)'; ctx.lineWidth = 1.2; ctx.stroke();
 
-  // 中央双联炮管
-  ctx.fillStyle = V.hull[2];
-  for (const dx of [-2.5, 2.5]) {
-    ctx.fillRect(dx - 1.2, V.noseY - 3, 2.4, 10);
+  // 分层装甲缝
+  ctx.strokeStyle = 'rgba(0,0,0,0.45)'; ctx.lineWidth = 1;
+  for (const yy of [V.noseY + 14, 2, V.back - 6]) {
+    ctx.beginPath(); ctx.moveTo(-V.hullW * 0.85, yy); ctx.lineTo(V.hullW * 0.85, yy); ctx.stroke();
   }
-  ctx.fillStyle = V.accent;
-  ctx.globalAlpha = 0.8;
-  ctx.fillRect(-3, V.noseY - 4, 6, 1.6);
-  ctx.globalAlpha = 1;
 
-  // 座舱（宽扁）
-  ctx.fillStyle = '#101a22';
-  ctx.beginPath(); ctx.ellipse(0, -6, 5.5, 7, 0, 0, Math.PI * 2); ctx.fill();
-  const cg = ctx.createLinearGradient(-5, -12, 5, 0);
-  cg.addColorStop(0, 'rgba(255,190,110,0.5)');
-  cg.addColorStop(0.5, 'rgba(140,200,255,0.35)');
-  cg.addColorStop(1, 'rgba(10,20,30,0.1)');
+  // 双联重炮 + 炮口制退器
+  for (const dx of [-5, 5]) {
+    ctx.fillStyle = '#151c22';
+    ctx.fillRect(dx - 2, V.noseY - 9, 4, 15);
+    ctx.fillStyle = V.accent; ctx.globalAlpha = 0.9;
+    ctx.fillRect(dx - 2.5, V.noseY - 10.5, 5, 2.2);
+    ctx.globalAlpha = 1;
+  }
+
+  // 旋转雷达罩
+  ctx.fillStyle = 'rgba(255,170,70,0.22)';
+  ctx.beginPath(); ctx.arc(0, 3, 6.5, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,200,140,0.85)'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(0, 3, 6.5, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(0, 3);
+  ctx.lineTo(Math.cos(t * 2.2) * 6.5, 3 + Math.sin(t * 2.2) * 6.5);
+  ctx.stroke();
+
+  // 低矮座舱
+  ctx.fillStyle = '#0c1418';
+  ctx.beginPath(); ctx.ellipse(0, -9, 6, 5, 0, 0, Math.PI * 2); ctx.fill();
+  const cg = ctx.createLinearGradient(-5, -13, 5, -4);
+  cg.addColorStop(0, 'rgba(255,200,130,0.55)');
+  cg.addColorStop(0.55, 'rgba(150,205,255,0.3)');
+  cg.addColorStop(1, 'rgba(8,16,20,0.05)');
   ctx.fillStyle = cg;
-  ctx.beginPath(); ctx.ellipse(0, -6, 5.5, 7, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = 'rgba(255,210,150,0.35)'; ctx.lineWidth = 0.9; ctx.stroke();
-
-  // 装甲分缝
-  ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(-V.hullW + 1, 4); ctx.lineTo(V.hullW - 1, 4); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(-V.span * 0.5, 12); ctx.lineTo(-V.span * 0.28, 14); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(V.span * 0.5, 12); ctx.lineTo(V.span * 0.28, 14); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(0, -9, 6, 5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,215,160,0.4)'; ctx.lineWidth = 0.9; ctx.stroke();
 }
 
-/* ---- 游隼：细长高速截击机（大后掠三角翼 + 尖锐机鼻）---- */
+/* ---- 游隼：前掠翼截击机（尖锐长机鼻 + 前掠翼 + 鸭翼 + 双垂尾）---- */
 function drawHullFalcon(V) {
   const t = game.time;
-  // 引擎尾焰（细长）
+  // 双发细长尾焰
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   for (const ex of V.engines) {
     const fl = 0.8 + 0.2 * Math.sin(t * 26 + ex * 2);
-    const g = ctx.createLinearGradient(ex, 16, ex, 92);
+    const g = ctx.createLinearGradient(ex, 16, ex, 96);
     g.addColorStop(0, `rgba(160,255,205,${0.62 * fl})`);
     g.addColorStop(0.45, 'rgba(80,240,160,0.2)');
     g.addColorStop(1, 'rgba(60,220,140,0)');
     ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.moveTo(ex - 2.6, 16); ctx.lineTo(ex + 2.6, 16);
-    ctx.lineTo(ex + 1.4, 48 + 18 * fl); ctx.lineTo(ex - 1.4, 48 + 18 * fl);
+    ctx.moveTo(ex - 2.4, 16); ctx.lineTo(ex + 2.4, 16);
+    ctx.lineTo(ex + 1.2, 50 + 18 * fl); ctx.lineTo(ex - 1.2, 50 + 18 * fl);
     ctx.closePath(); ctx.fill();
   }
   ctx.restore();
 
-  // 大后掠主翼
-  const wg = ctx.createLinearGradient(0, -12, 0, 20);
+  // 前掠主翼：翼尖明显靠前，与另两架形成强烈差异
+  const wg = ctx.createLinearGradient(0, -24, 0, V.back);
   wg.addColorStop(0, V.wing[0]); wg.addColorStop(0.55, V.wing[1]); wg.addColorStop(1, V.wing[2]);
   ctx.fillStyle = wg;
   ctx.beginPath();
-  ctx.moveTo(-4, -16);
-  ctx.lineTo(-V.span, V.back);
-  ctx.lineTo(-V.span + 4, V.back);
-  ctx.lineTo(-V.notch, 20);
-  ctx.lineTo(V.notch, 20);
-  ctx.lineTo(V.span - 4, V.back);
-  ctx.lineTo(V.span, V.back);
-  ctx.lineTo(4, -16);
+  ctx.moveTo(-4, -28);
+  ctx.lineTo(-V.span, -12);
+  ctx.lineTo(-V.span + 4, -3);
+  ctx.lineTo(-8, 14);
+  ctx.lineTo(-V.notch, V.back);
+  ctx.lineTo(V.notch, V.back);
+  ctx.lineTo(8, 14);
+  ctx.lineTo(V.span - 4, -3);
+  ctx.lineTo(V.span, -12);
+  ctx.lineTo(4, -28);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = 'rgba(126,240,160,0.4)'; ctx.lineWidth = 1.1; ctx.stroke();
+  ctx.strokeStyle = 'rgba(126,240,160,0.45)'; ctx.lineWidth = 1.2; ctx.stroke();
 
-  // 翼端小翼（向上折）
+  // 翼尖发光条
+  ctx.strokeStyle = 'rgba(160,255,205,0.9)'; ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(-V.span, -12); ctx.lineTo(-V.span + 4, -3);
+  ctx.moveTo(V.span, -12); ctx.lineTo(V.span - 4, -3);
+  ctx.stroke();
+
+  // 鸭翼（机鼻两侧小前翼）
+  ctx.fillStyle = V.wing[1];
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(side * (V.hullW + 1), -30);
+    ctx.lineTo(side * (V.hullW + 11), -25);
+    ctx.lineTo(side * (V.hullW + 2), -21);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(160,255,205,0.5)'; ctx.lineWidth = 0.9; ctx.stroke();
+  }
+
+  // 双垂尾（外倾）
   for (const side of [-1, 1]) {
     ctx.fillStyle = V.wing[2];
     ctx.beginPath();
-    ctx.moveTo(side * V.span, V.back);
-    ctx.lineTo(side * (V.span - 5), V.back - 10);
-    ctx.lineTo(side * (V.span - 9), V.back - 8);
-    ctx.lineTo(side * (V.span - 4), V.back);
+    ctx.moveTo(side * 5, 12);
+    ctx.lineTo(side * 13, 30);
+    ctx.lineTo(side * 9, 31);
+    ctx.lineTo(side * 2, 18);
     ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(126,240,160,0.55)'; ctx.lineWidth = 0.9; ctx.stroke();
   }
 
-  // 机身：细长、尖锐机鼻
+  // 机身：细长、尖锐长机鼻
   const fg = ctx.createLinearGradient(-V.hullW, 0, V.hullW, 0);
-  fg.addColorStop(0, V.hull[3]); fg.addColorStop(0.35, V.hull[1]);
-  fg.addColorStop(0.7, V.hull[0]); fg.addColorStop(1, V.hull[2]);
+  fg.addColorStop(0, V.hull[3]); fg.addColorStop(0.32, V.hull[1]);
+  fg.addColorStop(0.68, V.hull[0]); fg.addColorStop(1, V.hull[2]);
   ctx.fillStyle = fg;
   ctx.beginPath();
   ctx.moveTo(0, V.noseY);
-  ctx.quadraticCurveTo(V.hullW * 1.05, V.noseY + 16, V.hullW, -8);
-  ctx.lineTo(V.hullW * 0.72, 20);
-  ctx.lineTo(-V.hullW * 0.72, 20);
-  ctx.lineTo(-V.hullW, -8);
-  ctx.quadraticCurveTo(-V.hullW * 1.05, V.noseY + 16, 0, V.noseY);
+  ctx.quadraticCurveTo(V.hullW * 0.9, V.noseY + 22, V.hullW, -10);
+  ctx.lineTo(V.hullW * 0.8, 20);
+  ctx.lineTo(-V.hullW * 0.8, 20);
+  ctx.lineTo(-V.hullW, -10);
+  ctx.quadraticCurveTo(-V.hullW * 0.9, V.noseY + 22, 0, V.noseY);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = 'rgba(150,255,190,0.25)'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.strokeStyle = 'rgba(150,255,190,0.28)'; ctx.lineWidth = 1; ctx.stroke();
 
   // 脊线高光
-  ctx.strokeStyle = 'rgba(200,255,225,0.5)'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(0, V.noseY + 2); ctx.lineTo(0, 18); ctx.stroke();
+  ctx.strokeStyle = 'rgba(200,255,225,0.55)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, V.noseY + 4); ctx.lineTo(0, 18); ctx.stroke();
 
-  // 座舱（窄长）
+  // 窄长座舱
   ctx.fillStyle = '#0d1a14';
-  ctx.beginPath(); ctx.ellipse(0, -10, 3.6, 7.5, 0, 0, Math.PI * 2); ctx.fill();
-  const cg = ctx.createLinearGradient(-3, -16, 3, -3);
+  ctx.beginPath(); ctx.ellipse(0, -16, 3.4, 8.5, 0, 0, Math.PI * 2); ctx.fill();
+  const cg = ctx.createLinearGradient(-3, -23, 3, -8);
   cg.addColorStop(0, 'rgba(150,255,200,0.55)');
   cg.addColorStop(0.5, 'rgba(120,200,255,0.3)');
   cg.addColorStop(1, 'rgba(8,20,14,0.05)');
   ctx.fillStyle = cg;
-  ctx.beginPath(); ctx.ellipse(0, -10, 3.6, 7.5, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = 'rgba(170,255,205,0.3)'; ctx.lineWidth = 0.8; ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(0, -16, 3.4, 8.5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = 'rgba(170,255,205,0.32)'; ctx.lineWidth = 0.8; ctx.stroke();
 
   // 机鼻空速管
   ctx.strokeStyle = '#9fdcb8'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(0, V.noseY); ctx.lineTo(0, V.noseY - 6); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, V.noseY); ctx.lineTo(0, V.noseY - 7); ctx.stroke();
   ctx.fillStyle = V.accent;
-  ctx.beginPath(); ctx.arc(0, V.noseY - 6, 1.1, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(0, V.noseY - 7, 1.2, 0, Math.PI * 2); ctx.fill();
 }
 
 function drawPlayer() {
@@ -4027,28 +4088,29 @@ function drawPlayer() {
     ctx.globalAlpha = 1; ctx.shadowBlur = 0;
   }
 
-  // 发光部件呼吸脉动（座舱 / 翼尖 / 引擎）— 加色叠加，不写 player
+  // 发光部件呼吸脉动（座舱 / 翼尖 / 引擎）— 颜色随机体变化
   const breath = 0.5 + 0.5 * Math.sin(game.time * 2.4);
   const breath2 = 0.5 + 0.5 * Math.sin(game.time * 2.4 + 1.2);
+  const CPY = SV.cockpitY != null ? SV.cockpitY : -14;
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  // 座舱冷青光
-  const cgB = ctx.createRadialGradient(0, -14, 1, 0, -14, 12);
-  cgB.addColorStop(0, `rgba(120,240,255,${0.45 * breath})`);
-  cgB.addColorStop(1, 'rgba(120,240,255,0)');
+  // 座舱光
+  const cgB = ctx.createRadialGradient(0, CPY, 1, 0, CPY, 12);
+  cgB.addColorStop(0, hexToRgba(SV.accent, 0.45 * breath));
+  cgB.addColorStop(1, hexToRgba(SV.accent, 0));
   ctx.fillStyle = cgB;
-  ctx.beginPath(); ctx.arc(0, -14, 12, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(0, CPY, 12, 0, Math.PI * 2); ctx.fill();
   // 左翼尖
   const WT = SV.span - 2;
   const wl = ctx.createRadialGradient(-WT, 14, 1, -WT, 14, 10);
-  wl.addColorStop(0, `rgba(0,200,255,${0.35 * breath2})`);
-  wl.addColorStop(1, 'rgba(0,200,255,0)');
+  wl.addColorStop(0, hexToRgba(SV.accent, 0.35 * breath2));
+  wl.addColorStop(1, hexToRgba(SV.accent, 0));
   ctx.fillStyle = wl;
   ctx.beginPath(); ctx.arc(-WT, 14, 10, 0, Math.PI * 2); ctx.fill();
   // 右翼尖
   const wr = ctx.createRadialGradient(WT, 14, 1, WT, 14, 10);
-  wr.addColorStop(0, `rgba(0,200,255,${0.35 * breath2})`);
-  wr.addColorStop(1, 'rgba(0,200,255,0)');
+  wr.addColorStop(0, hexToRgba(SV.accent, 0.35 * breath2));
+  wr.addColorStop(1, hexToRgba(SV.accent, 0));
   ctx.fillStyle = wr;
   ctx.beginPath(); ctx.arc(WT, 14, 10, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
@@ -17613,26 +17675,28 @@ function openHangar() {
 function shipThumb(key) {
   const c = getShip(key).color;
   if (key === 'fortress') {
-    return `<svg viewBox="0 0 64 64" aria-hidden="true"><g stroke="${c}" stroke-width="1.3" stroke-linejoin="round">
-      <path d="M8 44 L8 33 L22 26 L42 26 L56 33 L56 44 L42 50 L22 50 Z" fill="rgba(255,179,71,0.16)"/>
-      <path d="M27 20 L37 20 L40 50 L24 50 Z" fill="rgba(255,179,71,0.34)"/>
-      <rect x="11" y="50" width="7" height="7" rx="1.6" fill="${c}" opacity=".65"/>
-      <rect x="25" y="50" width="7" height="7" rx="1.6" fill="${c}" opacity=".65"/>
-      <rect x="39" y="50" width="7" height="7" rx="1.6" fill="${c}" opacity=".65"/>
-      <path d="M32 20 L32 13" stroke-width="2.2"/>
+    return `<svg viewBox="0 0 64 64" aria-hidden="true"><g stroke="${c}" stroke-width="1.2" stroke-linejoin="round">
+      <path d="M9 40 L9 32 L20 27 L44 27 L55 32 L55 40 L44 46 L20 46 Z" fill="rgba(255,179,71,0.13)"/>
+      <rect x="5" y="27" width="9" height="21" rx="2.5" fill="rgba(255,179,71,0.32)"/>
+      <rect x="50" y="27" width="9" height="21" rx="2.5" fill="rgba(255,179,71,0.32)"/>
+      <path d="M27 21 L37 21 L40 47 L24 47 Z" fill="rgba(255,179,71,0.44)"/>
+      <path d="M29 21 L29 14 M35 21 L35 14" stroke-width="2.2"/>
+      <circle cx="32" cy="37" r="3.2" fill="none" stroke-width="1"/>
+      <path d="M32 37 L35 34" stroke-width="1"/>
     </g></svg>`;
   }
   if (key === 'falcon') {
-    return `<svg viewBox="0 0 64 64" aria-hidden="true"><g stroke="${c}" stroke-width="1.3" stroke-linejoin="round">
-      <path d="M32 3 L36 22 L58 52 L52 54 L34 45 L30 45 L12 54 L6 52 L28 22 Z" fill="rgba(126,240,160,0.15)"/>
-      <path d="M32 8 L34.5 27 L33 46 L31 46 L29.5 27 Z" fill="rgba(126,240,160,0.36)"/>
-      <circle cx="32" cy="25" r="2.2" fill="${c}"/>
-      <path d="M32 3 L32 -1" stroke-width="1.8"/>
+    return `<svg viewBox="0 0 64 64" aria-hidden="true"><g stroke="${c}" stroke-width="1.2" stroke-linejoin="round">
+      <path d="M32 11 L38 24 L58 27 L58 34 L42 39 L45 51 L38 53 L32 43 L26 53 L19 51 L22 39 L6 34 L6 27 L26 24 Z"
+        fill="rgba(126,240,160,0.13)"/>
+      <path d="M32 8 L35 26 L34 48 L30 48 L29 26 Z" fill="rgba(126,240,160,0.42)"/>
+      <path d="M32 11 L32 2" stroke-width="1.6"/>
+      <circle cx="32" cy="28" r="2" fill="${c}"/>
     </g></svg>`;
   }
-  return `<svg viewBox="0 0 64 64" aria-hidden="true"><g stroke="${c}" stroke-width="1.3" stroke-linejoin="round">
-    <path d="M32 5 L40 26 L58 49 L51 52 L36 44 L32 47 L28 44 L13 52 L6 49 L24 26 Z" fill="rgba(0,229,255,0.14)"/>
-    <path d="M32 11 L36 27 L34 44 L30 44 L28 27 Z" fill="rgba(0,229,255,0.34)"/>
+  return `<svg viewBox="0 0 64 64" aria-hidden="true"><g stroke="${c}" stroke-width="1.2" stroke-linejoin="round">
+    <path d="M32 5 L40 26 L58 49 L51 52 L36 44 L32 47 L28 44 L13 52 L6 49 L24 26 Z" fill="rgba(0,229,255,0.13)"/>
+    <path d="M32 11 L36 27 L34 44 L30 44 L28 27 Z" fill="rgba(0,229,255,0.36)"/>
     <circle cx="32" cy="24" r="2.6" fill="${c}"/>
   </g></svg>`;
 }
@@ -17640,18 +17704,22 @@ function renderShipSelect() {
   const grid = document.getElementById('shipGrid');
   if (!grid) return;
   const cur = currentShip().key;
-  const bar = (label, v) => `<div class="ship-stat"><b>${label}</b><div class="ship-bar"><i style="width:${v}%"></i></div></div>`;
+  const row = (label, v) => `<div class="ship-stat"><span>${label}</span><div class="ship-bar"><i style="width:${v}%"></i></div><b>${v}</b></div>`;
   grid.innerHTML = SHIP_TYPES.map(s => `
-    <div class="ship-item ${s.key === cur ? 'on' : ''}" data-ship="${s.key}" style="--sc:${s.color}">
+    <div class="ship-item ${s.key === cur ? 'on' : ''}" data-ship="${s.key}"
+      style="--sc:${s.color};--scA:${hexToRgba(s.color, 0.22)}">
       <div class="picked">已选</div>
       <div class="ship-thumb">${shipThumb(s.key)}</div>
       <div class="ship-body">
-        <div class="ship-name">${s.name}<em>${s.en}</em><span class="ship-tag">${s.tag}</span></div>
+        <div class="ship-head">
+          <div class="ship-name">${s.name}<em>${s.en}</em></div>
+          <span class="ship-tag">${s.tag}</span>
+        </div>
         <div class="ship-desc">${s.desc}</div>
         <div class="ship-stats">
-          ${bar('火力', s.stat.fire)}${bar('机动', s.stat.speed)}${bar('装甲', s.stat.armor)}
+          ${row('火力', s.stat.fire)}${row('机动', s.stat.speed)}${row('装甲', s.stat.armor)}
         </div>
-        <div class="ship-perk">${s.perk}</div>
+        <div class="ship-perk">▸ ${s.perk}</div>
       </div>
     </div>`).join('');
   grid.querySelectorAll('.ship-item').forEach(el => {
