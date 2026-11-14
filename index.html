@@ -586,7 +586,9 @@ const PIXEL_BUDGET = 1150000;
 const IS_WECHAT_BROWSER = isWeChatBrowser();
 const IS_QUARK_BROWSER = isQuarkBrowser();
 const IS_MOBILE_DEVICE = isMobileDevice();
-let renderDPRCap = IS_MOBILE_DEVICE ? ((IS_WECHAT_BROWSER || IS_QUARK_BROWSER) ? 1.25 : MOBILE_DPR_CAP) : 2;
+let renderDPRCap = IS_MOBILE_DEVICE ? ((IS_WECHAT_BROWSER) ? 1.25 : (IS_QUARK_BROWSER ? 1.0 : MOBILE_DPR_CAP)) : 2;
+// 画布在屏幕上的位置缓存：避免每个 pointermove 都触发一次强制布局
+let canvasRect = { left: 0, top: 0 };
 const vv = () => window.visualViewport;
 function resize() {
   W = vv() ? vv().width : innerWidth;
@@ -602,11 +604,18 @@ function resize() {
   canvas.style.width = W + 'px';
   canvas.style.height = H + 'px';
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  canvasRect = canvas.getBoundingClientRect();
   try { if (typeof resizeUI === 'function') resizeUI(); } catch(e) {}
   try { if (typeof positionBossBar === 'function') positionBossBar(); } catch(e) {}
 }
 resize();
-addEventListener('resize', resize);
+// 夸克等浏览器在触摸/滚动时会反复触发 visualViewport 尺寸变化（地址栏收起），
+// 每次都会重建后备缓冲造成明显卡顿，这里做 120ms 合并。
+let _resizeTimer = 0;
+addEventListener('resize', () => {
+  clearTimeout(_resizeTimer);
+  _resizeTimer = setTimeout(resize, 120);
+});
 
 /* ==================== 配置 ==================== */
 const CFG = {
@@ -1884,6 +1893,7 @@ let bombBtn = { cx:0, cy:0, r:25, flash:0 };
 // 磁极切换按钮（第11关，触摸操作；同时兼容拖拽/摇杆两种模式）
 let polarBtn = { cx:0, cy:0, r:26, flash:0 };
 let touchActive = false, touchId = null;
+let activeTouchCount = 0; // 屏幕上仍按住的手指数量（用于 pointercancel 兜底判断）
 
 function layoutActionButtons() {
   const tc = GAME_CONFIG.touch;
@@ -1995,28 +2005,88 @@ ta.addEventListener('pointermove', e => {
       }
     }
   } else {
-    if (touchActive && e.pointerId === touchId) movePlayerTo(e.clientX, e.clientY);
+    if (touchActive) {
+      // 不强制要求 pointerId 相等：夸克/UC 在接管手势后可能丢失或更换 pointerId，
+      // 只要拖动状态还在，就用当前指针继续跟随（多指时由首个认领者锁定）
+      if (touchId == null) touchId = e.pointerId;
+      if (e.pointerId === touchId) movePlayerTo(e.clientX, e.clientY);
+    }
   }
 }, {passive:false});
 
-function releaseTouchPointer(id) {
-  if (stick.active && id === stick.id) {
+// 触摸兜底：部分内核会在手势接管时停发 pointermove 但 touchmove 仍然连续，
+// 这里直接跟随第一根手指，避免机体突然“卡住不动”。
+ta.addEventListener('touchstart', e => {
+  activeTouchCount = e.touches.length;
+  if (game.state !== 'playing') return;
+  if (GAME_CONFIG.touch.mode === 'joystick') return;
+  if (touchActive) return;
+  const t = e.touches[0];
+  if (!t) return;
+  // 与 pointerdown 一致：落点在按钮上时不进入拖动
+  if (actionButtonsVisible() && (
+      Math.hypot(t.clientX - bombBtn.cx, t.clientY - bombBtn.cy) <= bombBtn.r + 16 ||
+      Math.hypot(t.clientX - dashBtn.cx, t.clientY - dashBtn.cy) <= dashBtn.r + 16)) return;
+  if (levelPhaseMode() &&
+      Math.hypot(t.clientX - polarBtn.cx, t.clientY - polarBtn.cy) <= polarBtn.r + 12) return;
+  touchActive = true; touchId = null;
+  movePlayerTo(t.clientX, t.clientY);
+}, {passive:false});
+
+ta.addEventListener('touchmove', e => {
+  activeTouchCount = e.touches.length;
+  if (game.state !== 'playing') return;
+  if (GAME_CONFIG.touch.mode === 'joystick') return;
+  if (!touchActive) return;
+  const t = e.touches[0];
+  if (!t) return;
+  movePlayerTo(t.clientX, t.clientY);
+  e.preventDefault();
+}, {passive:false});
+
+// 拖动指针的释放策略：
+//  - pointerup / touchend / touchcancel：真松手，硬释放
+//  - pointercancel / lostpointercapture：浏览器接管了指针流，但手指可能仍按着，
+//    只解绑 pointerId，保留 touchActive，让后续 touchmove 继续驱动
+function releaseTouchPointer(id, hard, pointerType) {
+  if (stick.active && (id == null || id === stick.id)) {
     stick.active = false; stick.id = null; stick.dx = 0; stick.dy = 0;
     stickInput.left = stickInput.right = stickInput.up = stickInput.down = false;
   }
-  if (shootBtn.active && id === shootBtn.id) {
+  if (shootBtn.active && (id == null || id === shootBtn.id)) {
     shootBtn.active = false; shootBtn.id = null; shootBtn.pressed = false;
   }
-  if (touchActive && id === touchId) {
+  if (!touchActive) return;
+  if (!hard) { touchId = null; return; } // 捕获丢失/指针被取消：保留拖动，等 touchmove 接续
+  // 只有拖动手指本身抬起、鼠标抬起或屏幕已无触点时才结束拖动（避免副手指误伤）
+  if (id == null || id === touchId || pointerType === 'mouse' || activeTouchCount === 0) {
     touchActive = false; touchId = null;
   }
 }
 
-ta.addEventListener('pointerup', e => releaseTouchPointer(e.pointerId));
-ta.addEventListener('pointercancel', e => releaseTouchPointer(e.pointerId));
-ta.addEventListener('lostpointercapture', e => releaseTouchPointer(e.pointerId));
+ta.addEventListener('pointerup', e => {
+  releaseTouchPointer(e.pointerId, true, e.pointerType);
+  if (e.pointerType !== 'mouse') {
+    setTimeout(() => { if (!activeTouchCount) releaseTouchPointer(null, true); }, 400);
+  }
+});
+ta.addEventListener('lostpointercapture', e => releaseTouchPointer(e.pointerId, false));
+// 指针流被取消时手指往往还在屏幕上，先保留拖动状态，并用短定时器兜底
+ta.addEventListener('pointercancel', e => {
+  releaseTouchPointer(e.pointerId, false);
+  setTimeout(() => { if (!activeTouchCount) releaseTouchPointer(null, true); }, 400);
+});
+// 原始触摸流的结束信号：此时手指确实离开了屏幕
+ta.addEventListener('touchend', e => {
+  activeTouchCount = e.touches.length;
+  if (!activeTouchCount) releaseTouchPointer(null, true);
+}, {passive:false});
+ta.addEventListener('touchcancel', e => {
+  activeTouchCount = 0;
+  releaseTouchPointer(null, true);
+}, {passive:false});
 // 兜底：指针在窗口外抬起 / 切后台时清理残留输入
-window.addEventListener('pointerup', e => releaseTouchPointer(e.pointerId));
+window.addEventListener('pointerup', e => releaseTouchPointer(e.pointerId, true, e.pointerType));
 window.addEventListener('blur', () => { resetInput(); pauseIfPlaying(); });
 // 禁止长按菜单、双指缩放等浏览器手势抢走触控
 ta.addEventListener('contextmenu', e => e.preventDefault());
@@ -2069,11 +2139,10 @@ const PERF_PROFILES = {
       { quality: 'low', dpr: 1.0 },
     ],
   },
-  // 夸克/UC：合成器回退比微信更慢，直接按低端机起步
+  // 夸克/UC：合成器回退比微信更慢，直接按低端机起步（1.0 DPR 换取帧率）
   quark: {
     start: 0, maxIndex: 0,
     tiers: [
-      { quality: 'low', dpr: 1.25 },
       { quality: 'low', dpr: 1.0 },
     ],
   },
@@ -2311,7 +2380,7 @@ window.addEventListener('popstate', () => {
 });
 
 function movePlayerTo(cx, cy) {
-  const rect = canvas.getBoundingClientRect();
+  const rect = canvasRect;
   const pb = GAME_CONFIG.playerBounds;
   // 手指偏移：让机体停在触点上方，避免 Boss 战时机体被拇指完全遮住
   const lift = GAME_CONFIG.touch.dragOffsetY || 0;
@@ -16550,7 +16619,7 @@ function resetInput() {
   bombKeyDown = false;
   inputPolarity = false;
   polarityKeyDown = false;
-  touchActive = false; touchId = null;
+  touchActive = false; touchId = null; activeTouchCount = 0;
   stick.active = false; stick.id = null; stick.dx = 0; stick.dy = 0;
   shootBtn.active = false; shootBtn.id = null; shootBtn.pressed = false;
 }
