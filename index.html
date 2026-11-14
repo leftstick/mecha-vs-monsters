@@ -636,11 +636,11 @@ const DIFFICULTIES = [
     desc: '标准难度，适合首次通关', enemySpeed: 1.00, enemyFire: 1.00,
     bulletSpeed: 1.00, bossHp: 1.00, bossRate: 1.00, maxBullets: 1.00, scoreMult: 1.00, alloyMult: 1.00 },
   { id: 1, name: '困难', short: 'HARD', color: '#ffb347',
-    desc: '弹速与射速提升，Boss 更耐打', enemySpeed: 1.04, enemyFire: 1.08,
-    bulletSpeed: 1.06, bossHp: 1.12, bossRate: 1.06, maxBullets: 1.05, scoreMult: 1.25, alloyMult: 1.25 },
+    desc: '敌人更凶，Boss 出招更快、更耐打', enemySpeed: 1.07, enemyFire: 1.18,
+    bulletSpeed: 1.10, bossHp: 1.32, bossRate: 1.16, maxBullets: 1.10, scoreMult: 1.25, alloyMult: 1.25 },
   { id: 2, name: '噩梦', short: 'NIGHTMARE', color: '#ff5566',
-    desc: '高压弹幕，只有一条命的空间', enemySpeed: 1.08, enemyFire: 1.15,
-    bulletSpeed: 1.12, bossHp: 1.25, bossRate: 1.12, maxBullets: 1.10, scoreMult: 1.60, alloyMult: 1.55 },
+    desc: '弹幕与节奏全面高压，容错极低', enemySpeed: 1.13, enemyFire: 1.32,
+    bulletSpeed: 1.22, bossHp: 1.62, bossRate: 1.32, maxBullets: 1.24, scoreMult: 1.70, alloyMult: 1.60 },
 ];
 function getDifficulty(d) {
   const i = clamp(d === undefined ? (game.difficulty | 0) : (d | 0), 0, DIFFICULTIES.length - 1);
@@ -663,6 +663,42 @@ function getBalance() {
   };
   _balanceCache = { key, val };
   return val;
+}
+
+/* ==================== Boss 耐久（防秒杀） ==================== */
+// 旧版 Boss 血量是固定值，而玩家火力会随「永久改装 + 武器 + 僚机」成倍增长，
+// 满改装下 DPS 可翻 6~8 倍，导致 Boss 一进场就被融化。
+// 现在按“当前实际 DPS × 期望战斗时长”反推血量：无论练度如何，Boss 战都稳定在
+// 12~20 秒量级，再由难度倍率整体放大。
+function estimatePlayerDps() {
+  const w = player.weapon;
+  const base = w === 'laser' ? 2 / 0.08
+             : w === 'shotgun' ? 5 / 0.28
+             : w === 'rocket' ? 9 / 0.35
+             : 1 / CFG.fireInterval;
+  const dmg = player.dmgMult || 1;
+  const rate = 1 / (player.fireRateMult || 1);
+  const crit = 1 + critChance() * (GAME_CONFIG.crit.mult - 1);
+  const aim = 0.72; // 弹幕游戏实战命中率折扣
+  let dps = base * dmg * rate * crit * aim;
+  const perWing = (w === 'laser' ? 1.2 / 0.2
+                 : w === 'shotgun' ? 1.8 / 0.55
+                 : w === 'rocket' ? 1.8 / 0.7
+                 : 0.7 / 0.34) * (player.wingDmgMult || 1) * crit * aim;
+  dps += (player.wingmen ? player.wingmen.length : 0) * perWing;
+  return Math.max(4, dps);
+}
+function calcBossHp(type) {
+  const cfg = BOSS_TYPES[type];
+  const diff = getDifficulty();
+  // 期望战斗时长随关卡缓慢增长，难度只放大血量
+  const fightSeconds = 12 + (game.level | 0) * 0.65;
+  const dynamicHp = estimatePlayerDps() * fightSeconds;
+  return Math.round(Math.max(cfg.hp, dynamicHp) * diff.bossHp);
+}
+// 小怪血量倍率：困难/噩梦的杂兵更耐打，避免只有 Boss 变强、清杂依旧无压力
+function diffEnemyHpScale() {
+  return [1.00, 1.18, 1.40][clamp(game.difficulty | 0, 0, 2)] || 1;
 }
 
 /* ==================== 战斗手感参数 ==================== */
@@ -2470,9 +2506,10 @@ function spawnWave(wave) {
     // 确保生成位置在屏幕水平范围内
     x = clamp(x, sp.marginX, W - sp.marginX);
     const shootInt = cfg.shoot ? cfg.shootInterval / bal.enemyFire : 0;
+    const _mhp = Math.round(cfg.hp * diffEnemyHpScale());
     const mm = {
       type: wave.type, x, y, vx, vy,
-      hp: cfg.hp, maxHp: cfg.hp,
+      hp: _mhp, maxHp: _mhp,
       size: cfg.size, score: cfg.score,
       shootCD: cfg.shoot ? rand(0.5, shootInt) : 0,
       shootInterval: shootInt,
@@ -2555,8 +2592,7 @@ function positionBossBar() {
 
 function spawnBoss(type) {
   const cfg = BOSS_TYPES[type];
-  const diff = getDifficulty();
-  const bossHp = Math.round(cfg.hp * diff.bossHp);
+  const bossHp = calcBossHp(type);
   game.boss = {
     type, x: W / 2, y: -150,
     hp: bossHp, maxHp: bossHp,
@@ -3229,7 +3265,7 @@ function triggerBossIntro(type) {
     const cfg = BOSS_TYPES[type];
     document.getElementById('bossIntroName').textContent = cfg.name;
     document.getElementById('bossIntroDesc').textContent = cfg.desc;
-    document.getElementById('bossIntroHP').textContent = Math.round(cfg.hp * getDifficulty().bossHp);
+    document.getElementById('bossIntroHP').textContent = calcBossHp(type);
     document.getElementById('bossIntroLv').textContent = '第 ' + (game.level + 1) + ' 关 · ' + LEVELS[game.level].name;
     // 先显示 overlay，再画头像（即使头像失败也能看到预告界面）
     document.getElementById('ovBossIntro').classList.remove('hidden');
@@ -10360,7 +10396,7 @@ const ATTACK_LIB = {
     const count = o.count || 16;
     const gapStart = o.gapStart || 0;
     const gapCount = o.gapCount || 0;
-    const speed = o.speed || 140;
+    const speed = (o.speed || 140) * bossAttackSpeedScale();
     const pol = attackPolarity(o);
     // x/y 省略时以 Boss 当前位置为圆心，剧本招式无需重复写坐标
     const ox = o.x == null ? (game.boss ? game.boss.x : W / 2) : o.x;
@@ -10380,7 +10416,7 @@ const ATTACK_LIB = {
   },
   lanes(o) {
     const shots = o.shots || 3;
-    const speed = o.speed || 170;
+    const speed = (o.speed || 170) * bossAttackSpeedScale();
     const xs = o.xs || [];
     for (let i = 0; i < xs.length; i++) {
       if (i === o.gapIndex) continue;
@@ -10400,7 +10436,7 @@ const ATTACK_LIB = {
     const count = o.count || 5;
     const spread = o.spread || 0.16;
     const center = (count - 1) / 2;
-    const speed = o.speed || 170;
+    const speed = (o.speed || 170) * bossAttackSpeedScale();
     const pol = attackPolarity(o);
     const ox = o.x == null ? (game.boss ? game.boss.x : W / 2) : o.x;
     const oy = o.y == null ? (game.boss ? game.boss.y : H * 0.2) : o.y;
@@ -10421,6 +10457,7 @@ const ATTACK_LIB = {
   },
   markers(o) {
     const angles = o.angles;
+    const mSpeed = (o.speed || 150) * bossAttackSpeedScale();
     for (const p of (o.points || [])) {
       const x = W * p.fx, y = p.y == null ? -24 : p.y;
       const list = angles || (() => {
@@ -10433,14 +10470,57 @@ const ATTACK_LIB = {
       for (const ang of list) {
         const b = {
           x, y,
-          vx: Math.cos(ang) * (o.speed || 150),
-          vy: Math.sin(ang) * (o.speed || 150),
+          vx: Math.cos(ang) * mSpeed,
+          vy: Math.sin(ang) * mSpeed,
           color: o.color || '#ffaa44', radius: o.radius || 6,
           delay: (o.delay || 0) + (p.delay || 0),
         };
         if (o.homing) b.homing = o.homing;
         if (o.coverOnLand) b.coverOnLand = true;
         game.enemyBullets.push(b);
+      }
+    }
+  },
+  // 移动缺口墙：整排横墙自上而下压来，只在指定列留出固定通道。
+  // 玩法意义明确——玩家必须提前移动到通道，而不是原地挨打。
+  sweep(o) {
+    const rows = o.rows || 3;
+    const spacing = o.spacing || 36;
+    const gapW = o.gapW == null ? W * 0.24 : o.gapW;
+    const gapX = W * (o.gapFx == null ? 0.5 : o.gapFx);
+    const rowGap = o.rowGap == null ? 54 : o.rowGap;
+    const speed = (o.speed || 155) * bossAttackSpeedScale();
+    const startY = o.y == null ? -26 : o.y;
+    for (let r = 0; r < rows; r++) {
+      for (let x = spacing * 0.5; x < W + spacing; x += spacing) {
+        if (Math.abs(x - gapX) <= gapW * 0.5) continue;
+        game.enemyBullets.push({
+          x, y: startY - r * rowGap,
+          vx: 0, vy: speed,
+          color: o.color || '#9fe8ff', radius: o.radius || 5,
+        });
+      }
+    }
+  },
+  // 旋转螺旋：多条旋臂按固定角速度依次吐出，臂与臂之间是可穿行的通道。
+  spiral(o) {
+    const arms = o.arms || 3;
+    const per = o.per || 3;
+    const step = o.step || 0.1;
+    const twist = o.twist == null ? 0.26 : o.twist;
+    const speed = (o.speed || 145) * bossAttackSpeedScale();
+    const ox = o.x == null ? (game.boss ? game.boss.x : W / 2) : o.x;
+    const oy = o.y == null ? (game.boss ? game.boss.y : H * 0.2) : o.y;
+    const rot0 = o.rotate || 0;
+    for (let k = 0; k < per; k++) {
+      for (let a = 0; a < arms; a++) {
+        const ang = rot0 + a * (Math.PI * 2 / arms) + k * twist;
+        game.enemyBullets.push({
+          x: ox, y: oy,
+          vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed,
+          color: o.color || '#c79bff', radius: o.radius || 5,
+          delay: k * step,
+        });
       }
     }
   },
@@ -10517,6 +10597,33 @@ function drawTelegraphs() {
       ctx.moveTo(t.x, 0); ctx.lineTo(t.x, H);
       ctx.stroke();
       ctx.setLineDash([]);
+    } else if (t.kind === 'hband') {
+      // 横向推进警示带：告诉玩家“整排弹幕会从上方压下来”
+      const y0 = t.y || 0;
+      const h = t.h || 96;
+      const g = ctx.createLinearGradient(0, y0, 0, y0 + h);
+      g.addColorStop(0, hexToRgba(color, 0.42));
+      g.addColorStop(1, hexToRgba(color, 0));
+      ctx.globalAlpha = 0.42 + 0.35 * k;
+      ctx.fillStyle = g;
+      ctx.fillRect(0, y0, W, h);
+      ctx.globalAlpha = 0.75;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([16, 12]);
+      ctx.lineDashOffset = now * 90;
+      ctx.beginPath();
+      ctx.moveTo(0, y0 + h); ctx.lineTo(W, y0 + h);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      if (t.label) {
+        ctx.globalAlpha = 0.9;
+        ctx.font = 'bold 12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#cfefff';
+        ctx.fillText(t.label, W * 0.5, y0 + 16);
+        ctx.textAlign = 'left';
+      }
     } else if (t.kind === 'fan') {
       // 扇形：每条危险方向画粗线，中间缺口用蓝色标出
       const count = t.count || 5;
@@ -10764,6 +10871,11 @@ function fireVolleyGroup(members, st) {
 /* ==================== Boss 预警 / 特殊攻击 ==================== */
 function bossBulletScale() {
   return 0.94 + game.level * 0.025; // 第 1 关 0.965 → 第 10 关 1.19
+}
+// 剧本招式弹速倍率：难度越高弹速越快，狂暴再叠一层
+function bossAttackSpeedScale() {
+  const d = getDifficulty();
+  return d.bulletSpeed * (game.boss && game.boss.enraged ? 1.08 : 1);
 }
 
 /* ==================== Boss 攻击剧本 ==================== */
@@ -11510,6 +11622,39 @@ const BOSS_SCRIPTS = {
   },
 };
 
+/* ==================== 通用机制招式 ==================== */
+// 16 个 Boss 共用两种“必须走位”的招式，注入到各自卡组：
+//   sweepWall   横向弹墙 + 单一固定通道（强制横向移动）
+//   spiralArms  旋转螺旋臂（强制绕行，而不是站桩输出）
+// 这样每个 Boss 的循环里都同时存在「弹幕/轨道/扇射/走位机制」，不再是纯弹幕堆叠。
+const COMMON_BOSS_PATTERNS = {
+  sweepWall: {
+    station: 'center', tele: 0.95, recover: 1.05,
+    steps: [{ t: 0, emit: 'sweep', args: { rows: 3, gapFx: 0.30, spacing: 36, rowGap: 58, speed: 158 } }],
+  },
+  sweepWallAlt: {
+    station: 'right', tele: 0.95, recover: 1.05,
+    steps: [{ t: 0, emit: 'sweep', args: { rows: 3, gapFx: 0.70, spacing: 36, rowGap: 58, speed: 158 } }],
+  },
+  spiralArms: {
+    station: 'center', tele: 0.92, recover: 1.0,
+    steps: [{ t: 0, emit: 'spiral', args: { arms: 3, per: 4, step: 0.10, twist: 0.30, speed: 140, rotate: Math.PI / 2 } }],
+  },
+  spiralArmsFast: {
+    station: 'center', tele: 0.82, recover: 0.95,
+    steps: [{ t: 0, emit: 'spiral', args: { arms: 4, per: 4, step: 0.09, twist: -0.34, speed: 152, rotate: 0 } }],
+  },
+};
+for (const key of Object.keys(BOSS_SCRIPTS)) {
+  const script = BOSS_SCRIPTS[key];
+  Object.assign(script.patterns, COMMON_BOSS_PATTERNS);
+  const first = script.phases[0];
+  const last = script.phases[script.phases.length - 1];
+  // 一阶段至少混入一次螺旋，终阶段混入弹墙；避免同一套招式循环到死
+  if (!first.deck.includes('spiralArms')) first.deck.push('spiralArms');
+  if (!last.deck.includes('sweepWall') && !last.deck.includes('sweepWallAlt')) last.deck.push('sweepWall');
+}
+
 function showBossPatternTelegraph(b, pat) {
   // 动态锁定类招式（预判轨道、引力井、召唤点）由招式自己铺预警
   if (pat.onTele) { pat.onTele(b, pat); return; }
@@ -11549,6 +11694,20 @@ function showBossPatternTelegraph(b, pat) {
       spread: a.spread || 0.18, count: a.count || 5, skipIndex: a.skipIndex,
       life: pat.tele,
       color: (a.polFromBoss && b) ? POLAR_COLOR[b.polarity] : (a.color || '#ff8844'),
+    });
+  } else if (step.emit === 'sweep') {
+    // 弹墙：顶部画推进警示带，同时高亮唯一的固定通道
+    const gapW = a.gapW == null ? W * 0.24 : a.gapW;
+    pushTelegraph({ kind: 'hband', y: 0, h: 104, life: pat.tele, color: a.color || '#9fe8ff', label: '弹墙推进' });
+    pushTelegraph({
+      kind: 'safe', x: W * (a.gapFx == null ? 0.5 : a.gapFx), w: gapW,
+      life: pat.tele, color: '#7ef0ff', label: '通道',
+    });
+  } else if (step.emit === 'spiral') {
+    pushTelegraph({
+      kind: 'ring', x: b.x, y: b.y, r: Math.min(W * 0.44, 200),
+      count: (a.arms || 3) * 2, gapCount: 0, rotate: a.rotate || 0,
+      life: pat.tele, color: a.color || '#c79bff',
     });
   }
 }
@@ -11826,6 +11985,9 @@ function updateBossScript(b, dt) {
   else if (b.type === 'swarmmother') updateSwarmCore(b, dt);
 
   const mv = BOSS_MOTION[b.type] || BOSS_MOTION.default;
+  // 难度节奏：困难/噩梦缩短走位、预警与恢复时间，并加快多段招式的发弹间隔
+  const pace = Math.max(0.8, getDifficulty().bossRate || 1);
+  const stepPace = Math.min(1.3, pace);
 
   // 冲撞招式：预警后沿锁定方向推进，接近终点或越界时停止
   if (b.charging) {
@@ -11870,7 +12032,7 @@ function updateBossScript(b, dt) {
     s.moveK = tgt.k || mv.k || 4;
     s.moveT = 0;
     s.warpDone = false;
-    s.timer = mv.move || 0.7;
+    s.timer = (mv.move || 0.7) / pace;
     clearBossTelegraphs();
     return;
   }
@@ -11890,7 +12052,7 @@ function updateBossScript(b, dt) {
         s.warpDone = true;
       }
     } else {
-      const k = Math.min(1, (s.moveK || 4) * dt);
+      const k = Math.min(1, (s.moveK || 4) * pace * dt);
       b.x += (s.tx - b.x) * k;
       b.y += (s.ty - b.y) * k;
       spawnBossMotionFx(b, mv, dt);
@@ -11906,9 +12068,9 @@ function updateBossScript(b, dt) {
       s.tx = b.x; s.ty = b.y;
       bossMotionArrive(b, mv);
       s.phase = 'tele';
-      s.timer = s.pattern.tele;
-      b.teleMax = s.pattern.tele;
-      b.tele = s.pattern.tele;
+      s.timer = Math.max(0.55, s.pattern.tele / pace);
+      b.teleMax = s.timer;
+      b.tele = s.timer;
       b.teleKind = null;
       showBossPatternTelegraph(b, s.pattern);
       sfx('charge');
@@ -11929,7 +12091,7 @@ function updateBossScript(b, dt) {
   }
 
   if (s.phase === 'fire') {
-    s.stepT += dt;
+    s.stepT += dt * stepPace;
     while (s.step < s.pattern.steps.length && s.stepT >= s.pattern.steps[s.step].t) {
       const step = s.pattern.steps[s.step];
       if (step.emit === 'special') {
@@ -11942,7 +12104,7 @@ function updateBossScript(b, dt) {
     }
     if (s.step >= s.pattern.steps.length) {
       s.phase = 'recover';
-      s.timer = s.pattern.recover;
+      s.timer = Math.max(0.35, s.pattern.recover / pace);
     }
     return;
   }
@@ -13155,10 +13317,11 @@ function spawnTrickle(lv) {
   for (let i = 0; i < count; i++) {
     const x = clamp(rand(W * 0.15, W * 0.85), sp.marginX, W - sp.marginX);
     const shootInt = cfg.shoot ? cfg.shootInterval / bal.enemyFire : 0;
+    const _thp = Math.round(cfg.hp * diffEnemyHpScale());
     game.monsters.push({
       type, x, y: clamp(sp.minY - i * 40, sp.maxY, sp.minY),
       vx: rand(-30, 30) * bal.enemySpeed, vy: cfg.speed * CFG.baseMonsterSpeed * bal.enemySpeed,
-      hp: cfg.hp, maxHp: cfg.hp, size: cfg.size, score: cfg.score,
+      hp: _thp, maxHp: _thp, size: cfg.size, score: cfg.score,
       shootCD: cfg.shoot ? rand(0.5, shootInt) : 0, shootInterval: shootInt,
       groupId, fireRole: fireRoleFor(type),
       t: Math.random() * Math.PI * 2, t0: Math.random() * Math.PI * 2, pattern: 'wave', phase: 'enter',
